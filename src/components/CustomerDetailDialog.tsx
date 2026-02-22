@@ -3,9 +3,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, ExternalLink, Copy, CheckCircle2, Clock } from "lucide-react";
+import { Loader2, ExternalLink, Copy, CheckCircle2, Clock, Import } from "lucide-react";
 import { toast } from "sonner";
 import type { Customer } from "@/hooks/useCustomers";
 import type { Invoice } from "@/hooks/useInvoices";
@@ -19,27 +19,68 @@ interface Props {
 export default function CustomerDetailDialog({ open, onOpenChange, customer }: Props) {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(false);
+  const [checkingEfi, setCheckingEfi] = useState(false);
+
+  const fetchInvoices = useCallback(() => {
+    if (!customer) return;
+    setLoading(true);
+    supabase
+      .from("invoices")
+      .select("*")
+      .eq("customer_id", customer.id)
+      .order("vencimento", { ascending: false })
+      .then(({ data, error }) => {
+        if (error) {
+          toast.error("Erro ao carregar faturas");
+        } else {
+          setInvoices(data as Invoice[]);
+        }
+        setLoading(false);
+      });
+  }, [customer]);
 
   useEffect(() => {
     if (open && customer) {
-      setLoading(true);
-      supabase
-        .from("invoices")
-        .select("*")
-        .eq("customer_id", customer.id)
-        .order("vencimento", { ascending: false })
-        .then(({ data, error }) => {
-          if (error) {
-            toast.error("Erro ao carregar faturas");
-          } else {
-            setInvoices(data as Invoice[]);
-          }
-          setLoading(false);
-        });
+      fetchInvoices();
     } else {
       setInvoices([]);
     }
-  }, [open, customer]);
+  }, [open, customer, fetchInvoices]);
+
+  const handleCheckEfi = async () => {
+    if (!customer) return;
+    setCheckingEfi(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      if (!token) { toast.error("Sessão expirada"); setCheckingEfi(false); return; }
+
+      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+      const response = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/efi-boleto/check-customer?customer_id=${customer.id}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+        }
+      );
+
+      const result = await response.json();
+      if (!response.ok) {
+        toast.error(result.error || "Erro ao consultar EFI");
+      } else {
+        toast.success(`Encontrados: ${result.total_found} | Importados: ${result.imported} | Já existentes: ${result.skipped}`);
+        if (result.imported > 0) {
+          fetchInvoices();
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Erro ao consultar cobranças na EFI");
+    }
+    setCheckingEfi(false);
+  };
 
   if (!customer) return null;
 
@@ -110,6 +151,12 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer }: P
           </div>
           <div className="text-muted-foreground">
             {invoices.length} fatura{invoices.length !== 1 ? "s" : ""}
+          </div>
+          <div className="ml-auto">
+            <Button variant="outline" size="sm" disabled={checkingEfi} onClick={handleCheckEfi}>
+              {checkingEfi ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Import className="mr-1.5 h-3.5 w-3.5" />}
+              Consultar EFI
+            </Button>
           </div>
         </div>
 
