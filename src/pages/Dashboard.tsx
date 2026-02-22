@@ -8,6 +8,7 @@ import CustomerFormDialog from "@/components/CustomerFormDialog";
 import CSVImportDialog from "@/components/CSVImportDialog";
 import InvoiceTable from "@/components/InvoiceTable";
 import CreateBoletoDialog from "@/components/CreateBoletoDialog";
+import CustomerDetailDialog from "@/components/CustomerDetailDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -26,6 +27,7 @@ export default function Dashboard() {
   const [deletingCustomer, setDeletingCustomer] = useState<Customer | null>(null);
   const [boletoOpen, setBoletoOpen] = useState(false);
   const [csvImportOpen, setCsvImportOpen] = useState(false);
+  const [detailCustomer, setDetailCustomer] = useState<Customer | null>(null);
   const [importing, setImporting] = useState(false);
 
   if (authLoading) {
@@ -139,7 +141,7 @@ export default function Dashboard() {
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
               </div>
             ) : (
-              <CustomerTable customers={customers} onEdit={handleEdit} onDelete={setDeletingCustomer} onToggleActive={toggleCustomerActive} />
+              <CustomerTable customers={customers} onEdit={handleEdit} onDelete={setDeletingCustomer} onToggleActive={toggleCustomerActive} onDetail={setDetailCustomer} />
             )}
           </TabsContent>
 
@@ -218,6 +220,13 @@ export default function Dashboard() {
         onOpenChange={setCsvImportOpen}
         onImport={bulkImport}
         existingCpfs={customers.map((c) => c.cpf)}
+      />
+
+      {/* Customer Detail */}
+      <CustomerDetailDialog
+        open={!!detailCustomer}
+        onOpenChange={(open) => !open && setDetailCustomer(null)}
+        customer={detailCustomer}
       />
 
       {/* Delete confirmation */}
