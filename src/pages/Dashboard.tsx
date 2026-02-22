@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useCustomers } from "@/hooks/useCustomers";
 import { useInvoices } from "@/hooks/useInvoices";
+import { usePlans } from "@/hooks/usePlans";
 import type { Customer } from "@/hooks/useCustomers";
 import CustomerTable from "@/components/CustomerTable";
 import CustomerFormDialog from "@/components/CustomerFormDialog";
@@ -13,14 +14,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Wifi, Plus, Search, Download, LogOut, Loader2, ShieldAlert, FileText, Import, Settings as SettingsIcon, Upload } from "lucide-react";
+import { Wifi, Plus, Search, Download, LogOut, Loader2, ShieldAlert, FileText, Import, Settings as SettingsIcon, Upload, AlertTriangle, Zap, Filter } from "lucide-react";
 import { Navigate, useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 
 export default function Dashboard() {
   const { user, isAdmin, loading: authLoading, signOut } = useAuth();
   const navigate = useNavigate();
   const { customers, loading, searchTerm, setSearchTerm, addCustomer, updateCustomer, deleteCustomer, toggleCustomerActive, exportCSV, bulkImport } = useCustomers();
-  const { invoices, loading: invoicesLoading, invoiceSearch, setInvoiceSearch, createBoleto, checkPayment, cancelInvoice, importFromEfi } = useInvoices();
+  const { invoices, allInvoices, loading: invoicesLoading, invoiceSearch, setInvoiceSearch, createBoleto, checkPayment, cancelInvoice, importFromEfi, refetch: refetchInvoices } = useInvoices();
+  const { plans } = usePlans();
 
   const [formOpen, setFormOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
@@ -29,6 +32,32 @@ export default function Dashboard() {
   const [csvImportOpen, setCsvImportOpen] = useState(false);
   const [detailCustomer, setDetailCustomer] = useState<Customer | null>(null);
   const [importing, setImporting] = useState(false);
+  const [filterNoBoleto, setFilterNoBoleto] = useState(false);
+  const [bulkGenerating, setBulkGenerating] = useState(false);
+
+  // Compute which customers have invoices this month
+  const customerIdsWithInvoiceThisMonth = useMemo(() => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    const ids = new Set<string>();
+    for (const inv of allInvoices) {
+      if (inv.status === "cancelled") continue;
+      const d = new Date(inv.vencimento + "T12:00:00");
+      if (d.getFullYear() === year && d.getMonth() === month) {
+        ids.add(inv.customer_id);
+      }
+    }
+    return ids;
+  }, [allInvoices]);
+
+  const activeCustomersWithoutBoleto = useMemo(() => {
+    return customers.filter(c => c.ativo && !customerIdsWithInvoiceThisMonth.has(c.id));
+  }, [customers, customerIdsWithInvoiceThisMonth]);
+
+  const displayedCustomers = filterNoBoleto
+    ? customers.filter(c => !customerIdsWithInvoiceThisMonth.has(c.id))
+    : customers;
 
   if (authLoading) {
     return (
@@ -111,6 +140,62 @@ export default function Dashboard() {
 
           {/* Customers Tab */}
           <TabsContent value="customers" className="space-y-4">
+            {/* Alert for customers without boleto */}
+            {activeCustomersWithoutBoleto.length > 0 && !loading && (
+              <div className="flex items-center gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-3">
+                <AlertTriangle className="h-5 w-5 text-destructive shrink-0" />
+                <div className="flex-1 text-sm">
+                  <strong>{activeCustomersWithoutBoleto.length}</strong> cliente{activeCustomersWithoutBoleto.length !== 1 ? "s" : ""} ativo{activeCustomersWithoutBoleto.length !== 1 ? "s" : ""} sem boleto emitido no mês atual.
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setFilterNoBoleto(!filterNoBoleto)}
+                  >
+                    <Filter className="mr-1.5 h-3.5 w-3.5" />
+                    {filterNoBoleto ? "Mostrar todos" : "Filtrar"}
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    disabled={bulkGenerating || plans.length === 0}
+                    onClick={async () => {
+                      if (plans.length === 0) {
+                        toast.error("Cadastre pelo menos um plano antes de gerar boletos em lote");
+                        return;
+                      }
+                      const defaultPlan = plans.find(p => p.ativo) || plans[0];
+                      const now = new Date();
+                      const vencimento = new Date(now.getFullYear(), now.getMonth() + 1, 10).toISOString().slice(0, 10);
+                      const mesNome = now.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+
+                      setBulkGenerating(true);
+                      let success = 0;
+                      let failed = 0;
+                      for (const c of activeCustomersWithoutBoleto) {
+                        const ok = await createBoleto({
+                          customer_id: c.id,
+                          descricao: `Mensalidade Internet - ${mesNome}`,
+                          valor_centavos: defaultPlan.valor_centavos,
+                          vencimento,
+                          plan_id: defaultPlan.id,
+                        });
+                        if (ok) success++;
+                        else failed++;
+                      }
+                      setBulkGenerating(false);
+                      toast.success(`Boletos gerados: ${success} sucesso, ${failed} falha(s)`);
+                      refetchInvoices();
+                    }}
+                  >
+                    {bulkGenerating ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Zap className="mr-1.5 h-3.5 w-3.5" />}
+                    Gerar em lote
+                  </Button>
+                </div>
+              </div>
+            )}
+
             <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
               <div className="relative w-full sm:max-w-sm">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -134,14 +219,21 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="flex items-center gap-4 text-sm text-muted-foreground">
-              <span>{customers.length} cliente{customers.length !== 1 ? "s" : ""} cadastrado{customers.length !== 1 ? "s" : ""}</span>
+              <span>{displayedCustomers.length} cliente{displayedCustomers.length !== 1 ? "s" : ""}{filterNoBoleto ? " sem boleto" : " cadastrado" + (displayedCustomers.length !== 1 ? "s" : "")}</span>
             </div>
             {loading ? (
               <div className="flex justify-center py-16">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
               </div>
             ) : (
-              <CustomerTable customers={customers} onEdit={handleEdit} onDelete={setDeletingCustomer} onToggleActive={toggleCustomerActive} onDetail={setDetailCustomer} />
+              <CustomerTable
+                customers={displayedCustomers}
+                onEdit={handleEdit}
+                onDelete={setDeletingCustomer}
+                onToggleActive={toggleCustomerActive}
+                onDetail={setDetailCustomer}
+                customerIdsWithInvoice={customerIdsWithInvoiceThisMonth}
+              />
             )}
           </TabsContent>
 
