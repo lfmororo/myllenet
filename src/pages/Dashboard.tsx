@@ -10,12 +10,13 @@ import CSVImportDialog from "@/components/CSVImportDialog";
 import InvoiceCSVImportDialog from "@/components/InvoiceCSVImportDialog";
 import InvoiceTable from "@/components/InvoiceTable";
 import CreateBoletoDialog from "@/components/CreateBoletoDialog";
+import NoInvoiceNotificationDialog from "@/components/NoInvoiceNotificationDialog";
 import CustomerDetailDialog from "@/components/CustomerDetailDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Wifi, Plus, Search, Download, LogOut, Loader2, ShieldAlert, FileText, Import, Settings as SettingsIcon, Upload, AlertTriangle, Zap, Filter, RefreshCw } from "lucide-react";
+import { Wifi, Plus, Search, Download, LogOut, Loader2, ShieldAlert, FileText, Import, Settings as SettingsIcon, Upload, AlertTriangle, Zap, Filter, RefreshCw, MessageCircle } from "lucide-react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -36,6 +37,7 @@ export default function Dashboard() {
   const [invoiceCsvImportOpen, setInvoiceCsvImportOpen] = useState(false);
   const [importing, setImporting] = useState(false);
   const [filterNoBoleto, setFilterNoBoleto] = useState(false);
+  const [notifyNoBoletoOpen, setNotifyNoBoletoOpen] = useState(false);
   const [bulkGenerating, setBulkGenerating] = useState(false);
   const [bulkCheckingEfi, setBulkCheckingEfi] = useState(false);
   const [bulkCheckProgress, setBulkCheckProgress] = useState({ done: 0, total: 0, imported: 0 });
@@ -152,6 +154,14 @@ export default function Dashboard() {
                   <strong>{activeCustomersWithoutBoleto.length}</strong> cliente{activeCustomersWithoutBoleto.length !== 1 ? "s" : ""} ativo{activeCustomersWithoutBoleto.length !== 1 ? "s" : ""} sem boleto emitido no mês atual.
                 </div>
                 <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setNotifyNoBoletoOpen(true)}
+                  >
+                    <MessageCircle className="mr-1.5 h-3.5 w-3.5" />
+                    Notificar
+                  </Button>
                   <Button
                     variant="outline"
                     size="sm"
@@ -446,6 +456,13 @@ export default function Dashboard() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* No Invoice Notification */}
+      <NoInvoiceNotificationDialog
+        open={notifyNoBoletoOpen}
+        onOpenChange={setNotifyNoBoletoOpen}
+        customers={activeCustomersWithoutBoleto}
+      />
     </div>
   );
 }
