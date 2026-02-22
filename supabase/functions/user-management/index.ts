@@ -60,6 +60,7 @@ async function listUsers(req: Request) {
     id: u.id,
     email: u.email,
     full_name: profilesMap.get(u.id) || u.user_metadata?.full_name || "",
+    phone: u.user_metadata?.phone || u.phone || "",
     role: rolesMap.get(u.id) || "user",
     created_at: u.created_at,
     last_sign_in_at: u.last_sign_in_at,
@@ -72,7 +73,7 @@ async function listUsers(req: Request) {
 
 async function createUser(req: Request) {
   await verifyAdmin(req.headers.get("Authorization"));
-  const { email, password, full_name, role } = await req.json();
+  const { email, password, full_name, role, phone } = await req.json();
 
   if (!email || !password) {
     return new Response(JSON.stringify({ error: "Email e senha obrigatórios" }), {
@@ -86,7 +87,8 @@ async function createUser(req: Request) {
     email,
     password,
     email_confirm: true,
-    user_metadata: { full_name: full_name || email },
+    phone: phone || undefined,
+    user_metadata: { full_name: full_name || email, phone: phone || "" },
   });
 
   if (createError) {
@@ -107,7 +109,7 @@ async function createUser(req: Request) {
 
 async function updateUser(req: Request) {
   await verifyAdmin(req.headers.get("Authorization"));
-  const { user_id, email, password, full_name, role } = await req.json();
+  const { user_id, email, password, full_name, role, phone } = await req.json();
 
   if (!user_id) {
     return new Response(JSON.stringify({ error: "user_id obrigatório" }), {
@@ -120,7 +122,10 @@ async function updateUser(req: Request) {
   const updateData: any = {};
   if (email) updateData.email = email;
   if (password) updateData.password = password;
-  if (full_name) updateData.user_metadata = { full_name };
+  const metadata: any = {};
+  if (full_name) metadata.full_name = full_name;
+  if (phone !== undefined) metadata.phone = phone;
+  if (Object.keys(metadata).length > 0) updateData.user_metadata = metadata;
 
   if (Object.keys(updateData).length > 0) {
     const { error } = await admin.auth.admin.updateUserById(user_id, updateData);
