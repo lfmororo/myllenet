@@ -3,8 +3,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
 import type { Customer, CustomerInput } from "@/hooks/useCustomers";
+import type { Plan } from "@/hooks/usePlans";
 
 interface Props {
   open: boolean;
@@ -12,6 +14,7 @@ interface Props {
   customer?: Customer | null;
   onSave: (data: CustomerInput) => Promise<boolean>;
   onUpdate?: (id: string, data: Partial<CustomerInput>) => Promise<boolean>;
+  plans?: Plan[];
 }
 
 const formatCPF = (value: string) => {
@@ -30,33 +33,37 @@ const formatPhone = (value: string) => {
   return digits.replace(/(\d{2})(\d)/, "($1) $2").replace(/(\d{5})(\d)/, "$1-$2");
 };
 
-export default function CustomerFormDialog({ open, onOpenChange, customer, onSave, onUpdate }: Props) {
+const formatCEP = (value: string) => {
+  const digits = value.replace(/\D/g, "").slice(0, 8);
+  return digits.replace(/(\d{5})(\d)/, "$1-$2");
+};
+
+const formatCurrency = (cents: number) =>
+  (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+export default function CustomerFormDialog({ open, onOpenChange, customer, onSave, onUpdate, plans = [] }: Props) {
   const [form, setForm] = useState<CustomerInput>({
     nome: "", cpf: "", email: "", telefone: "", usuario_pppoe: "", senha_pppoe: "",
     rua: null, numero: null, complemento: null, bairro: null, cidade: null, estado: null, cep: null,
+    dia_vencimento: 10, plan_id: null, desconto_especial_centavos: 0,
   });
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (customer) {
       setForm({
-        nome: customer.nome,
-        cpf: customer.cpf,
-        email: customer.email,
-        telefone: customer.telefone || "",
-        usuario_pppoe: customer.usuario_pppoe,
-        senha_pppoe: customer.senha_pppoe,
-        rua: customer.rua || null,
-        numero: customer.numero || null,
-        complemento: customer.complemento || null,
-        bairro: customer.bairro || null,
-        cidade: customer.cidade || null,
-        estado: customer.estado || null,
-        cep: customer.cep || null,
+        nome: customer.nome, cpf: customer.cpf, email: customer.email,
+        telefone: customer.telefone || "", usuario_pppoe: customer.usuario_pppoe, senha_pppoe: customer.senha_pppoe,
+        rua: customer.rua || null, numero: customer.numero || null, complemento: customer.complemento || null,
+        bairro: customer.bairro || null, cidade: customer.cidade || null, estado: customer.estado || null, cep: customer.cep || null,
+        dia_vencimento: customer.dia_vencimento, plan_id: customer.plan_id, desconto_especial_centavos: customer.desconto_especial_centavos,
       });
     } else {
-      setForm({ nome: "", cpf: "", email: "", telefone: "", usuario_pppoe: "", senha_pppoe: "",
-        rua: null, numero: null, complemento: null, bairro: null, cidade: null, estado: null, cep: null });
+      setForm({
+        nome: "", cpf: "", email: "", telefone: "", usuario_pppoe: "", senha_pppoe: "",
+        rua: null, numero: null, complemento: null, bairro: null, cidade: null, estado: null, cep: null,
+        dia_vencimento: 10, plan_id: null, desconto_especial_centavos: 0,
+      });
     }
   }, [customer, open]);
 
@@ -76,10 +83,7 @@ export default function CustomerFormDialog({ open, onOpenChange, customer, onSav
     if (success) onOpenChange(false);
   };
 
-  const formatCEP = (value: string) => {
-    const digits = value.replace(/\D/g, "").slice(0, 8);
-    return digits.replace(/(\d{5})(\d)/, "$1-$2");
-  };
+  const activePlans = plans.filter(p => p.ativo);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -112,6 +116,64 @@ export default function CustomerFormDialog({ open, onOpenChange, customer, onSav
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="senha_pppoe">Senha PPPoE *</Label>
               <Input id="senha_pppoe" value={form.senha_pppoe} onChange={(e) => setForm({ ...form, senha_pppoe: e.target.value })} required maxLength={50} />
+            </div>
+          </div>
+
+          {/* Faturamento */}
+          <div className="border-t pt-4">
+            <p className="text-sm font-medium mb-3 text-muted-foreground">Faturamento</p>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="plan_id">Plano</Label>
+                <Select
+                  value={form.plan_id || "none"}
+                  onValueChange={(v) => setForm({ ...form, plan_id: v === "none" ? null : v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione um plano" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Nenhum</SelectItem>
+                    {activePlans.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.nome} — {formatCurrency(p.valor_centavos)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="dia_vencimento">Dia de vencimento</Label>
+                <Select
+                  value={String(form.dia_vencimento)}
+                  onValueChange={(v) => setForm({ ...form, dia_vencimento: Number(v) })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
+                      <SelectItem key={d} value={String(d)}>{d}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="desconto_especial">Desconto especial (pagamento antecipado)</Label>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">R$</span>
+                  <Input
+                    id="desconto_especial"
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    value={(form.desconto_especial_centavos / 100).toFixed(2)}
+                    onChange={(e) => setForm({ ...form, desconto_especial_centavos: Math.round(Number(e.target.value) * 100) })}
+                    placeholder="0.00"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">Desconto adicional ao do plano para este cliente</p>
+              </div>
             </div>
           </div>
 

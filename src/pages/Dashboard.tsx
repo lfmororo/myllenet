@@ -355,6 +355,7 @@ export default function Dashboard() {
         customer={editingCustomer}
         onSave={addCustomer}
         onUpdate={updateCustomer}
+        plans={plans}
       />
 
       {/* Boleto Form */}

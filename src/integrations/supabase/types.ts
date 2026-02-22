@@ -23,11 +23,14 @@ export type Database = {
           complemento: string | null
           cpf: string
           created_at: string
+          desconto_especial_centavos: number
+          dia_vencimento: number
           email: string
           estado: string | null
           id: string
           nome: string
           numero: string | null
+          plan_id: string | null
           rua: string | null
           senha_pppoe: string
           telefone: string | null
@@ -42,11 +45,14 @@ export type Database = {
           complemento?: string | null
           cpf: string
           created_at?: string
+          desconto_especial_centavos?: number
+          dia_vencimento?: number
           email: string
           estado?: string | null
           id?: string
           nome: string
           numero?: string | null
+          plan_id?: string | null
           rua?: string | null
           senha_pppoe: string
           telefone?: string | null
@@ -61,18 +67,29 @@ export type Database = {
           complemento?: string | null
           cpf?: string
           created_at?: string
+          desconto_especial_centavos?: number
+          dia_vencimento?: number
           email?: string
           estado?: string | null
           id?: string
           nome?: string
           numero?: string | null
+          plan_id?: string | null
           rua?: string | null
           senha_pppoe?: string
           telefone?: string | null
           updated_at?: string
           usuario_pppoe?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "customers_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       invoices: {
         Row: {
