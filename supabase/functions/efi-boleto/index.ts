@@ -470,6 +470,198 @@ async function cancelCharge(req: Request) {
   }
 }
 
+async function checkCustomerCharges(req: Request) {
+  const authHeader = req.headers.get("Authorization");
+  await verifyAdmin(authHeader);
+
+  const url = new URL(req.url);
+  const customerId = url.searchParams.get("customer_id");
+  if (!customerId) {
+    return new Response(JSON.stringify({ error: "customer_id obrigatório" }), {
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const supabase = getSupabaseAdmin();
+
+  const { data: customer, error: custErr } = await supabase
+    .from("customers")
+    .select("*")
+    .eq("id", customerId)
+    .single();
+
+  if (custErr || !customer) {
+    return new Response(JSON.stringify({ error: "Cliente não encontrado" }), {
+      status: 404,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const cpf = customer.cpf.replace(/\D/g, "");
+
+  try {
+    // Search charges by CPF on EFI (billets + carnets)
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+
+    let allCharges: any[] = [];
+
+    // Fetch billets
+    let chunkStart = new Date("2020-01-01T00:00:00");
+    const finalEnd = new Date(todayStr + "T00:00:00");
+
+    while (chunkStart <= finalEnd) {
+      const chunkEnd = new Date(chunkStart);
+      chunkEnd.setFullYear(chunkEnd.getFullYear() + 1);
+      chunkEnd.setDate(chunkEnd.getDate() - 1);
+      const effectiveEnd = chunkEnd > finalEnd ? finalEnd : chunkEnd;
+
+      const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+      const bd = fmt(chunkStart);
+      const ed = fmt(effectiveEnd);
+
+      let offset = 0;
+      const limit = 100;
+      let hasMore = true;
+      while (hasMore) {
+        try {
+          const charges = await efiRequest(
+            `/v1/charges?charge_type=billet&begin_date=${bd}&end_date=${ed}&limit=${limit}&offset=${offset}`,
+            "GET"
+          );
+          const page = charges.data || charges || [];
+          if (Array.isArray(page)) {
+            // Filter by CPF
+            const matching = page.filter((c: any) => {
+              const cCpf = (c.customer?.cpf || "").replace(/\D/g, "");
+              return cCpf === cpf;
+            });
+            allCharges = allCharges.concat(matching);
+            hasMore = page.length === limit;
+          } else {
+            hasMore = false;
+          }
+        } catch (e) {
+          console.error("Error fetching charges chunk:", e);
+          hasMore = false;
+        }
+        offset += limit;
+      }
+
+      chunkStart = new Date(effectiveEnd);
+      chunkStart.setDate(chunkStart.getDate() + 1);
+    }
+
+    // Also try to fetch carnets
+    try {
+      let carnetOffset = 0;
+      let carnetHasMore = true;
+      while (carnetHasMore) {
+        try {
+          const carnets = await efiRequest(
+            `/v1/carnets?begin_date=2020-01-01&end_date=${todayStr}&limit=100&offset=${carnetOffset}`,
+            "GET"
+          );
+          const page = carnets.data || carnets || [];
+          if (Array.isArray(page)) {
+            const matching = page.filter((c: any) => {
+              const cCpf = (c.customer?.cpf || "").replace(/\D/g, "");
+              return cCpf === cpf;
+            });
+            // For carnets, each has parcels - flatten them as charges
+            for (const carnet of matching) {
+              const parcels = carnet.parcels || carnet.charges || [];
+              for (const parcel of parcels) {
+                allCharges.push({
+                  ...parcel,
+                  charge_id: parcel.charge_id || parcel.id,
+                  customer: carnet.customer,
+                  message: carnet.message || `Carnê #${carnet.carnet_id || carnet.id}`,
+                  source: "carnet",
+                });
+              }
+            }
+            carnetHasMore = page.length === 100;
+          } else {
+            carnetHasMore = false;
+          }
+        } catch (e) {
+          console.error("Error fetching carnets:", e);
+          carnetHasMore = false;
+        }
+        carnetOffset += 100;
+      }
+    } catch (e) {
+      console.error("Carnet fetch error (endpoint may not exist):", e);
+    }
+
+    // Import found charges
+    let imported = 0;
+    let skipped = 0;
+
+    for (const charge of allCharges) {
+      const chargeId = charge.charge_id || charge.id;
+      if (!chargeId) continue;
+
+      // Check if already imported
+      const { data: existing } = await supabase
+        .from("invoices")
+        .select("id")
+        .eq("efi_charge_id", chargeId)
+        .maybeSingle();
+
+      if (existing) {
+        skipped++;
+        continue;
+      }
+
+      let status = "pending";
+      if (charge.status === "paid" || charge.status === "settled") status = "paid";
+      else if (charge.status === "canceled" || charge.status === "refunded") status = "cancelled";
+      else if (charge.status === "expired" || charge.status === "unpaid") status = "overdue";
+
+      const billet = charge.payment?.banking_billet || {};
+      const value = charge.value || charge.total || billet.value || 0;
+
+      const { error: invErr } = await supabase.from("invoices").insert({
+        customer_id: customer.id,
+        descricao: charge.message || charge.custom_id || `Cobrança EFI #${chargeId}`,
+        valor_centavos: value,
+        vencimento: billet.expire_at || charge.expire_at || charge.created_at?.slice(0, 10) || now.toISOString().slice(0, 10),
+        status,
+        efi_charge_id: chargeId,
+        efi_barcode: billet.barcode || null,
+        efi_link: billet.link || billet.pdf?.charge || null,
+        paid_at: status === "paid" ? (charge.paid_at || now.toISOString()) : null,
+      });
+
+      if (invErr) {
+        console.error("Import invoice error:", invErr);
+      } else {
+        imported++;
+      }
+    }
+
+    return new Response(
+      JSON.stringify({
+        cpf,
+        customer_name: customer.nome,
+        total_found: allCharges.length,
+        imported,
+        skipped,
+      }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  } catch (err) {
+    console.error("Check customer charges error:", err);
+    return new Response(
+      JSON.stringify({ error: err.message || "Erro ao consultar cobranças na EFI" }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -488,6 +680,8 @@ Deno.serve(async (req) => {
         return await importFromEfi(req);
       case "cancel":
         return await cancelCharge(req);
+      case "check-customer":
+        return await checkCustomerCharges(req);
       case "test": {
         const authHeader = req.headers.get("Authorization");
         await verifyAdmin(authHeader);
