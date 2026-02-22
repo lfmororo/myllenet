@@ -47,15 +47,20 @@ async function efiRequest(path: string, method: string, body?: unknown) {
 
   if (body) options.body = JSON.stringify(body);
 
-  const response = await fetch(`${EFI_BASE_URL}${path}`, options);
-  const data = await response.json();
+  const fullUrl = `${EFI_BASE_URL}${path}`;
+  console.log("EFI request:", method, fullUrl);
+
+  const response = await fetch(fullUrl, options);
+  const responseText = await response.text();
+  console.log("EFI response:", response.status, responseText.slice(0, 500));
+
+  let data;
+  try { data = JSON.parse(responseText); } catch { data = { raw: responseText }; }
 
   if (!response.ok) {
-    console.error("EFI API error:", JSON.stringify(data));
-    throw new Error(data.message || `EFI API error: ${response.status}`);
+    throw new Error(data.message || data.error_description || `EFI API error: ${response.status} - ${responseText.slice(0, 200)}`);
   }
 
-  return data;
   return data;
 }
 
@@ -296,13 +301,28 @@ async function importFromEfi(req: Request) {
   const supabase = getSupabaseAdmin();
 
   try {
-    // Fetch charges from EFI (boleto type)
-    const charges = await efiRequest(
-      `/v1/charges?charge_type=billet&status=all&begin_date=${beginDate}&end_date=${endDate}&limit=500&offset=0`,
-      "GET"
-    );
+    // Fetch charges from EFI with pagination (max 100 per page)
+    let allCharges: any[] = [];
+    let offset = 0;
+    const limit = 100;
+    let hasMore = true;
 
-    const chargeList = charges.data || charges || [];
+    while (hasMore) {
+      const charges = await efiRequest(
+        `/v1/charges?charge_type=billet&status=all&begin_date=${beginDate}&end_date=${endDate}&limit=${limit}&offset=${offset}`,
+        "GET"
+      );
+      const page = charges.data || charges || [];
+      if (Array.isArray(page)) {
+        allCharges = allCharges.concat(page);
+        hasMore = page.length === limit;
+      } else {
+        hasMore = false;
+      }
+      offset += limit;
+    }
+
+    const chargeList = allCharges;
     let importedCustomers = 0;
     let importedInvoices = 0;
     let skippedInvoices = 0;
