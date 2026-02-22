@@ -103,6 +103,7 @@ export default function Settings() {
         if (userForm.full_name !== editingUser.full_name) body.full_name = userForm.full_name;
         if (userForm.email !== editingUser.email) body.email = userForm.email;
         if (userForm.password) body.password = userForm.password;
+        body.phone = userForm.phone;
 
         const res = await fetch(`https://${projectId}.supabase.co/functions/v1/user-management/update`, {
           method: "POST", headers, body: JSON.stringify(body),
