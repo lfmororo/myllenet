@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Wifi, Plus, Search, Download, LogOut, Loader2, ShieldAlert, FileText, Import, Settings as SettingsIcon, Upload, AlertTriangle, Zap, Filter } from "lucide-react";
+import { Wifi, Plus, Search, Download, LogOut, Loader2, ShieldAlert, FileText, Import, Settings as SettingsIcon, Upload, AlertTriangle, Zap, Filter, RefreshCw } from "lucide-react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -24,7 +24,7 @@ export default function Dashboard() {
   const { user, isAdmin, loading: authLoading, signOut } = useAuth();
   const navigate = useNavigate();
   const { customers, loading, searchTerm, setSearchTerm, addCustomer, updateCustomer, deleteCustomer, toggleCustomerActive, exportCSV, bulkImport, refetch: refetchCustomers } = useCustomers();
-  const { invoices, allInvoices, loading: invoicesLoading, invoiceSearch, setInvoiceSearch, createBoleto, checkPayment, cancelInvoice, importFromEfi, bulkImportInvoices, refetch: refetchInvoices } = useInvoices();
+  const { invoices, allInvoices, loading: invoicesLoading, invoiceSearch, setInvoiceSearch, createBoleto, checkPayment, cancelInvoice, importFromEfi, bulkImportInvoices, bulkCheckPayments, bulkChecking, refetch: refetchInvoices } = useInvoices();
   const { plans } = usePlans();
 
   const [formOpen, setFormOpen] = useState(false);
@@ -330,6 +330,14 @@ export default function Dashboard() {
                       Consultar EFI (todos)
                     </>
                   )}
+                </Button>
+                <Button
+                  variant="outline"
+                  disabled={bulkChecking}
+                  onClick={() => bulkCheckPayments()}
+                >
+                  {bulkChecking ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+                  Verificar Pagamentos
                 </Button>
                 <Button variant="outline" onClick={() => setInvoiceCsvImportOpen(true)}>
                   <Upload className="mr-2 h-4 w-4" /> Importar CSV

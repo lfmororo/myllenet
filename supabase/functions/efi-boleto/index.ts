@@ -618,6 +618,72 @@ async function checkCustomerCharges(req: Request) {
   }
 }
 
+async function bulkCheckPayments(req: Request) {
+  const authHeader = req.headers.get("Authorization");
+  await verifyAdmin(authHeader);
+
+  const supabase = getSupabaseAdmin();
+
+  // Get all pending/waiting invoices that have an efi_charge_id
+  const { data: pendingInvoices, error } = await supabase
+    .from("invoices")
+    .select("id, efi_charge_id, status, paid_at")
+    .in("status", ["pending", "waiting", "overdue"])
+    .not("efi_charge_id", "is", null);
+
+  if (error) {
+    return new Response(JSON.stringify({ error: "Erro ao buscar faturas" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  if (!pendingInvoices || pendingInvoices.length === 0) {
+    return new Response(JSON.stringify({ checked: 0, updated: 0 }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  let updated = 0;
+  let errors = 0;
+
+  for (const inv of pendingInvoices) {
+    try {
+      const efiResponse = await efiRequest(`/v1/charge/${inv.efi_charge_id}`, "GET");
+      const chargeData = efiResponse.data || efiResponse;
+      const efiStatus = chargeData.status;
+
+      let newStatus = inv.status;
+      let paidAt = inv.paid_at;
+
+      if (efiStatus === "paid" || efiStatus === "settled") {
+        newStatus = "paid";
+        paidAt = paidAt || new Date().toISOString();
+      } else if (efiStatus === "canceled" || efiStatus === "refunded") {
+        newStatus = "cancelled";
+      } else if (efiStatus === "expired" || efiStatus === "unpaid") {
+        newStatus = "overdue";
+      }
+
+      if (newStatus !== inv.status) {
+        await supabase
+          .from("invoices")
+          .update({ status: newStatus, paid_at: paidAt })
+          .eq("id", inv.id);
+        updated++;
+      }
+    } catch (e) {
+      console.error(`Error checking charge ${inv.efi_charge_id}:`, e);
+      errors++;
+    }
+  }
+
+  return new Response(
+    JSON.stringify({ checked: pendingInvoices.length, updated, errors }),
+    { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  );
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -632,6 +698,8 @@ Deno.serve(async (req) => {
         return await createBoleto(req);
       case "check":
         return await checkPayment(req);
+      case "bulk-check":
+        return await bulkCheckPayments(req);
       case "import":
         return await importFromEfi(req);
       case "cancel":
