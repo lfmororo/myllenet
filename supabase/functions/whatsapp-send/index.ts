@@ -111,9 +111,9 @@ async function sendText(req: Request) {
 
   try {
     const formattedPhone = formatPhone(phone);
-    const result = await uazapiRequest("/sendText", {
-      phone: formattedPhone,
-      message,
+    const result = await uazapiRequest("/send/text", {
+      number: formattedPhone,
+      text: message,
     });
 
     return new Response(JSON.stringify({ success: true, result }), {
@@ -147,9 +147,9 @@ async function sendBulk(req: Request) {
   for (const msg of messages) {
     try {
       const formattedPhone = formatPhone(msg.phone);
-      await uazapiRequest("/sendText", {
-        phone: formattedPhone,
-        message: msg.message,
+      await uazapiRequest("/send/text", {
+        number: formattedPhone,
+        text: msg.message,
       });
       success++;
       // Small delay to avoid rate limiting
@@ -247,9 +247,9 @@ async function sendInvoiceNotification(req: Request) {
 
   try {
     const formattedPhone = formatPhone(customer.telefone);
-    const result = await uazapiRequest("/sendText", {
-      phone: formattedPhone,
-      message,
+    const result = await uazapiRequest("/send/text", {
+      number: formattedPhone,
+      text: message,
     });
 
     return new Response(JSON.stringify({ success: true, result }), {

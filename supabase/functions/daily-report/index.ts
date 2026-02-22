@@ -36,10 +36,10 @@ async function sendWhatsApp(phone: string, message: string) {
   let digits = phone.replace(/\D/g, "");
   if (!digits.startsWith("55")) digits = "55" + digits;
 
-  const response = await fetch(`${UAZAPI_BASE_URL}/sendText`, {
+  const response = await fetch(`${UAZAPI_BASE_URL}/send/text`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "token": token },
-    body: JSON.stringify({ phone: digits, message }),
+    body: JSON.stringify({ number: digits, text: message }),
   });
 
   const text = await response.text();
