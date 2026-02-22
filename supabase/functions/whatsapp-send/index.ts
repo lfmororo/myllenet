@@ -46,7 +46,6 @@ async function verifyAdmin(authHeader: string | null) {
 }
 
 async function getUazapiToken(): Promise<string> {
-  // Try settings table first, fallback to env
   const supabase = getSupabaseAdmin();
   const { data } = await supabase
     .from("settings")
@@ -88,20 +87,43 @@ async function uazapiRequest(endpoint: string, body: unknown) {
 }
 
 function formatPhone(phone: string): string {
-  // Remove all non-digits
   let digits = phone.replace(/\D/g, "");
-  // Add Brazil country code if not present
   if (!digits.startsWith("55")) {
     digits = "55" + digits;
   }
   return digits;
 }
 
+async function logNotification(params: {
+  customer_id?: string;
+  customer_name: string;
+  phone?: string;
+  type: string;
+  message: string;
+  status: "sent" | "failed";
+  error_message?: string;
+}) {
+  try {
+    const supabase = getSupabaseAdmin();
+    await supabase.from("notification_logs").insert({
+      customer_id: params.customer_id || null,
+      customer_name: params.customer_name,
+      phone: params.phone || null,
+      type: params.type,
+      message: params.message,
+      status: params.status,
+      error_message: params.error_message || null,
+    });
+  } catch (err) {
+    console.error("Failed to log notification:", err);
+  }
+}
+
 async function sendText(req: Request) {
   const authHeader = req.headers.get("Authorization");
   await verifyAdmin(authHeader);
 
-  const { phone, message } = await req.json();
+  const { phone, message, customer_id, customer_name } = await req.json();
   if (!phone || !message) {
     return new Response(JSON.stringify({ error: "phone e message obrigatórios" }), {
       status: 400,
@@ -116,10 +138,29 @@ async function sendText(req: Request) {
       text: message,
     });
 
+    await logNotification({
+      customer_id,
+      customer_name: customer_name || phone,
+      phone,
+      type: "manual",
+      message,
+      status: "sent",
+    });
+
     return new Response(JSON.stringify({ success: true, result }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
+    await logNotification({
+      customer_id,
+      customer_name: customer_name || phone,
+      phone,
+      type: "manual",
+      message,
+      status: "failed",
+      error_message: err.message,
+    });
+
     console.error("WhatsApp send error:", err);
     return new Response(
       JSON.stringify({ error: err.message || "Erro ao enviar WhatsApp" }),
@@ -152,11 +193,30 @@ async function sendBulk(req: Request) {
         text: msg.message,
       });
       success++;
-      // Small delay to avoid rate limiting
+
+      await logNotification({
+        customer_id: msg.customer_id,
+        customer_name: msg.customer_name || msg.phone,
+        phone: msg.phone,
+        type: msg.type || "bulk",
+        message: msg.message,
+        status: "sent",
+      });
+
       await new Promise(resolve => setTimeout(resolve, 1000));
     } catch (err) {
       failed++;
       errors.push(`${msg.phone}: ${err.message}`);
+
+      await logNotification({
+        customer_id: msg.customer_id,
+        customer_name: msg.customer_name || msg.phone,
+        phone: msg.phone,
+        type: msg.type || "bulk",
+        message: msg.message,
+        status: "failed",
+        error_message: err.message,
+      });
     }
   }
 
@@ -209,38 +269,24 @@ async function sendInvoiceNotification(req: Request) {
   switch (notifType) {
     case "boleto_gerado":
       message = `Olá ${customer.nome}! 🌐\n\nSua fatura da *Myllenet* foi gerada:\n\n📋 ${invoice.descricao}\n💰 Valor: ${valor}\n📅 Vencimento: ${vencimento}`;
-      if (invoice.efi_link) {
-        message += `\n\n🔗 Boleto: ${invoice.efi_link}`;
-      }
-      if (invoice.efi_barcode) {
-        message += `\n\n📊 Código de barras:\n${invoice.efi_barcode}`;
-      }
-      if (invoice.efi_pix_copiacola) {
-        message += `\n\n📱 PIX Copia e Cola:\n${invoice.efi_pix_copiacola}`;
-      }
+      if (invoice.efi_link) message += `\n\n🔗 Boleto: ${invoice.efi_link}`;
+      if (invoice.efi_barcode) message += `\n\n📊 Código de barras:\n${invoice.efi_barcode}`;
+      if (invoice.efi_pix_copiacola) message += `\n\n📱 PIX Copia e Cola:\n${invoice.efi_pix_copiacola}`;
       message += "\n\nQualquer dúvida, estamos à disposição! 😊";
       break;
-
     case "lembrete_vencimento":
       message = `Olá ${customer.nome}! 🌐\n\n⏰ Lembrete: sua fatura da *Myllenet* vence em breve!\n\n📋 ${invoice.descricao}\n💰 Valor: ${valor}\n📅 Vencimento: ${vencimento}`;
-      if (invoice.efi_link) {
-        message += `\n\n🔗 Boleto: ${invoice.efi_link}`;
-      }
+      if (invoice.efi_link) message += `\n\n🔗 Boleto: ${invoice.efi_link}`;
       message += "\n\nEvite a suspensão do serviço. Pague em dia! 😊";
       break;
-
     case "pagamento_confirmado":
       message = `Olá ${customer.nome}! 🌐\n\n✅ Pagamento confirmado!\n\n📋 ${invoice.descricao}\n💰 Valor: ${valor}\n\nObrigado por manter sua internet em dia! 🚀`;
       break;
-
     case "cobranca_atrasada":
       message = `Olá ${customer.nome}! 🌐\n\n⚠️ Sua fatura da *Myllenet* está vencida!\n\n📋 ${invoice.descricao}\n💰 Valor: ${valor}\n📅 Vencimento: ${vencimento}`;
-      if (invoice.efi_link) {
-        message += `\n\n🔗 Boleto: ${invoice.efi_link}`;
-      }
+      if (invoice.efi_link) message += `\n\n🔗 Boleto: ${invoice.efi_link}`;
       message += "\n\nRegularize para evitar a suspensão do serviço. Em caso de dúvidas, entre em contato!";
       break;
-
     default:
       message = `Olá ${customer.nome}! Informação sobre sua fatura: ${invoice.descricao} - ${valor}`;
   }
@@ -252,10 +298,29 @@ async function sendInvoiceNotification(req: Request) {
       text: message,
     });
 
+    await logNotification({
+      customer_id: invoice.customer_id,
+      customer_name: customer.nome,
+      phone: customer.telefone,
+      type: notifType,
+      message,
+      status: "sent",
+    });
+
     return new Response(JSON.stringify({ success: true, result }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
+    await logNotification({
+      customer_id: invoice.customer_id,
+      customer_name: customer.nome,
+      phone: customer.telefone,
+      type: notifType,
+      message,
+      status: "failed",
+      error_message: err.message,
+    });
+
     console.error("WhatsApp notification error:", err);
     return new Response(
       JSON.stringify({ error: err.message || "Erro ao enviar notificação" }),

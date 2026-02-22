@@ -77,7 +77,7 @@ export default function NoInvoiceNotificationDialog({ open, onOpenChange, custom
       const c = toSend[i];
       const personalizedMsg = message.replace(/\{nome\}/g, c.nome.split(" ")[0]);
 
-      const ok = await sendText(c.telefone!, personalizedMsg);
+      const ok = await sendText(c.telefone!, personalizedMsg, { customer_id: c.id, customer_name: c.nome });
       if (ok) {
         success++;
         setResults(prev => ({ ...prev, [c.id]: "success" }));
