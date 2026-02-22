@@ -2,7 +2,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Pencil, Trash2, Eye, EyeOff } from "lucide-react";
+import { Pencil, Trash2, Eye, EyeOff, FileSearch } from "lucide-react";
 import { useState } from "react";
 import type { Customer } from "@/hooks/useCustomers";
 
@@ -11,9 +11,10 @@ interface Props {
   onEdit: (customer: Customer) => void;
   onDelete: (customer: Customer) => void;
   onToggleActive: (id: string, ativo: boolean) => Promise<boolean>;
+  onDetail: (customer: Customer) => void;
 }
 
-export default function CustomerTable({ customers, onEdit, onDelete, onToggleActive }: Props) {
+export default function CustomerTable({ customers, onEdit, onDelete, onToggleActive, onDetail }: Props) {
   const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
 
   const togglePassword = (id: string) => {
@@ -81,6 +82,9 @@ export default function CustomerTable({ customers, onEdit, onDelete, onToggleAct
               </TableCell>
               <TableCell className="text-right">
                 <div className="flex justify-end gap-1">
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onDetail(c)} title="Detalhes">
+                    <FileSearch className="h-4 w-4" />
+                  </Button>
                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(c)}>
                     <Pencil className="h-4 w-4" />
                   </Button>
