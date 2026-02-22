@@ -49,7 +49,7 @@ export default function Settings() {
   const [userFormOpen, setUserFormOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<SystemUser | null>(null);
   const [deletingUser, setDeletingUser] = useState<SystemUser | null>(null);
-  const [userForm, setUserForm] = useState({ email: "", password: "", full_name: "", role: "user" });
+  const [userForm, setUserForm] = useState({ email: "", password: "", full_name: "", role: "user", phone: "" });
   const [savingUser, setSavingUser] = useState(false);
 
   // Plans state
@@ -510,7 +510,7 @@ export default function Settings() {
           <TabsContent value="users" className="mt-4 space-y-4">
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">{users.length} usuário{users.length !== 1 ? "s" : ""}</p>
-              <Button onClick={() => { setEditingUser(null); setUserForm({ email: "", password: "", full_name: "", role: "user" }); setUserFormOpen(true); }}>
+              <Button onClick={() => { setEditingUser(null); setUserForm({ email: "", password: "", full_name: "", role: "user", phone: "" }); setUserFormOpen(true); }}>
                 <Plus className="mr-2 h-4 w-4" /> Novo Usuário
               </Button>
             </div>
@@ -543,7 +543,7 @@ export default function Settings() {
                           <div className="flex justify-end gap-1">
                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
                               setEditingUser(u);
-                              setUserForm({ email: u.email, password: "", full_name: u.full_name, role: u.role });
+                              setUserForm({ email: u.email, password: "", full_name: u.full_name, role: u.role, phone: (u as any).phone || "" });
                               setUserFormOpen(true);
                             }}>
                               <Pencil className="h-4 w-4" />
@@ -615,6 +615,10 @@ export default function Settings() {
               <div className="space-y-2">
                 <Label>{editingUser ? "Nova senha (deixe vazio para manter)" : "Senha"}</Label>
                 <Input type="password" value={userForm.password} onChange={(e) => setUserForm({ ...userForm, password: e.target.value })} placeholder="••••••••" required={!editingUser} minLength={6} />
+              </div>
+              <div className="space-y-2">
+                <Label>Telefone</Label>
+                <Input value={userForm.phone} onChange={(e) => setUserForm({ ...userForm, phone: e.target.value })} placeholder="(00) 00000-0000" />
               </div>
               <div className="space-y-2">
                 <Label>Perfil</Label>
