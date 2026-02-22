@@ -444,6 +444,32 @@ async function importFromEfi(req: Request) {
   }
 }
 
+async function cancelCharge(req: Request) {
+  const authHeader = req.headers.get("Authorization");
+  await verifyAdmin(authHeader);
+
+  const { charge_id } = await req.json();
+  if (!charge_id) {
+    return new Response(JSON.stringify({ error: "charge_id obrigatório" }), {
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  try {
+    await efiRequest(`/v1/charge/${charge_id}/cancel`, "PUT");
+    return new Response(JSON.stringify({ success: true }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (err) {
+    console.error("EFI cancel error:", err);
+    return new Response(
+      JSON.stringify({ error: err.message || "Erro ao cancelar na EFI" }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -460,6 +486,8 @@ Deno.serve(async (req) => {
         return await checkPayment(req);
       case "import":
         return await importFromEfi(req);
+      case "cancel":
+        return await cancelCharge(req);
       case "test": {
         const authHeader = req.headers.get("Authorization");
         await verifyAdmin(authHeader);
