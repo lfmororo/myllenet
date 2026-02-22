@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -34,6 +34,8 @@ export function useInvoices() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [invoiceSearch, setInvoiceSearch] = useState("");
+  const [bulkChecking, setBulkChecking] = useState(false);
+  const autoCheckedRef = useRef(false);
 
   const fetchInvoices = useCallback(async () => {
     setLoading(true);
@@ -200,6 +202,54 @@ export function useInvoices() {
     return { success, failed, skipped };
   };
 
+  const bulkCheckPayments = useCallback(async () => {
+    try {
+      setBulkChecking(true);
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      if (!token) { toast.error("Sessão expirada"); return null; }
+
+      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+      const response = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/efi-boleto/bulk-check`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+        }
+      );
+
+      const result = await response.json();
+      if (!response.ok) {
+        console.error("Bulk check error:", result);
+        return null;
+      }
+
+      if (result.updated > 0) {
+        toast.success(`${result.updated} cobrança(s) atualizada(s) na verificação`);
+        fetchInvoices();
+      }
+      return result;
+    } catch (err) {
+      console.error("Bulk check error:", err);
+      return null;
+    } finally {
+      setBulkChecking(false);
+    }
+  }, [fetchInvoices]);
+
+  // Auto-check payments on first load
+  useEffect(() => {
+    if (!loading && invoices.length > 0 && !autoCheckedRef.current) {
+      const hasPending = invoices.some(inv => ["pending", "waiting", "overdue"].includes(inv.status) && inv.efi_charge_id);
+      if (hasPending) {
+        autoCheckedRef.current = true;
+        bulkCheckPayments();
+      }
+    }
+  }, [loading, invoices, bulkCheckPayments]);
+
   const filteredInvoices = invoices.filter((inv) => {
     if (!invoiceSearch.trim()) return true;
     const term = invoiceSearch.trim().toLowerCase();
@@ -208,5 +258,5 @@ export function useInvoices() {
     return nome.includes(term) || usuario.includes(term);
   });
 
-  return { invoices: filteredInvoices, allInvoices: invoices, loading, invoiceSearch, setInvoiceSearch, createBoleto, checkPayment, cancelInvoice, importFromEfi, bulkImportInvoices, refetch: fetchInvoices };
+  return { invoices: filteredInvoices, allInvoices: invoices, loading, invoiceSearch, setInvoiceSearch, createBoleto, checkPayment, cancelInvoice, importFromEfi, bulkImportInvoices, bulkCheckPayments, bulkChecking, refetch: fetchInvoices };
 }
