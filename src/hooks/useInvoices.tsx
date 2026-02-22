@@ -179,22 +179,25 @@ export function useInvoices() {
     }
   };
 
-  const bulkImportInvoices = async (rows: { customer_id: string; descricao: string; valor_centavos: number; vencimento: string; status: string }[]) => {
+  const bulkImportInvoices = async (rows: { customer_id: string; descricao: string; valor_centavos: number; vencimento: string; status: string; paid_at?: string | null }[]) => {
     let success = 0;
     let failed = 0;
-    // Insert in batches of 50
-    for (let i = 0; i < rows.length; i += 50) {
-      const batch = rows.slice(i, i + 50);
-      const { error } = await supabase.from("invoices").insert(batch);
+    let skipped = 0;
+    for (const row of rows) {
+      const { error } = await supabase.from("invoices").insert(row);
       if (error) {
-        console.error("Batch insert error:", error);
-        failed += batch.length;
+        if (error.code === "23505") {
+          skipped++;
+        } else {
+          console.error("Insert error:", error);
+          failed++;
+        }
       } else {
-        success += batch.length;
+        success++;
       }
     }
     fetchInvoices();
-    return { success, failed };
+    return { success, failed, skipped };
   };
 
   const filteredInvoices = invoices.filter((inv) => {
