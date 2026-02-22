@@ -501,99 +501,55 @@ async function checkCustomerCharges(req: Request) {
   const cpf = customer.cpf.replace(/\D/g, "");
 
   try {
-    // Search charges by CPF on EFI (billets + carnets)
+    // Search charges by CPF on EFI using customer_document filter
     const now = new Date();
     const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
 
     let allCharges: any[] = [];
 
-    // Fetch billets
-    let chunkStart = new Date("2020-01-01T00:00:00");
-    const finalEnd = new Date(todayStr + "T00:00:00");
+    // Search both billets and carnets via /v1/charges with customer_document filter
+    const chargeTypes = ["billet", "carnet"];
 
-    while (chunkStart <= finalEnd) {
-      const chunkEnd = new Date(chunkStart);
-      chunkEnd.setFullYear(chunkEnd.getFullYear() + 1);
-      chunkEnd.setDate(chunkEnd.getDate() - 1);
-      const effectiveEnd = chunkEnd > finalEnd ? finalEnd : chunkEnd;
+    for (const chargeType of chargeTypes) {
+      let chunkStart = new Date("2020-01-01T00:00:00");
+      const finalEnd = new Date(todayStr + "T00:00:00");
 
-      const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-      const bd = fmt(chunkStart);
-      const ed = fmt(effectiveEnd);
+      while (chunkStart <= finalEnd) {
+        const chunkEnd = new Date(chunkStart);
+        chunkEnd.setFullYear(chunkEnd.getFullYear() + 1);
+        chunkEnd.setDate(chunkEnd.getDate() - 1);
+        const effectiveEnd = chunkEnd > finalEnd ? finalEnd : chunkEnd;
 
-      let offset = 0;
-      const limit = 100;
-      let hasMore = true;
-      while (hasMore) {
-        try {
-          const charges = await efiRequest(
-            `/v1/charges?charge_type=billet&begin_date=${bd}&end_date=${ed}&limit=${limit}&offset=${offset}`,
-            "GET"
-          );
-          const page = charges.data || charges || [];
-          if (Array.isArray(page)) {
-            // Filter by CPF
-            const matching = page.filter((c: any) => {
-              const cCpf = (c.customer?.cpf || "").replace(/\D/g, "");
-              return cCpf === cpf;
-            });
-            allCharges = allCharges.concat(matching);
-            hasMore = page.length === limit;
-          } else {
+        const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+        const bd = fmt(chunkStart);
+        const ed = fmt(effectiveEnd);
+
+        let offset = 0;
+        const limit = 100;
+        let hasMore = true;
+        while (hasMore) {
+          try {
+            const charges = await efiRequest(
+              `/v1/charges?charge_type=${chargeType}&customer_document=${cpf}&begin_date=${bd}&end_date=${ed}&limit=${limit}&offset=${offset}`,
+              "GET"
+            );
+            const page = charges.data || charges || [];
+            if (Array.isArray(page)) {
+              allCharges = allCharges.concat(page);
+              hasMore = page.length === limit;
+            } else {
+              hasMore = false;
+            }
+          } catch (e) {
+            console.error(`Error fetching ${chargeType} charges:`, e);
             hasMore = false;
           }
-        } catch (e) {
-          console.error("Error fetching charges chunk:", e);
-          hasMore = false;
+          offset += limit;
         }
-        offset += limit;
-      }
 
-      chunkStart = new Date(effectiveEnd);
-      chunkStart.setDate(chunkStart.getDate() + 1);
-    }
-
-    // Also try to fetch carnets
-    try {
-      let carnetOffset = 0;
-      let carnetHasMore = true;
-      while (carnetHasMore) {
-        try {
-          const carnets = await efiRequest(
-            `/v1/carnets?begin_date=2020-01-01&end_date=${todayStr}&limit=100&offset=${carnetOffset}`,
-            "GET"
-          );
-          const page = carnets.data || carnets || [];
-          if (Array.isArray(page)) {
-            const matching = page.filter((c: any) => {
-              const cCpf = (c.customer?.cpf || "").replace(/\D/g, "");
-              return cCpf === cpf;
-            });
-            // For carnets, each has parcels - flatten them as charges
-            for (const carnet of matching) {
-              const parcels = carnet.parcels || carnet.charges || [];
-              for (const parcel of parcels) {
-                allCharges.push({
-                  ...parcel,
-                  charge_id: parcel.charge_id || parcel.id,
-                  customer: carnet.customer,
-                  message: carnet.message || `Carnê #${carnet.carnet_id || carnet.id}`,
-                  source: "carnet",
-                });
-              }
-            }
-            carnetHasMore = page.length === 100;
-          } else {
-            carnetHasMore = false;
-          }
-        } catch (e) {
-          console.error("Error fetching carnets:", e);
-          carnetHasMore = false;
-        }
-        carnetOffset += 100;
+        chunkStart = new Date(effectiveEnd);
+        chunkStart.setDate(chunkStart.getDate() + 1);
       }
-    } catch (e) {
-      console.error("Carnet fetch error (endpoint may not exist):", e);
     }
 
     // Import found charges
