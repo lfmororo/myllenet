@@ -7,12 +7,16 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Upload, FileText, AlertTriangle, CheckCircle, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
+import type { Plan } from "@/hooks/usePlans";
+import type { CustomerInput } from "@/hooks/useCustomers";
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   customers: { id: string; nome: string; cpf: string }[];
   onImport: (invoices: InvoiceRow[]) => Promise<{ success: number; failed: number }>;
+  plans: Plan[];
+  onUpdateCustomer: (id: string, data: Partial<CustomerInput>) => Promise<boolean>;
 }
 
 export interface InvoiceRow {
@@ -21,6 +25,8 @@ export interface InvoiceRow {
   valor_centavos: number;
   vencimento: string;
   status: string;
+  paid_at?: string | null;
+  _cpf?: string; // internal: used for post-import customer update
 }
 
 type Step = "upload" | "mapping" | "preview";
@@ -145,7 +151,7 @@ function mapStatus(raw: string): string {
   return "pending";
 }
 
-export default function InvoiceCSVImportDialog({ open, onOpenChange, customers, onImport }: Props) {
+export default function InvoiceCSVImportDialog({ open, onOpenChange, customers, onImport, plans, onUpdateCustomer }: Props) {
   const [step, setStep] = useState<Step>("upload");
   const [headers, setHeaders] = useState<string[]>([]);
   const [rows, setRows] = useState<string[][]>([]);
@@ -226,9 +232,10 @@ export default function InvoiceCSVImportDialog({ open, onOpenChange, customers, 
       const descricao = getValue("descricao") || "Cobrança importada via CSV";
       const statusRaw = getValue("status");
       const status = statusRaw ? mapStatus(statusRaw) : "pending";
+      const paid_at = status === "paid" ? vencimento + "T12:00:00Z" : null;
 
       if (rowValid && customer && valorCentavos && vencimento) {
-        valid.push({ customer_id: customer.id, descricao, valor_centavos: valorCentavos, vencimento, status });
+        valid.push({ customer_id: customer.id, descricao, valor_centavos: valorCentavos, vencimento, status, paid_at, _cpf: cpf });
       }
     });
 
@@ -241,9 +248,40 @@ export default function InvoiceCSVImportDialog({ open, onOpenChange, customers, 
     if (validRows.length === 0) return;
     setImporting(true);
     try {
-      const result = await onImport(validRows);
+      // Strip internal _cpf before sending to DB
+      const dbRows = validRows.map(({ _cpf, ...rest }) => rest);
+      const result = await onImport(dbRows);
       toast.success(`${result.success} cobrança(s) importada(s)!`);
       if (result.failed > 0) toast.error(`${result.failed} falha(s) na importação`);
+
+      // Post-import: update dia_vencimento and plan_id on each customer
+      if (plans.length > 0) {
+        const customerMap = new Map(customers.map(c => [c.id, c]));
+        // Group invoices by customer, pick latest vencimento
+        const byCustomer = new Map<string, InvoiceRow[]>();
+        for (const row of validRows) {
+          const arr = byCustomer.get(row.customer_id) || [];
+          arr.push(row);
+          byCustomer.set(row.customer_id, arr);
+        }
+
+        let updated = 0;
+        for (const [customerId, invoices] of byCustomer) {
+          const sorted = invoices.sort((a, b) => b.vencimento.localeCompare(a.vencimento));
+          const latest = sorted[0];
+          const vencDate = new Date(latest.vencimento + "T12:00:00");
+          const diaVencimento = vencDate.getDate();
+          const matchedPlan = plans.find(p => p.ativo && p.valor_centavos === latest.valor_centavos);
+
+          const updateData: Partial<CustomerInput> = { dia_vencimento: diaVencimento };
+          if (matchedPlan) updateData.plan_id = matchedPlan.id;
+
+          const ok = await onUpdateCustomer(customerId, updateData);
+          if (ok) updated++;
+        }
+        if (updated > 0) toast.success(`${updated} cliente(s) atualizado(s) com vencimento e plano`);
+      }
+
       handleClose(false);
     } catch {
       toast.error("Erro durante a importação");
