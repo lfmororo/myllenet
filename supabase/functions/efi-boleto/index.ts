@@ -13,12 +13,6 @@ const EFI_AUTH_URL = `${EFI_BASE_URL}/v1/authorize`;
 async function getEfiToken(): Promise<string> {
   const clientId = Deno.env.get("EFI_CLIENT_ID")!;
   const clientSecret = Deno.env.get("EFI_CLIENT_SECRET")!;
-  const certBase64 = Deno.env.get("EFI_CERTIFICATE_BASE64")!;
-
-  // Decode the p12 certificate
-  const certBytes = Uint8Array.from(atob(certBase64), (c) => c.charCodeAt(0));
-
-  // For Deno, we use the native TLS with the certificate
   const auth = btoa(`${clientId}:${clientSecret}`);
 
   const response = await fetch(EFI_AUTH_URL, {
@@ -28,14 +22,6 @@ async function getEfiToken(): Promise<string> {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ grant_type: "client_credentials" }),
-    // @ts-ignore - Deno specific TLS options
-    client: Deno.createHttpClient({
-      caCerts: [],
-      certChain: undefined,
-      privateKey: undefined,
-      // Use the p12 cert
-      cert: certBytes,
-    }),
   });
 
   if (!response.ok) {
@@ -50,19 +36,13 @@ async function getEfiToken(): Promise<string> {
 
 async function efiRequest(path: string, method: string, body?: unknown) {
   const token = await getEfiToken();
-  const certBase64 = Deno.env.get("EFI_CERTIFICATE_BASE64")!;
-  const certBytes = Uint8Array.from(atob(certBase64), (c) => c.charCodeAt(0));
 
-  const options: RequestInit & { client?: unknown } = {
+  const options: RequestInit = {
     method,
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
-    // @ts-ignore
-    client: Deno.createHttpClient({
-      cert: certBytes,
-    }),
   };
 
   if (body) options.body = JSON.stringify(body);
@@ -75,6 +55,7 @@ async function efiRequest(path: string, method: string, body?: unknown) {
     throw new Error(data.message || `EFI API error: ${response.status}`);
   }
 
+  return data;
   return data;
 }
 
