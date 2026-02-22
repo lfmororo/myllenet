@@ -1,0 +1,280 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+};
+
+const UAZAPI_BASE_URL = "https://ipazua.uazapi.com";
+
+function getSupabaseAdmin() {
+  return createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+  );
+}
+
+function getSupabaseClient(authHeader: string) {
+  return createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_ANON_KEY")!,
+    { global: { headers: { Authorization: authHeader } } }
+  );
+}
+
+async function verifyAdmin(authHeader: string | null) {
+  if (!authHeader?.startsWith("Bearer ")) {
+    throw new Error("Unauthorized");
+  }
+  const supabase = getSupabaseClient(authHeader);
+  const token = authHeader.replace("Bearer ", "");
+  const { data, error } = await supabase.auth.getClaims(token);
+  if (error || !data?.claims) throw new Error("Unauthorized");
+
+  const userId = data.claims.sub as string;
+  const admin = getSupabaseAdmin();
+  const { data: roleData } = await admin
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", userId)
+    .eq("role", "admin")
+    .maybeSingle();
+
+  if (!roleData) throw new Error("Forbidden: admin only");
+  return userId;
+}
+
+async function uazapiRequest(endpoint: string, body: unknown) {
+  const token = Deno.env.get("UAZAPI_TOKEN");
+  if (!token) throw new Error("UAZAPI_TOKEN not configured");
+
+  const response = await fetch(`${UAZAPI_BASE_URL}${endpoint}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "token": token,
+    },
+    body: JSON.stringify(body),
+  });
+
+  const responseText = await response.text();
+  console.log("UAZAPI response:", response.status, responseText.slice(0, 500));
+
+  let data;
+  try { data = JSON.parse(responseText); } catch { data = { raw: responseText }; }
+
+  if (!response.ok) {
+    throw new Error(`UAZAPI error [${response.status}]: ${JSON.stringify(data)}`);
+  }
+
+  return data;
+}
+
+function formatPhone(phone: string): string {
+  // Remove all non-digits
+  let digits = phone.replace(/\D/g, "");
+  // Add Brazil country code if not present
+  if (!digits.startsWith("55")) {
+    digits = "55" + digits;
+  }
+  return digits;
+}
+
+async function sendText(req: Request) {
+  const authHeader = req.headers.get("Authorization");
+  await verifyAdmin(authHeader);
+
+  const { phone, message } = await req.json();
+  if (!phone || !message) {
+    return new Response(JSON.stringify({ error: "phone e message obrigatórios" }), {
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  try {
+    const formattedPhone = formatPhone(phone);
+    const result = await uazapiRequest("/sendText", {
+      phone: formattedPhone,
+      message,
+    });
+
+    return new Response(JSON.stringify({ success: true, result }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (err) {
+    console.error("WhatsApp send error:", err);
+    return new Response(
+      JSON.stringify({ error: err.message || "Erro ao enviar WhatsApp" }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+}
+
+async function sendBulk(req: Request) {
+  const authHeader = req.headers.get("Authorization");
+  await verifyAdmin(authHeader);
+
+  const { messages } = await req.json();
+  if (!Array.isArray(messages) || messages.length === 0) {
+    return new Response(JSON.stringify({ error: "messages array obrigatório" }), {
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  let success = 0;
+  let failed = 0;
+  const errors: string[] = [];
+
+  for (const msg of messages) {
+    try {
+      const formattedPhone = formatPhone(msg.phone);
+      await uazapiRequest("/sendText", {
+        phone: formattedPhone,
+        message: msg.message,
+      });
+      success++;
+      // Small delay to avoid rate limiting
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    } catch (err) {
+      failed++;
+      errors.push(`${msg.phone}: ${err.message}`);
+    }
+  }
+
+  return new Response(JSON.stringify({ success, failed, errors }), {
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+async function sendInvoiceNotification(req: Request) {
+  const authHeader = req.headers.get("Authorization");
+  await verifyAdmin(authHeader);
+
+  const { invoice_id, type } = await req.json();
+  if (!invoice_id) {
+    return new Response(JSON.stringify({ error: "invoice_id obrigatório" }), {
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const supabase = getSupabaseAdmin();
+
+  const { data: invoice, error: invErr } = await supabase
+    .from("invoices")
+    .select("*, customers(nome, telefone, cpf)")
+    .eq("id", invoice_id)
+    .single();
+
+  if (invErr || !invoice) {
+    return new Response(JSON.stringify({ error: "Fatura não encontrada" }), {
+      status: 404,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const customer = (invoice as any).customers;
+  if (!customer?.telefone) {
+    return new Response(JSON.stringify({ error: "Cliente sem telefone cadastrado" }), {
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const valor = (invoice.valor_centavos / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  const vencimento = new Date(invoice.vencimento + "T12:00:00").toLocaleDateString("pt-BR");
+
+  let message = "";
+  const notifType = type || "boleto_gerado";
+
+  switch (notifType) {
+    case "boleto_gerado":
+      message = `Olá ${customer.nome}! 🌐\n\nSua fatura da *Myllenet* foi gerada:\n\n📋 ${invoice.descricao}\n💰 Valor: ${valor}\n📅 Vencimento: ${vencimento}`;
+      if (invoice.efi_link) {
+        message += `\n\n🔗 Boleto: ${invoice.efi_link}`;
+      }
+      if (invoice.efi_barcode) {
+        message += `\n\n📊 Código de barras:\n${invoice.efi_barcode}`;
+      }
+      if (invoice.efi_pix_copiacola) {
+        message += `\n\n📱 PIX Copia e Cola:\n${invoice.efi_pix_copiacola}`;
+      }
+      message += "\n\nQualquer dúvida, estamos à disposição! 😊";
+      break;
+
+    case "lembrete_vencimento":
+      message = `Olá ${customer.nome}! 🌐\n\n⏰ Lembrete: sua fatura da *Myllenet* vence em breve!\n\n📋 ${invoice.descricao}\n💰 Valor: ${valor}\n📅 Vencimento: ${vencimento}`;
+      if (invoice.efi_link) {
+        message += `\n\n🔗 Boleto: ${invoice.efi_link}`;
+      }
+      message += "\n\nEvite a suspensão do serviço. Pague em dia! 😊";
+      break;
+
+    case "pagamento_confirmado":
+      message = `Olá ${customer.nome}! 🌐\n\n✅ Pagamento confirmado!\n\n📋 ${invoice.descricao}\n💰 Valor: ${valor}\n\nObrigado por manter sua internet em dia! 🚀`;
+      break;
+
+    case "cobranca_atrasada":
+      message = `Olá ${customer.nome}! 🌐\n\n⚠️ Sua fatura da *Myllenet* está vencida!\n\n📋 ${invoice.descricao}\n💰 Valor: ${valor}\n📅 Vencimento: ${vencimento}`;
+      if (invoice.efi_link) {
+        message += `\n\n🔗 Boleto: ${invoice.efi_link}`;
+      }
+      message += "\n\nRegularize para evitar a suspensão do serviço. Em caso de dúvidas, entre em contato!";
+      break;
+
+    default:
+      message = `Olá ${customer.nome}! Informação sobre sua fatura: ${invoice.descricao} - ${valor}`;
+  }
+
+  try {
+    const formattedPhone = formatPhone(customer.telefone);
+    const result = await uazapiRequest("/sendText", {
+      phone: formattedPhone,
+      message,
+    });
+
+    return new Response(JSON.stringify({ success: true, result }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (err) {
+    console.error("WhatsApp notification error:", err);
+    return new Response(
+      JSON.stringify({ error: err.message || "Erro ao enviar notificação" }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+}
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const url = new URL(req.url);
+    const path = url.pathname.split("/").pop();
+
+    switch (path) {
+      case "send-text":
+        return await sendText(req);
+      case "send-bulk":
+        return await sendBulk(req);
+      case "notify-invoice":
+        return await sendInvoiceNotification(req);
+      default:
+        return new Response(JSON.stringify({ error: "Endpoint não encontrado" }), {
+          status: 404,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+    }
+  } catch (err) {
+    console.error("WhatsApp function error:", err);
+    return new Response(
+      JSON.stringify({ error: err.message || "Erro interno" }),
+      { status: err.message?.includes("Unauthorized") ? 401 : err.message?.includes("Forbidden") ? 403 : 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+});
