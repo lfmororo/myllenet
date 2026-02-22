@@ -1,0 +1,148 @@
+import { useState, useEffect, useCallback } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+
+export interface Invoice {
+  id: string;
+  customer_id: string;
+  plan_id: string | null;
+  descricao: string;
+  valor_centavos: number;
+  vencimento: string;
+  status: string;
+  efi_charge_id: number | null;
+  efi_barcode: string | null;
+  efi_pix_qrcode: string | null;
+  efi_pix_copiacola: string | null;
+  efi_link: string | null;
+  paid_at: string | null;
+  created_at: string;
+  updated_at: string;
+  // joined
+  customers?: { nome: string; cpf: string };
+}
+
+export interface CreateInvoiceInput {
+  customer_id: string;
+  descricao: string;
+  valor_centavos: number;
+  vencimento: string;
+  plan_id?: string;
+}
+
+export function useInvoices() {
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchInvoices = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("invoices")
+      .select("*, customers(nome, cpf)")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      toast.error("Erro ao carregar faturas");
+      console.error(error);
+    } else {
+      setInvoices(data as Invoice[]);
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    fetchInvoices();
+  }, [fetchInvoices]);
+
+  const createBoleto = async (input: CreateInvoiceInput) => {
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      if (!token) {
+        toast.error("Sessão expirada");
+        return false;
+      }
+
+      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+      const response = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/efi-boleto/create`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+          body: JSON.stringify(input),
+        }
+      );
+
+      const result = await response.json();
+      if (!response.ok) {
+        toast.error(result.error || "Erro ao gerar boleto");
+        return false;
+      }
+
+      toast.success("Boleto gerado com sucesso!");
+      fetchInvoices();
+      return true;
+    } catch (err) {
+      console.error(err);
+      toast.error("Erro ao gerar boleto");
+      return false;
+    }
+  };
+
+  const checkPayment = async (invoiceId: string) => {
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      if (!token) {
+        toast.error("Sessão expirada");
+        return null;
+      }
+
+      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+      const response = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/efi-boleto/check?invoice_id=${invoiceId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+        }
+      );
+
+      const result = await response.json();
+      if (!response.ok) {
+        toast.error(result.error || "Erro ao verificar pagamento");
+        return null;
+      }
+
+      fetchInvoices();
+      toast.success(`Status: ${result.status === "paid" ? "Pago" : result.status}`);
+      return result;
+    } catch (err) {
+      console.error(err);
+      toast.error("Erro ao verificar pagamento");
+      return null;
+    }
+  };
+
+  const cancelInvoice = async (invoiceId: string) => {
+    const { error } = await supabase
+      .from("invoices")
+      .update({ status: "cancelled" })
+      .eq("id", invoiceId);
+
+    if (error) {
+      toast.error("Erro ao cancelar fatura");
+      return false;
+    }
+    toast.success("Fatura cancelada");
+    fetchInvoices();
+    return true;
+  };
+
+  return { invoices, loading, createBoleto, checkPayment, cancelInvoice, refetch: fetchInvoices };
+}
