@@ -19,6 +19,8 @@ interface Props {
 }
 
 export default function CustomerTable({ customers, onEdit, onDelete, onToggleActive, onDetail, customerIdsWithInvoice, plans = [] }: Props) {
+  const now = new Date();
+  const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
   const planMap = Object.fromEntries(plans.map(p => [p.id, p.nome]));
   const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
 
@@ -61,7 +63,8 @@ export default function CustomerTable({ customers, onEdit, onDelete, onToggleAct
           </TableHeader>
           <TableBody>
             {customers.map((c) => {
-              const hasInvoice = customerIdsWithInvoice?.has(c.id) ?? false;
+              const hasPagoAte = c.pago_ate && new Date(c.pago_ate + "T12:00:00") >= currentMonthEnd;
+              const hasInvoice = hasPagoAte || (customerIdsWithInvoice?.has(c.id) ?? false);
               return (
                 <TableRow key={c.id} className={`hover:bg-muted/30 ${!c.ativo ? "opacity-50" : ""}`}>
                   <TableCell className="font-medium">{c.nome}</TableCell>
