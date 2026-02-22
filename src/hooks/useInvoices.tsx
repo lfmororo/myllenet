@@ -40,7 +40,7 @@ export function useInvoices() {
     const { data, error } = await supabase
       .from("invoices")
       .select("*, customers(nome, cpf, usuario_pppoe)")
-      .order("created_at", { ascending: false });
+      .order("vencimento", { ascending: true });
 
     if (error) {
       toast.error("Erro ao carregar faturas");
