@@ -1,22 +1,28 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useCustomers } from "@/hooks/useCustomers";
+import { useInvoices } from "@/hooks/useInvoices";
 import type { Customer } from "@/hooks/useCustomers";
 import CustomerTable from "@/components/CustomerTable";
 import CustomerFormDialog from "@/components/CustomerFormDialog";
+import InvoiceTable from "@/components/InvoiceTable";
+import CreateBoletoDialog from "@/components/CreateBoletoDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Wifi, Plus, Search, Download, LogOut, Loader2, ShieldAlert } from "lucide-react";
+import { Wifi, Plus, Search, Download, LogOut, Loader2, ShieldAlert, FileText } from "lucide-react";
 import { Navigate } from "react-router-dom";
 
 export default function Dashboard() {
   const { user, isAdmin, loading: authLoading, signOut } = useAuth();
   const { customers, loading, searchTerm, setSearchTerm, addCustomer, updateCustomer, deleteCustomer, exportCSV } = useCustomers();
+  const { invoices, loading: invoicesLoading, createBoleto, checkPayment, cancelInvoice } = useInvoices();
 
   const [formOpen, setFormOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [deletingCustomer, setDeletingCustomer] = useState<Customer | null>(null);
+  const [boletoOpen, setBoletoOpen] = useState(false);
 
   if (authLoading) {
     return (
@@ -85,49 +91,88 @@ export default function Dashboard() {
 
       {/* Main */}
       <main className="container mx-auto px-4 py-6 space-y-4">
-        {/* Actions bar */}
-        <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-          <div className="relative w-full sm:max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar por nome, CPF ou usuário PPPoE..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-          <div className="flex gap-2 w-full sm:w-auto">
-            <Button variant="outline" onClick={exportCSV} className="flex-1 sm:flex-none">
-              <Download className="mr-2 h-4 w-4" /> Exportar CSV
-            </Button>
-            <Button onClick={handleNewCustomer} className="flex-1 sm:flex-none">
-              <Plus className="mr-2 h-4 w-4" /> Novo Cliente
-            </Button>
-          </div>
-        </div>
+        <Tabs defaultValue="customers">
+          <TabsList>
+            <TabsTrigger value="customers">Clientes</TabsTrigger>
+            <TabsTrigger value="billing">
+              <FileText className="mr-1.5 h-4 w-4" />
+              Cobranças
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Stats */}
-        <div className="flex items-center gap-4 text-sm text-muted-foreground">
-          <span>{customers.length} cliente{customers.length !== 1 ? "s" : ""} cadastrado{customers.length !== 1 ? "s" : ""}</span>
-        </div>
+          {/* Customers Tab */}
+          <TabsContent value="customers" className="space-y-4">
+            <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+              <div className="relative w-full sm:max-w-sm">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar por nome, CPF ou usuário PPPoE..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              <div className="flex gap-2 w-full sm:w-auto">
+                <Button variant="outline" onClick={exportCSV} className="flex-1 sm:flex-none">
+                  <Download className="mr-2 h-4 w-4" /> Exportar CSV
+                </Button>
+                <Button onClick={handleNewCustomer} className="flex-1 sm:flex-none">
+                  <Plus className="mr-2 h-4 w-4" /> Novo Cliente
+                </Button>
+              </div>
+            </div>
+            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+              <span>{customers.length} cliente{customers.length !== 1 ? "s" : ""} cadastrado{customers.length !== 1 ? "s" : ""}</span>
+            </div>
+            {loading ? (
+              <div className="flex justify-center py-16">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            ) : (
+              <CustomerTable customers={customers} onEdit={handleEdit} onDelete={setDeletingCustomer} />
+            )}
+          </TabsContent>
 
-        {/* Table */}
-        {loading ? (
-          <div className="flex justify-center py-16">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          </div>
-        ) : (
-          <CustomerTable customers={customers} onEdit={handleEdit} onDelete={setDeletingCustomer} />
-        )}
+          {/* Billing Tab */}
+          <TabsContent value="billing" className="space-y-4">
+            <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+              <div className="text-sm text-muted-foreground">
+                {invoices.length} fatura{invoices.length !== 1 ? "s" : ""}
+              </div>
+              <Button onClick={() => setBoletoOpen(true)}>
+                <Plus className="mr-2 h-4 w-4" /> Gerar Boleto
+              </Button>
+            </div>
+            {invoicesLoading ? (
+              <div className="flex justify-center py-16">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            ) : (
+              <InvoiceTable
+                invoices={invoices}
+                onCheckPayment={checkPayment}
+                onCancel={cancelInvoice}
+              />
+            )}
+          </TabsContent>
+        </Tabs>
       </main>
 
-      {/* Form dialog */}
+      {/* Customer Form */}
       <CustomerFormDialog
         open={formOpen}
         onOpenChange={setFormOpen}
         customer={editingCustomer}
         onSave={addCustomer}
         onUpdate={updateCustomer}
+      />
+
+      {/* Boleto Form */}
+      <CreateBoletoDialog
+        open={boletoOpen}
+        onOpenChange={setBoletoOpen}
+        customers={customers}
+        onSave={createBoleto}
       />
 
       {/* Delete confirmation */}

@@ -50,6 +50,108 @@ export type Database = {
         }
         Relationships: []
       }
+      invoices: {
+        Row: {
+          created_at: string
+          customer_id: string
+          descricao: string
+          efi_barcode: string | null
+          efi_charge_id: number | null
+          efi_link: string | null
+          efi_pix_copiacola: string | null
+          efi_pix_qrcode: string | null
+          id: string
+          paid_at: string | null
+          plan_id: string | null
+          status: string
+          updated_at: string
+          valor_centavos: number
+          vencimento: string
+        }
+        Insert: {
+          created_at?: string
+          customer_id: string
+          descricao: string
+          efi_barcode?: string | null
+          efi_charge_id?: number | null
+          efi_link?: string | null
+          efi_pix_copiacola?: string | null
+          efi_pix_qrcode?: string | null
+          id?: string
+          paid_at?: string | null
+          plan_id?: string | null
+          status?: string
+          updated_at?: string
+          valor_centavos: number
+          vencimento: string
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string
+          descricao?: string
+          efi_barcode?: string | null
+          efi_charge_id?: number | null
+          efi_link?: string | null
+          efi_pix_copiacola?: string | null
+          efi_pix_qrcode?: string | null
+          id?: string
+          paid_at?: string | null
+          plan_id?: string | null
+          status?: string
+          updated_at?: string
+          valor_centavos?: number
+          vencimento?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      plans: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          descricao: string | null
+          id: string
+          intervalo_meses: number
+          nome: string
+          updated_at: string
+          valor_centavos: number
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          intervalo_meses?: number
+          nome: string
+          updated_at?: string
+          valor_centavos: number
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          intervalo_meses?: number
+          nome?: string
+          updated_at?: string
+          valor_centavos?: number
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
