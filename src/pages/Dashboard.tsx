@@ -74,7 +74,17 @@ export default function Dashboard() {
   }, [customers, customerIdsWithInvoiceThisMonth]);
 
   const displayedCustomers = filterNoBoleto
-    ? customers.filter(c => !customerIdsWithInvoiceThisMonth.has(c.id))
+    ? customers.filter(c => {
+        if (customerIdsWithInvoiceThisMonth.has(c.id)) return false;
+        if (!c.ativo) return false;
+        if (c.pago_ate) {
+          const now = new Date();
+          const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+          const pagoAte = new Date(c.pago_ate + "T12:00:00");
+          if (pagoAte >= currentMonthEnd) return false;
+        }
+        return true;
+      })
     : customers;
 
   if (authLoading) {
