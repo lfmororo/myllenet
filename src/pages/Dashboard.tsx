@@ -18,7 +18,7 @@ import { Navigate, useNavigate } from "react-router-dom";
 export default function Dashboard() {
   const { user, isAdmin, loading: authLoading, signOut } = useAuth();
   const navigate = useNavigate();
-  const { customers, loading, searchTerm, setSearchTerm, addCustomer, updateCustomer, deleteCustomer, exportCSV, bulkImport } = useCustomers();
+  const { customers, loading, searchTerm, setSearchTerm, addCustomer, updateCustomer, deleteCustomer, toggleCustomerActive, exportCSV, bulkImport } = useCustomers();
   const { invoices, loading: invoicesLoading, createBoleto, checkPayment, cancelInvoice, importFromEfi } = useInvoices();
 
   const [formOpen, setFormOpen] = useState(false);
@@ -139,7 +139,7 @@ export default function Dashboard() {
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
               </div>
             ) : (
-              <CustomerTable customers={customers} onEdit={handleEdit} onDelete={setDeletingCustomer} />
+              <CustomerTable customers={customers} onEdit={handleEdit} onDelete={setDeletingCustomer} onToggleActive={toggleCustomerActive} />
             )}
           </TabsContent>
 

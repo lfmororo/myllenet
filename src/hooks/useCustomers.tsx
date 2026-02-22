@@ -17,11 +17,12 @@ export interface Customer {
   cidade: string | null;
   estado: string | null;
   cep: string | null;
+  ativo: boolean;
   created_at: string;
   updated_at: string;
 }
 
-export type CustomerInput = Omit<Customer, "id" | "created_at" | "updated_at">;
+export type CustomerInput = Omit<Customer, "id" | "created_at" | "updated_at" | "ativo">;
 
 export function useCustomers() {
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -57,7 +58,7 @@ export function useCustomers() {
       if (error.code === "23505") {
         if (error.message.includes("cpf")) toast.error("CPF já cadastrado");
         else if (error.message.includes("email")) toast.error("E-mail já cadastrado");
-        else if (error.message.includes("usuario_pppoe")) toast.error("Usuário PPPoE já cadastrado");
+        else if (error.message.includes("usuario_pppoe")) toast.error("Usuário PPPoE já em uso por outro cliente ativo");
         else toast.error("Registro duplicado");
       } else {
         toast.error("Erro ao cadastrar cliente");
@@ -72,10 +73,29 @@ export function useCustomers() {
   const updateCustomer = async (id: string, customer: Partial<CustomerInput>) => {
     const { error } = await supabase.from("customers").update(customer).eq("id", id);
     if (error) {
-      toast.error("Erro ao atualizar cliente");
+      if (error.code === "23505" && error.message.includes("usuario_pppoe")) {
+        toast.error("Usuário PPPoE já em uso por outro cliente ativo");
+      } else {
+        toast.error("Erro ao atualizar cliente");
+      }
       return false;
     }
     toast.success("Cliente atualizado com sucesso!");
+    fetchCustomers();
+    return true;
+  };
+
+  const toggleCustomerActive = async (id: string, ativo: boolean) => {
+    const { error } = await supabase.from("customers").update({ ativo }).eq("id", id);
+    if (error) {
+      if (error.code === "23505" && error.message.includes("usuario_pppoe")) {
+        toast.error("Não é possível ativar: usuário PPPoE já em uso por outro cliente ativo");
+      } else {
+        toast.error(ativo ? "Erro ao ativar cliente" : "Erro ao desativar cliente");
+      }
+      return false;
+    }
+    toast.success(ativo ? "Cliente ativado!" : "Cliente desativado!");
     fetchCustomers();
     return true;
   };
@@ -129,5 +149,5 @@ export function useCustomers() {
     return { success, failed };
   };
 
-  return { customers, loading, searchTerm, setSearchTerm, addCustomer, updateCustomer, deleteCustomer, exportCSV, bulkImport, refetch: fetchCustomers };
+  return { customers, loading, searchTerm, setSearchTerm, addCustomer, updateCustomer, deleteCustomer, toggleCustomerActive, exportCSV, bulkImport, refetch: fetchCustomers };
 }
