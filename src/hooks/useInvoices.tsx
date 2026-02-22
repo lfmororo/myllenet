@@ -144,5 +144,39 @@ export function useInvoices() {
     return true;
   };
 
-  return { invoices, loading, createBoleto, checkPayment, cancelInvoice, refetch: fetchInvoices };
+  const importFromEfi = async (beginDate?: string, endDate?: string) => {
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      if (!token) { toast.error("Sessão expirada"); return null; }
+
+      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+      const params = new URLSearchParams();
+      if (beginDate) params.set("begin_date", beginDate);
+      if (endDate) params.set("end_date", endDate);
+
+      const response = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/efi-boleto/import?${params}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+        }
+      );
+
+      const result = await response.json();
+      if (!response.ok) { toast.error(result.error || "Erro ao importar"); return null; }
+
+      toast.success(`Importados: ${result.imported_customers} clientes, ${result.imported_invoices} faturas (${result.skipped_invoices} já existentes)`);
+      fetchInvoices();
+      return result;
+    } catch (err) {
+      console.error(err);
+      toast.error("Erro ao importar da EFI");
+      return null;
+    }
+  };
+
+  return { invoices, loading, createBoleto, checkPayment, cancelInvoice, importFromEfi, refetch: fetchInvoices };
 }

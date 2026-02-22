@@ -11,18 +11,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Wifi, Plus, Search, Download, LogOut, Loader2, ShieldAlert, FileText } from "lucide-react";
+import { Wifi, Plus, Search, Download, LogOut, Loader2, ShieldAlert, FileText, Import } from "lucide-react";
 import { Navigate } from "react-router-dom";
 
 export default function Dashboard() {
   const { user, isAdmin, loading: authLoading, signOut } = useAuth();
   const { customers, loading, searchTerm, setSearchTerm, addCustomer, updateCustomer, deleteCustomer, exportCSV } = useCustomers();
-  const { invoices, loading: invoicesLoading, createBoleto, checkPayment, cancelInvoice } = useInvoices();
+  const { invoices, loading: invoicesLoading, createBoleto, checkPayment, cancelInvoice, importFromEfi } = useInvoices();
 
   const [formOpen, setFormOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [deletingCustomer, setDeletingCustomer] = useState<Customer | null>(null);
   const [boletoOpen, setBoletoOpen] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   if (authLoading) {
     return (
@@ -139,9 +140,25 @@ export default function Dashboard() {
               <div className="text-sm text-muted-foreground">
                 {invoices.length} fatura{invoices.length !== 1 ? "s" : ""}
               </div>
-              <Button onClick={() => setBoletoOpen(true)}>
-                <Plus className="mr-2 h-4 w-4" /> Gerar Boleto
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  disabled={importing}
+                  onClick={async () => {
+                    setImporting(true);
+                    await importFromEfi();
+                    // Also refresh customers list
+                    setSearchTerm(searchTerm);
+                    setImporting(false);
+                  }}
+                >
+                  {importing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Import className="mr-2 h-4 w-4" />}
+                  Importar da EFI
+                </Button>
+                <Button onClick={() => setBoletoOpen(true)}>
+                  <Plus className="mr-2 h-4 w-4" /> Gerar Boleto
+                </Button>
+              </div>
             </div>
             {invoicesLoading ? (
               <div className="flex justify-center py-16">
