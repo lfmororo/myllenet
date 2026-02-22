@@ -11,11 +11,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Wifi, Plus, Search, Download, LogOut, Loader2, ShieldAlert, FileText, Import } from "lucide-react";
-import { Navigate } from "react-router-dom";
+import { Wifi, Plus, Search, Download, LogOut, Loader2, ShieldAlert, FileText, Import, Settings as SettingsIcon } from "lucide-react";
+import { Navigate, useNavigate } from "react-router-dom";
 
 export default function Dashboard() {
   const { user, isAdmin, loading: authLoading, signOut } = useAuth();
+  const navigate = useNavigate();
   const { customers, loading, searchTerm, setSearchTerm, addCustomer, updateCustomer, deleteCustomer, exportCSV } = useCustomers();
   const { invoices, loading: invoicesLoading, createBoleto, checkPayment, cancelInvoice, importFromEfi } = useInvoices();
 
@@ -83,6 +84,9 @@ export default function Dashboard() {
           </div>
           <div className="flex items-center gap-2">
             <span className="hidden sm:inline text-sm text-muted-foreground">{user.email}</span>
+            <Button variant="ghost" size="icon" onClick={() => navigate("/settings")} title="Configurações">
+              <SettingsIcon className="h-4 w-4" />
+            </Button>
             <Button variant="ghost" size="icon" onClick={signOut} title="Sair">
               <LogOut className="h-4 w-4" />
             </Button>
