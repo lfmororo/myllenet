@@ -196,13 +196,40 @@ export function useCustomers() {
     let success = 0;
     let failed = 0;
     for (const item of items) {
-      // Try upsert by CPF
-      const { error } = await supabase.from("customers").upsert(item, { onConflict: "cpf", ignoreDuplicates: false });
-      if (error) {
-        console.error("Import error for CPF", item.cpf, error.message);
-        failed++;
+      const cpfClean = item.cpf.replace(/\D/g, "");
+      // Check if customer already exists by CPF
+      const { data: existing } = await supabase
+        .from("customers")
+        .select("*")
+        .eq("cpf", cpfClean)
+        .maybeSingle();
+
+      if (existing) {
+        // Only update fields that are currently blank/null in the DB
+        const updates: Record<string, unknown> = {};
+        const fields: (keyof CustomerInput)[] = [
+          "nome", "email", "telefone", "usuario_pppoe", "senha_pppoe",
+          "rua", "numero", "complemento", "bairro", "cidade", "estado", "cep",
+        ];
+        for (const field of fields) {
+          const dbVal = existing[field];
+          const csvVal = item[field];
+          if ((!dbVal || (typeof dbVal === "string" && !dbVal.trim())) && csvVal) {
+            updates[field] = csvVal;
+          }
+        }
+        if (Object.keys(updates).length > 0) {
+          const { error } = await supabase.from("customers").update(updates).eq("id", existing.id);
+          if (error) { console.error("Update error for CPF", cpfClean, error.message); failed++; }
+          else success++;
+        } else {
+          success++; // nothing to update, counts as success
+        }
       } else {
-        success++;
+        // New customer — insert
+        const { error } = await supabase.from("customers").insert({ ...item, cpf: cpfClean });
+        if (error) { console.error("Insert error for CPF", cpfClean, error.message); failed++; }
+        else success++;
       }
     }
     fetchCustomers();
