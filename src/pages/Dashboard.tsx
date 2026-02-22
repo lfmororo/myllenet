@@ -19,7 +19,7 @@ export default function Dashboard() {
   const { user, isAdmin, loading: authLoading, signOut } = useAuth();
   const navigate = useNavigate();
   const { customers, loading, searchTerm, setSearchTerm, addCustomer, updateCustomer, deleteCustomer, toggleCustomerActive, exportCSV, bulkImport } = useCustomers();
-  const { invoices, loading: invoicesLoading, createBoleto, checkPayment, cancelInvoice, importFromEfi } = useInvoices();
+  const { invoices, loading: invoicesLoading, invoiceSearch, setInvoiceSearch, createBoleto, checkPayment, cancelInvoice, importFromEfi } = useInvoices();
 
   const [formOpen, setFormOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
@@ -146,8 +146,19 @@ export default function Dashboard() {
           {/* Billing Tab */}
           <TabsContent value="billing" className="space-y-4">
             <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-              <div className="text-sm text-muted-foreground">
-                {invoices.length} fatura{invoices.length !== 1 ? "s" : ""}
+              <div className="flex items-center gap-3">
+                <div className="relative w-full sm:w-72">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar por cliente ou usuário PPPoE..."
+                    value={invoiceSearch}
+                    onChange={(e) => setInvoiceSearch(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+                <span className="text-sm text-muted-foreground whitespace-nowrap">
+                  {invoices.length} fatura{invoices.length !== 1 ? "s" : ""}
+                </span>
               </div>
               <div className="flex gap-2">
                 <Button

@@ -19,7 +19,7 @@ export interface Invoice {
   created_at: string;
   updated_at: string;
   // joined
-  customers?: { nome: string; cpf: string };
+  customers?: { nome: string; cpf: string; usuario_pppoe: string };
 }
 
 export interface CreateInvoiceInput {
@@ -33,12 +33,13 @@ export interface CreateInvoiceInput {
 export function useInvoices() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
+  const [invoiceSearch, setInvoiceSearch] = useState("");
 
   const fetchInvoices = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase
       .from("invoices")
-      .select("*, customers(nome, cpf)")
+      .select("*, customers(nome, cpf, usuario_pppoe)")
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -178,5 +179,13 @@ export function useInvoices() {
     }
   };
 
-  return { invoices, loading, createBoleto, checkPayment, cancelInvoice, importFromEfi, refetch: fetchInvoices };
+  const filteredInvoices = invoices.filter((inv) => {
+    if (!invoiceSearch.trim()) return true;
+    const term = invoiceSearch.trim().toLowerCase();
+    const nome = inv.customers?.nome?.toLowerCase() || "";
+    const usuario = inv.customers?.usuario_pppoe?.toLowerCase() || "";
+    return nome.includes(term) || usuario.includes(term);
+  });
+
+  return { invoices: filteredInvoices, allInvoices: invoices, loading, invoiceSearch, setInvoiceSearch, createBoleto, checkPayment, cancelInvoice, importFromEfi, refetch: fetchInvoices };
 }
