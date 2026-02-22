@@ -246,8 +246,7 @@ export default function CSVImportDialog({ open, onOpenChange, onImport, existing
       }
 
       if (cpf && existingSet.has(cpf)) {
-        newIssues.push({ row: rowNum, field: "CPF", message: "Já cadastrado", type: "warning" });
-        rowValid = false;
+        newIssues.push({ row: rowNum, field: "CPF", message: "Já cadastrado — será atualizado", type: "warning" });
       }
       if (cpf && seenCpfs.has(cpf)) {
         newIssues.push({ row: rowNum, field: "CPF", message: "Duplicado no arquivo", type: "warning" });
