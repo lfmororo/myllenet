@@ -6,6 +6,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Pencil, Trash2, Eye, EyeOff, FileSearch, FileText, AlertCircle } from "lucide-react";
 import { useState } from "react";
 import type { Customer } from "@/hooks/useCustomers";
+import type { Plan } from "@/hooks/usePlans";
 
 interface Props {
   customers: Customer[];
@@ -14,9 +15,11 @@ interface Props {
   onToggleActive: (id: string, ativo: boolean) => Promise<boolean>;
   onDetail: (customer: Customer) => void;
   customerIdsWithInvoice?: Set<string>;
+  plans?: Plan[];
 }
 
-export default function CustomerTable({ customers, onEdit, onDelete, onToggleActive, onDetail, customerIdsWithInvoice }: Props) {
+export default function CustomerTable({ customers, onEdit, onDelete, onToggleActive, onDetail, customerIdsWithInvoice, plans = [] }: Props) {
+  const planMap = Object.fromEntries(plans.map(p => [p.id, p.nome]));
   const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
 
   const togglePassword = (id: string) => {
@@ -48,6 +51,7 @@ export default function CustomerTable({ customers, onEdit, onDelete, onToggleAct
               <TableHead className="font-semibold">CPF</TableHead>
               <TableHead className="font-semibold hidden md:table-cell">E-mail</TableHead>
               <TableHead className="font-semibold hidden lg:table-cell">Telefone</TableHead>
+              <TableHead className="font-semibold hidden lg:table-cell">Plano</TableHead>
               <TableHead className="font-semibold">Usuário PPPoE</TableHead>
               <TableHead className="font-semibold">Senha PPPoE</TableHead>
               {customerIdsWithInvoice && <TableHead className="font-semibold text-center">Boleto</TableHead>}
@@ -64,6 +68,7 @@ export default function CustomerTable({ customers, onEdit, onDelete, onToggleAct
                   <TableCell className="font-mono text-sm">{formatCPF(c.cpf)}</TableCell>
                   <TableCell className="hidden md:table-cell">{c.email}</TableCell>
                   <TableCell className="hidden lg:table-cell">{c.telefone || "—"}</TableCell>
+                  <TableCell className="hidden lg:table-cell">{c.plan_id ? planMap[c.plan_id] || "—" : "—"}</TableCell>
                   <TableCell className="font-mono text-sm">{c.usuario_pppoe}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">

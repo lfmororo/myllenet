@@ -237,6 +237,7 @@ export default function Dashboard() {
                 onToggleActive={toggleCustomerActive}
                 onDetail={setDetailCustomer}
                 customerIdsWithInvoice={customerIdsWithInvoiceThisMonth}
+                plans={plans}
               />
             )}
           </TabsContent>
