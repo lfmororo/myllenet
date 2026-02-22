@@ -115,14 +115,14 @@ export function useCustomers() {
   const bulkImport = async (items: CustomerInput[]): Promise<{ success: number; failed: number }> => {
     let success = 0;
     let failed = 0;
-    // Upsert in batches of 20 (update existing by CPF)
-    for (let i = 0; i < items.length; i += 20) {
-      const batch = items.slice(i, i + 20);
-      const { error } = await supabase.from("customers").upsert(batch, { onConflict: "cpf" });
+    for (const item of items) {
+      // Try upsert by CPF
+      const { error } = await supabase.from("customers").upsert(item, { onConflict: "cpf", ignoreDuplicates: false });
       if (error) {
-        failed += batch.length;
+        console.error("Import error for CPF", item.cpf, error.message);
+        failed++;
       } else {
-        success += batch.length;
+        success++;
       }
     }
     fetchCustomers();
