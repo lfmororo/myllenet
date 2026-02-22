@@ -271,6 +271,9 @@ export default function CSVImportDialog({ open, onOpenChange, onImport, existing
           cidade: getValue("cidade") || null,
           estado: getValue("estado") || null,
           cep: getValue("cep") || null,
+          dia_vencimento: 10,
+          plan_id: null,
+          desconto_especial_centavos: 0,
         });
       }
     });

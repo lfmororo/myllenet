@@ -18,6 +18,9 @@ export interface Customer {
   estado: string | null;
   cep: string | null;
   ativo: boolean;
+  dia_vencimento: number;
+  plan_id: string | null;
+  desconto_especial_centavos: number;
   created_at: string;
   updated_at: string;
 }
