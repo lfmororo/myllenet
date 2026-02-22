@@ -14,7 +14,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Loader2, Save, Upload, CheckCircle, XCircle, ShieldAlert, Zap, Plus, Pencil, Trash2, Package } from "lucide-react";
+import { ArrowLeft, Loader2, Save, Upload, CheckCircle, XCircle, ShieldAlert, Zap, Plus, Pencil, Trash2, Package, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 
 export default function Settings() {
@@ -28,6 +28,10 @@ export default function Settings() {
   const [saving, setSaving] = useState(false);
   const [loadingSettings, setLoadingSettings] = useState(true);
   const [testing, setTesting] = useState(false);
+
+  // WhatsApp settings
+  const [uazapiToken, setUazapiToken] = useState("");
+  const [savingWhatsapp, setSavingWhatsapp] = useState(false);
 
   // Plans state
   const { plans, loading: plansLoading, addPlan, updatePlan, deletePlan } = usePlans();
@@ -43,13 +47,14 @@ export default function Settings() {
     const { data } = await supabase
       .from("settings")
       .select("key, value")
-      .in("key", ["efi_client_id", "efi_client_secret", "efi_certificate_path"]);
+      .in("key", ["efi_client_id", "efi_client_secret", "efi_certificate_path", "uazapi_token"]);
 
     if (data) {
       for (const row of data) {
         if (row.key === "efi_client_id") setClientId(row.value || "");
         if (row.key === "efi_client_secret") setClientSecret(row.value || "");
         if (row.key === "efi_certificate_path") setCertUploaded(!!row.value);
+        if (row.key === "uazapi_token") setUazapiToken(row.value || "");
       }
     }
     setLoadingSettings(false);
@@ -168,6 +173,9 @@ export default function Settings() {
               <Package className="mr-1.5 h-4 w-4" /> Planos
             </TabsTrigger>
             <TabsTrigger value="efi">API EFI</TabsTrigger>
+            <TabsTrigger value="whatsapp">
+              <MessageCircle className="mr-1.5 h-4 w-4" /> WhatsApp
+            </TabsTrigger>
           </TabsList>
 
           {/* Plans Tab */}
@@ -330,6 +338,62 @@ export default function Settings() {
                         Testar Conexão
                       </Button>
                     </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* WhatsApp Tab */}
+          <TabsContent value="whatsapp" className="mt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>WhatsApp (uazapi)</CardTitle>
+                <CardDescription>
+                  Configure o token de acesso à API do servidor uazapi para envio de notificações via WhatsApp.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {loadingSettings ? (
+                  <div className="flex justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                  </div>
+                ) : (
+                  <div className="space-y-5">
+                    <div className="space-y-2">
+                      <Label htmlFor="uazapi_token">Token da API</Label>
+                      <Input
+                        id="uazapi_token"
+                        type="password"
+                        value={uazapiToken}
+                        onChange={(e) => setUazapiToken(e.target.value)}
+                        placeholder="Informe o token do servidor uazapi"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Servidor: https://ipazua.uazapi.com
+                      </p>
+                    </div>
+
+                    <Button
+                      onClick={async () => {
+                        setSavingWhatsapp(true);
+                        try {
+                          await upsertSetting("uazapi_token", uazapiToken);
+                          toast.success("Token WhatsApp salvo!");
+                        } catch (err: any) {
+                          toast.error("Erro ao salvar: " + (err.message || "Erro desconhecido"));
+                        }
+                        setSavingWhatsapp(false);
+                      }}
+                      disabled={savingWhatsapp}
+                    >
+                      {savingWhatsapp ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Save className="mr-2 h-4 w-4" />
+                      )}
+                      Salvar Token
+                    </Button>
                   </div>
                 )}
               </CardContent>

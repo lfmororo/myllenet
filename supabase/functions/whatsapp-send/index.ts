@@ -45,9 +45,25 @@ async function verifyAdmin(authHeader: string | null) {
   return userId;
 }
 
+async function getUazapiToken(): Promise<string> {
+  // Try settings table first, fallback to env
+  const supabase = getSupabaseAdmin();
+  const { data } = await supabase
+    .from("settings")
+    .select("value")
+    .eq("key", "uazapi_token")
+    .maybeSingle();
+
+  if (data?.value) return data.value;
+
+  const envToken = Deno.env.get("UAZAPI_TOKEN");
+  if (envToken) return envToken;
+
+  throw new Error("Token WhatsApp não configurado. Acesse Configurações > WhatsApp.");
+}
+
 async function uazapiRequest(endpoint: string, body: unknown) {
-  const token = Deno.env.get("UAZAPI_TOKEN");
-  if (!token) throw new Error("UAZAPI_TOKEN not configured");
+  const token = await getUazapiToken();
 
   const response = await fetch(`${UAZAPI_BASE_URL}${endpoint}`, {
     method: "POST",
