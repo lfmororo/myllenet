@@ -155,6 +155,7 @@ export type Database = {
           juros_mensal: number
           multa_centavos: number
           nome: string
+          nome_servidor: string | null
           updated_at: string
           valor_centavos: number
         }
@@ -169,6 +170,7 @@ export type Database = {
           juros_mensal?: number
           multa_centavos?: number
           nome: string
+          nome_servidor?: string | null
           updated_at?: string
           valor_centavos: number
         }
@@ -183,6 +185,7 @@ export type Database = {
           juros_mensal?: number
           multa_centavos?: number
           nome?: string
+          nome_servidor?: string | null
           updated_at?: string
           valor_centavos?: number
         }

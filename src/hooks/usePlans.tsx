@@ -5,6 +5,7 @@ import { toast } from "sonner";
 export interface Plan {
   id: string;
   nome: string;
+  nome_servidor: string | null;
   descricao: string | null;
   valor_centavos: number;
   intervalo_meses: number;
