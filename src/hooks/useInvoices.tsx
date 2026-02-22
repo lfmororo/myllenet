@@ -179,6 +179,24 @@ export function useInvoices() {
     }
   };
 
+  const bulkImportInvoices = async (rows: { customer_id: string; descricao: string; valor_centavos: number; vencimento: string; status: string }[]) => {
+    let success = 0;
+    let failed = 0;
+    // Insert in batches of 50
+    for (let i = 0; i < rows.length; i += 50) {
+      const batch = rows.slice(i, i + 50);
+      const { error } = await supabase.from("invoices").insert(batch);
+      if (error) {
+        console.error("Batch insert error:", error);
+        failed += batch.length;
+      } else {
+        success += batch.length;
+      }
+    }
+    fetchInvoices();
+    return { success, failed };
+  };
+
   const filteredInvoices = invoices.filter((inv) => {
     if (!invoiceSearch.trim()) return true;
     const term = invoiceSearch.trim().toLowerCase();
@@ -187,5 +205,5 @@ export function useInvoices() {
     return nome.includes(term) || usuario.includes(term);
   });
 
-  return { invoices: filteredInvoices, allInvoices: invoices, loading, invoiceSearch, setInvoiceSearch, createBoleto, checkPayment, cancelInvoice, importFromEfi, refetch: fetchInvoices };
+  return { invoices: filteredInvoices, allInvoices: invoices, loading, invoiceSearch, setInvoiceSearch, createBoleto, checkPayment, cancelInvoice, importFromEfi, bulkImportInvoices, refetch: fetchInvoices };
 }

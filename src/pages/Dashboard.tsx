@@ -7,6 +7,7 @@ import type { Customer } from "@/hooks/useCustomers";
 import CustomerTable from "@/components/CustomerTable";
 import CustomerFormDialog from "@/components/CustomerFormDialog";
 import CSVImportDialog from "@/components/CSVImportDialog";
+import InvoiceCSVImportDialog from "@/components/InvoiceCSVImportDialog";
 import InvoiceTable from "@/components/InvoiceTable";
 import CreateBoletoDialog from "@/components/CreateBoletoDialog";
 import CustomerDetailDialog from "@/components/CustomerDetailDialog";
@@ -23,7 +24,7 @@ export default function Dashboard() {
   const { user, isAdmin, loading: authLoading, signOut } = useAuth();
   const navigate = useNavigate();
   const { customers, loading, searchTerm, setSearchTerm, addCustomer, updateCustomer, deleteCustomer, toggleCustomerActive, exportCSV, bulkImport } = useCustomers();
-  const { invoices, allInvoices, loading: invoicesLoading, invoiceSearch, setInvoiceSearch, createBoleto, checkPayment, cancelInvoice, importFromEfi, refetch: refetchInvoices } = useInvoices();
+  const { invoices, allInvoices, loading: invoicesLoading, invoiceSearch, setInvoiceSearch, createBoleto, checkPayment, cancelInvoice, importFromEfi, bulkImportInvoices, refetch: refetchInvoices } = useInvoices();
   const { plans } = usePlans();
 
   const [formOpen, setFormOpen] = useState(false);
@@ -32,6 +33,7 @@ export default function Dashboard() {
   const [boletoOpen, setBoletoOpen] = useState(false);
   const [csvImportOpen, setCsvImportOpen] = useState(false);
   const [detailCustomer, setDetailCustomer] = useState<Customer | null>(null);
+  const [invoiceCsvImportOpen, setInvoiceCsvImportOpen] = useState(false);
   const [importing, setImporting] = useState(false);
   const [filterNoBoleto, setFilterNoBoleto] = useState(false);
   const [bulkGenerating, setBulkGenerating] = useState(false);
@@ -328,6 +330,9 @@ export default function Dashboard() {
                     </>
                   )}
                 </Button>
+                <Button variant="outline" onClick={() => setInvoiceCsvImportOpen(true)}>
+                  <Upload className="mr-2 h-4 w-4" /> Importar CSV
+                </Button>
                 <Button onClick={() => setBoletoOpen(true)}>
                   <Plus className="mr-2 h-4 w-4" /> Gerar Boleto
                 </Button>
@@ -376,6 +381,14 @@ export default function Dashboard() {
         allInvoices={allInvoices}
         onUpdateCustomer={updateCustomer}
         existingCustomers={customers.map(c => ({ id: c.id, cpf: c.cpf }))}
+      />
+
+      {/* Invoice CSV Import */}
+      <InvoiceCSVImportDialog
+        open={invoiceCsvImportOpen}
+        onOpenChange={setInvoiceCsvImportOpen}
+        customers={customers.map(c => ({ id: c.id, nome: c.nome, cpf: c.cpf }))}
+        onImport={bulkImportInvoices}
       />
 
       {/* Customer Detail */}
