@@ -33,6 +33,7 @@ const formatPhone = (value: string) => {
 export default function CustomerFormDialog({ open, onOpenChange, customer, onSave, onUpdate }: Props) {
   const [form, setForm] = useState<CustomerInput>({
     nome: "", cpf: "", email: "", telefone: "", usuario_pppoe: "", senha_pppoe: "",
+    rua: null, numero: null, complemento: null, bairro: null, cidade: null, estado: null, cep: null,
   });
   const [saving, setSaving] = useState(false);
 
@@ -45,9 +46,17 @@ export default function CustomerFormDialog({ open, onOpenChange, customer, onSav
         telefone: customer.telefone || "",
         usuario_pppoe: customer.usuario_pppoe,
         senha_pppoe: customer.senha_pppoe,
+        rua: customer.rua || null,
+        numero: customer.numero || null,
+        complemento: customer.complemento || null,
+        bairro: customer.bairro || null,
+        cidade: customer.cidade || null,
+        estado: customer.estado || null,
+        cep: customer.cep || null,
       });
     } else {
-      setForm({ nome: "", cpf: "", email: "", telefone: "", usuario_pppoe: "", senha_pppoe: "" });
+      setForm({ nome: "", cpf: "", email: "", telefone: "", usuario_pppoe: "", senha_pppoe: "",
+        rua: null, numero: null, complemento: null, bairro: null, cidade: null, estado: null, cep: null });
     }
   }, [customer, open]);
 
@@ -67,9 +76,14 @@ export default function CustomerFormDialog({ open, onOpenChange, customer, onSav
     if (success) onOpenChange(false);
   };
 
+  const formatCEP = (value: string) => {
+    const digits = value.replace(/\D/g, "").slice(0, 8);
+    return digits.replace(/(\d{5})(\d)/, "$1-$2");
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{customer ? "Editar Cliente" : "Novo Cliente"}</DialogTitle>
         </DialogHeader>
@@ -100,6 +114,42 @@ export default function CustomerFormDialog({ open, onOpenChange, customer, onSav
               <Input id="senha_pppoe" value={form.senha_pppoe} onChange={(e) => setForm({ ...form, senha_pppoe: e.target.value })} required maxLength={50} />
             </div>
           </div>
+
+          {/* Endereço */}
+          <div className="border-t pt-4">
+            <p className="text-sm font-medium mb-3 text-muted-foreground">Endereço</p>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="rua">Rua</Label>
+                <Input id="rua" value={form.rua || ""} onChange={(e) => setForm({ ...form, rua: e.target.value || null })} maxLength={200} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="numero">Número</Label>
+                <Input id="numero" value={form.numero || ""} onChange={(e) => setForm({ ...form, numero: e.target.value || null })} maxLength={20} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="complemento">Complemento</Label>
+                <Input id="complemento" value={form.complemento || ""} onChange={(e) => setForm({ ...form, complemento: e.target.value || null })} maxLength={100} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="bairro">Bairro</Label>
+                <Input id="bairro" value={form.bairro || ""} onChange={(e) => setForm({ ...form, bairro: e.target.value || null })} maxLength={100} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="cidade">Cidade</Label>
+                <Input id="cidade" value={form.cidade || ""} onChange={(e) => setForm({ ...form, cidade: e.target.value || null })} maxLength={100} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="estado">Estado</Label>
+                <Input id="estado" value={form.estado || ""} onChange={(e) => setForm({ ...form, estado: e.target.value.toUpperCase() || null })} placeholder="UF" maxLength={2} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="cep">CEP</Label>
+                <Input id="cep" value={form.cep || ""} onChange={(e) => setForm({ ...form, cep: formatCEP(e.target.value) })} placeholder="00000-000" maxLength={9} />
+              </div>
+            </div>
+          </div>
+
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
             <Button type="submit" disabled={saving}>
