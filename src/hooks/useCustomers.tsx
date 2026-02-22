@@ -104,5 +104,22 @@ export function useCustomers() {
     toast.success("Exportação concluída!");
   };
 
-  return { customers, loading, searchTerm, setSearchTerm, addCustomer, updateCustomer, deleteCustomer, exportCSV, refetch: fetchCustomers };
+  const bulkImport = async (items: CustomerInput[]): Promise<{ success: number; failed: number }> => {
+    let success = 0;
+    let failed = 0;
+    // Insert in batches of 20
+    for (let i = 0; i < items.length; i += 20) {
+      const batch = items.slice(i, i + 20);
+      const { error } = await supabase.from("customers").insert(batch);
+      if (error) {
+        failed += batch.length;
+      } else {
+        success += batch.length;
+      }
+    }
+    fetchCustomers();
+    return { success, failed };
+  };
+
+  return { customers, loading, searchTerm, setSearchTerm, addCustomer, updateCustomer, deleteCustomer, exportCSV, bulkImport, refetch: fetchCustomers };
 }

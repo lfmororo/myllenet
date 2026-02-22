@@ -5,25 +5,27 @@ import { useInvoices } from "@/hooks/useInvoices";
 import type { Customer } from "@/hooks/useCustomers";
 import CustomerTable from "@/components/CustomerTable";
 import CustomerFormDialog from "@/components/CustomerFormDialog";
+import CSVImportDialog from "@/components/CSVImportDialog";
 import InvoiceTable from "@/components/InvoiceTable";
 import CreateBoletoDialog from "@/components/CreateBoletoDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Wifi, Plus, Search, Download, LogOut, Loader2, ShieldAlert, FileText, Import, Settings as SettingsIcon } from "lucide-react";
+import { Wifi, Plus, Search, Download, LogOut, Loader2, ShieldAlert, FileText, Import, Settings as SettingsIcon, Upload } from "lucide-react";
 import { Navigate, useNavigate } from "react-router-dom";
 
 export default function Dashboard() {
   const { user, isAdmin, loading: authLoading, signOut } = useAuth();
   const navigate = useNavigate();
-  const { customers, loading, searchTerm, setSearchTerm, addCustomer, updateCustomer, deleteCustomer, exportCSV } = useCustomers();
+  const { customers, loading, searchTerm, setSearchTerm, addCustomer, updateCustomer, deleteCustomer, exportCSV, bulkImport } = useCustomers();
   const { invoices, loading: invoicesLoading, createBoleto, checkPayment, cancelInvoice, importFromEfi } = useInvoices();
 
   const [formOpen, setFormOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [deletingCustomer, setDeletingCustomer] = useState<Customer | null>(null);
   const [boletoOpen, setBoletoOpen] = useState(false);
+  const [csvImportOpen, setCsvImportOpen] = useState(false);
   const [importing, setImporting] = useState(false);
 
   if (authLoading) {
@@ -121,6 +123,9 @@ export default function Dashboard() {
                 <Button variant="outline" onClick={exportCSV} className="flex-1 sm:flex-none">
                   <Download className="mr-2 h-4 w-4" /> Exportar CSV
                 </Button>
+                <Button variant="outline" onClick={() => setCsvImportOpen(true)} className="flex-1 sm:flex-none">
+                  <Upload className="mr-2 h-4 w-4" /> Importar CSV
+                </Button>
                 <Button onClick={handleNewCustomer} className="flex-1 sm:flex-none">
                   <Plus className="mr-2 h-4 w-4" /> Novo Cliente
                 </Button>
@@ -194,6 +199,14 @@ export default function Dashboard() {
         onOpenChange={setBoletoOpen}
         customers={customers}
         onSave={createBoleto}
+      />
+
+      {/* CSV Import */}
+      <CSVImportDialog
+        open={csvImportOpen}
+        onOpenChange={setCsvImportOpen}
+        onImport={bulkImport}
+        existingCpfs={customers.map((c) => c.cpf)}
       />
 
       {/* Delete confirmation */}
