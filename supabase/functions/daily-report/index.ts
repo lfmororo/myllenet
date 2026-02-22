@@ -47,6 +47,28 @@ async function sendWhatsApp(phone: string, message: string) {
   return response.ok;
 }
 
+async function logNotification(supabase: any, params: {
+  customer_name: string;
+  phone?: string;
+  type: string;
+  message: string;
+  status: "sent" | "failed";
+  error_message?: string;
+}) {
+  try {
+    await supabase.from("notification_logs").insert({
+      customer_name: params.customer_name,
+      phone: params.phone || null,
+      type: params.type,
+      message: params.message,
+      status: params.status,
+      error_message: params.error_message || null,
+    });
+  } catch (err) {
+    console.error("Failed to log notification:", err);
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -57,14 +79,12 @@ Deno.serve(async (req) => {
     const today = new Date();
     const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
 
-    // Get invoices due today (pending)
     const { data: dueToday } = await supabase
       .from("invoices")
       .select("*, customers(nome, telefone, cpf, usuario_pppoe)")
       .eq("vencimento", todayStr)
       .eq("status", "pending");
 
-    // Get overdue invoices (pending with past due date)
     const { data: overdue } = await supabase
       .from("invoices")
       .select("*, customers(nome, telefone, cpf, usuario_pppoe)")
@@ -81,7 +101,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Build admin notification message
     const formatCurrency = (v: number) => (v / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
     const formatDate = (d: string) => {
       const [y, m, day] = d.split("-");
@@ -103,7 +122,6 @@ Deno.serve(async (req) => {
       const totalOverdue = overdueList.reduce((s: number, i: any) => s + i.valor_centavos, 0);
       message += `⚠️ *Inadimplentes (${overdueList.length}) - Total: ${formatCurrency(totalOverdue)}:*\n`;
       
-      // Group by days overdue
       const sorted = overdueList.sort((a: any, b: any) => a.vencimento.localeCompare(b.vencimento));
       for (const inv of sorted.slice(0, 30)) {
         const c = (inv as any).customers;
@@ -117,7 +135,6 @@ Deno.serve(async (req) => {
 
     message += "\n_Relatório automático do sistema Myllenet_";
 
-    // Get admin users with phone numbers
     const { data: adminRoles } = await supabase
       .from("user_roles")
       .select("user_id")
@@ -130,7 +147,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Get admin phone numbers from auth
     let sent = 0;
     let failed = 0;
 
@@ -144,15 +160,39 @@ Deno.serve(async (req) => {
 
       try {
         const ok = await sendWhatsApp(phone, message);
-        if (ok) sent++;
-        else failed++;
+        if (ok) {
+          sent++;
+          await logNotification(supabase, {
+            customer_name: "Admin",
+            phone,
+            type: "relatorio_diario",
+            message,
+            status: "sent",
+          });
+        } else {
+          failed++;
+          await logNotification(supabase, {
+            customer_name: "Admin",
+            phone,
+            type: "relatorio_diario",
+            message,
+            status: "failed",
+          });
+        }
       } catch (err) {
         console.error(`Failed to send to admin ${role.user_id}:`, err);
         failed++;
+        await logNotification(supabase, {
+          customer_name: "Admin",
+          phone,
+          type: "relatorio_diario",
+          message,
+          status: "failed",
+          error_message: err.message,
+        });
       }
     }
 
-    // Also update overdue invoices status
     if (overdueList.length > 0) {
       const overdueIds = overdueList.filter((i: any) => i.status === "pending").map((i: any) => i.id);
       if (overdueIds.length > 0) {

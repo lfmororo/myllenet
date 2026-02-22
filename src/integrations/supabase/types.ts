@@ -160,6 +160,50 @@ export type Database = {
           },
         ]
       }
+      notification_logs: {
+        Row: {
+          created_at: string
+          customer_id: string | null
+          customer_name: string
+          error_message: string | null
+          id: string
+          message: string
+          phone: string | null
+          status: string
+          type: string
+        }
+        Insert: {
+          created_at?: string
+          customer_id?: string | null
+          customer_name: string
+          error_message?: string | null
+          id?: string
+          message: string
+          phone?: string | null
+          status?: string
+          type: string
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string | null
+          customer_name?: string
+          error_message?: string | null
+          id?: string
+          message?: string
+          phone?: string | null
+          status?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_logs_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       plans: {
         Row: {
           ativo: boolean

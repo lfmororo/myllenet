@@ -47,6 +47,30 @@ async function sendWhatsApp(phone: string, message: string) {
   return response.ok;
 }
 
+async function logNotification(supabase: any, params: {
+  customer_id?: string;
+  customer_name: string;
+  phone?: string;
+  type: string;
+  message: string;
+  status: "sent" | "failed";
+  error_message?: string;
+}) {
+  try {
+    await supabase.from("notification_logs").insert({
+      customer_id: params.customer_id || null,
+      customer_name: params.customer_name,
+      phone: params.phone || null,
+      type: params.type,
+      message: params.message,
+      status: params.status,
+      error_message: params.error_message || null,
+    });
+  } catch (err) {
+    console.error("Failed to log notification:", err);
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -56,14 +80,12 @@ Deno.serve(async (req) => {
     const supabase = getSupabaseAdmin();
     const today = new Date();
 
-    // Calculate the date 3 days from now
     const reminderDate = new Date(today);
     reminderDate.setDate(reminderDate.getDate() + 3);
     const reminderStr = `${reminderDate.getFullYear()}-${String(reminderDate.getMonth() + 1).padStart(2, "0")}-${String(reminderDate.getDate()).padStart(2, "0")}`;
 
     console.log(`Checking invoices due on ${reminderStr} (3 days from now)`);
 
-    // Get pending invoices due in 3 days
     const { data: dueSoon } = await supabase
       .from("invoices")
       .select("*, customers(nome, telefone, cpf, usuario_pppoe)")
@@ -111,14 +133,42 @@ _Equipe Myllenet_`;
 
       try {
         const ok = await sendWhatsApp(customer.telefone, message);
-        if (ok) sent++;
-        else failed++;
+        if (ok) {
+          sent++;
+          await logNotification(supabase, {
+            customer_id: inv.customer_id,
+            customer_name: customer.nome,
+            phone: customer.telefone,
+            type: "lembrete_vencimento",
+            message,
+            status: "sent",
+          });
+        } else {
+          failed++;
+          await logNotification(supabase, {
+            customer_id: inv.customer_id,
+            customer_name: customer.nome,
+            phone: customer.telefone,
+            type: "lembrete_vencimento",
+            message,
+            status: "failed",
+            error_message: "WhatsApp API returned non-ok status",
+          });
+        }
       } catch (err) {
         console.error(`Failed to send reminder to ${customer.nome}:`, err);
         failed++;
+        await logNotification(supabase, {
+          customer_id: inv.customer_id,
+          customer_name: customer.nome,
+          phone: customer.telefone,
+          type: "lembrete_vencimento",
+          message,
+          status: "failed",
+          error_message: err.message,
+        });
       }
 
-      // Delay between messages to avoid rate limiting
       await new Promise(resolve => setTimeout(resolve, 1500));
     }
 

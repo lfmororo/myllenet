@@ -91,7 +91,7 @@ export function useWhatsApp() {
     return { success, failed };
   };
 
-  const sendText = async (phone: string, message: string) => {
+  const sendText = async (phone: string, message: string, customerInfo?: { customer_id?: string; customer_name?: string }) => {
     const headers = await getAuthHeaders();
     if (!headers) return false;
 
@@ -102,7 +102,7 @@ export function useWhatsApp() {
         {
           method: "POST",
           headers,
-          body: JSON.stringify({ phone, message }),
+          body: JSON.stringify({ phone, message, ...customerInfo }),
         }
       );
 
