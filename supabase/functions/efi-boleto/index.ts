@@ -58,7 +58,10 @@ async function efiRequest(path: string, method: string, body?: unknown) {
   try { data = JSON.parse(responseText); } catch { data = { raw: responseText }; }
 
   if (!response.ok) {
-    throw new Error(data.message || data.error_description || `EFI API error: ${response.status} - ${responseText.slice(0, 200)}`);
+    const errMsg = typeof data.error_description === 'object' 
+      ? JSON.stringify(data.error_description) 
+      : (data.error_description || data.message || `EFI API error: ${response.status}`);
+    throw new Error(errMsg);
   }
 
   return data;
@@ -309,7 +312,7 @@ async function importFromEfi(req: Request) {
 
     while (hasMore) {
       const charges = await efiRequest(
-        `/v1/charges?charge_type=billet&status=all&begin_date=${beginDate}&end_date=${endDate}&limit=${limit}&offset=${offset}`,
+        `/v1/charges?charge_type=billet&begin_date=${beginDate}&end_date=${endDate}&limit=${limit}&offset=${offset}`,
         "GET"
       );
       const page = charges.data || charges || [];
