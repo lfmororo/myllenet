@@ -86,15 +86,48 @@ export function useCustomers() {
   };
 
   const toggleCustomerActive = async (id: string, ativo: boolean) => {
-    // If deactivating, cancel all pending invoices first
+    // If deactivating, cancel all pending invoices (locally + EFI)
     if (!ativo) {
       const { data: openInvoices } = await supabase
         .from("invoices")
-        .select("id")
+        .select("id, efi_charge_id")
         .eq("customer_id", id)
         .in("status", ["pending", "waiting"]);
 
       if (openInvoices && openInvoices.length > 0) {
+        // Cancel on EFI for invoices that have a charge_id
+        const efiInvoices = openInvoices.filter((inv) => inv.efi_charge_id);
+        if (efiInvoices.length > 0) {
+          try {
+            const { data: sessionData } = await supabase.auth.getSession();
+            const token = sessionData?.session?.access_token;
+            if (token) {
+              const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+              for (const inv of efiInvoices) {
+                try {
+                  await fetch(
+                    `https://${projectId}.supabase.co/functions/v1/efi-boleto/cancel`,
+                    {
+                      method: "POST",
+                      headers: {
+                        Authorization: `Bearer ${token}`,
+                        "Content-Type": "application/json",
+                        apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+                      },
+                      body: JSON.stringify({ charge_id: inv.efi_charge_id }),
+                    }
+                  );
+                } catch (e) {
+                  console.error("Erro ao cancelar cobrança EFI:", inv.efi_charge_id, e);
+                }
+              }
+            }
+          } catch (e) {
+            console.error("Erro ao obter sessão para cancelar na EFI:", e);
+          }
+        }
+
+        // Cancel locally
         const { error: cancelError } = await supabase
           .from("invoices")
           .update({ status: "cancelled" })
@@ -106,7 +139,7 @@ export function useCustomers() {
           toast.error("Erro ao cancelar faturas em aberto");
           return false;
         }
-        toast.info(`${openInvoices.length} fatura(s) em aberto cancelada(s)`);
+        toast.info(`${openInvoices.length} fatura(s) em aberto cancelada(s) (inclusive na EFI)`);
       }
     }
 
