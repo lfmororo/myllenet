@@ -17,6 +17,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Wifi, Plus, Search, Download, LogOut, Loader2, ShieldAlert, FileText, Import, Settings as SettingsIcon, Upload, AlertTriangle, Zap, Filter } from "lucide-react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function Dashboard() {
   const { user, isAdmin, loading: authLoading, signOut } = useAuth();
@@ -34,7 +35,8 @@ export default function Dashboard() {
   const [importing, setImporting] = useState(false);
   const [filterNoBoleto, setFilterNoBoleto] = useState(false);
   const [bulkGenerating, setBulkGenerating] = useState(false);
-
+  const [bulkCheckingEfi, setBulkCheckingEfi] = useState(false);
+  const [bulkCheckProgress, setBulkCheckProgress] = useState({ done: 0, total: 0, imported: 0 });
   // Compute which customers have invoices this month
   const customerIdsWithInvoiceThisMonth = useMemo(() => {
     const now = new Date();
@@ -254,20 +256,77 @@ export default function Dashboard() {
                   {invoices.length} fatura{invoices.length !== 1 ? "s" : ""}
                 </span>
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button
                   variant="outline"
                   disabled={importing}
                   onClick={async () => {
                     setImporting(true);
                     await importFromEfi();
-                    // Also refresh customers list
                     setSearchTerm(searchTerm);
                     setImporting(false);
                   }}
                 >
                   {importing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Import className="mr-2 h-4 w-4" />}
                   Importar da EFI
+                </Button>
+                <Button
+                  variant="outline"
+                  disabled={bulkCheckingEfi}
+                  onClick={async () => {
+                    const activeCustomers = customers.filter(c => c.ativo);
+                    if (activeCustomers.length === 0) {
+                      toast.error("Nenhum cliente ativo para consultar");
+                      return;
+                    }
+                    setBulkCheckingEfi(true);
+                    setBulkCheckProgress({ done: 0, total: activeCustomers.length, imported: 0 });
+
+                    const { data: sessionData } = await supabase.auth.getSession();
+                    const token = sessionData?.session?.access_token;
+                    if (!token) { toast.error("Sessão expirada"); setBulkCheckingEfi(false); return; }
+
+                    const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+                    let totalImported = 0;
+
+                    for (let i = 0; i < activeCustomers.length; i++) {
+                      const c = activeCustomers[i];
+                      try {
+                        const response = await fetch(
+                          `https://${projectId}.supabase.co/functions/v1/efi-boleto/check-customer?customer_id=${c.id}`,
+                          {
+                            headers: {
+                              Authorization: `Bearer ${token}`,
+                              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+                            },
+                          }
+                        );
+                        const result = await response.json();
+                        if (response.ok && result.imported > 0) {
+                          totalImported += result.imported;
+                        }
+                      } catch (e) {
+                        console.error(`Erro ao consultar EFI para ${c.nome}:`, e);
+                      }
+                      setBulkCheckProgress({ done: i + 1, total: activeCustomers.length, imported: totalImported });
+                    }
+
+                    setBulkCheckingEfi(false);
+                    toast.success(`Consulta concluída! ${totalImported} cobrança(s) importada(s) de ${activeCustomers.length} clientes.`);
+                    refetchInvoices();
+                  }}
+                >
+                  {bulkCheckingEfi ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      {bulkCheckProgress.done}/{bulkCheckProgress.total}
+                    </>
+                  ) : (
+                    <>
+                      <Search className="mr-2 h-4 w-4" />
+                      Consultar EFI (todos)
+                    </>
+                  )}
                 </Button>
                 <Button onClick={() => setBoletoOpen(true)}>
                   <Plus className="mr-2 h-4 w-4" /> Gerar Boleto
