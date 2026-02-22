@@ -1,0 +1,1 @@
+ALTER TABLE public.plans ADD COLUMN nome_servidor text;

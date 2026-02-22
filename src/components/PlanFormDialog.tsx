@@ -17,6 +17,7 @@ interface Props {
 
 const emptyForm: PlanInput = {
   nome: "",
+  nome_servidor: null,
   descricao: null,
   valor_centavos: 0,
   intervalo_meses: 1,
@@ -42,6 +43,7 @@ export default function PlanFormDialog({ open, onOpenChange, plan, onSave, onUpd
     if (plan) {
       setForm({
         nome: plan.nome,
+        nome_servidor: plan.nome_servidor,
         descricao: plan.descricao,
         valor_centavos: plan.valor_centavos,
         intervalo_meses: plan.intervalo_meses,
@@ -84,6 +86,10 @@ export default function PlanFormDialog({ open, onOpenChange, plan, onSave, onUpd
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="plan-desc">Descrição</Label>
               <Input id="plan-desc" value={form.descricao || ""} onChange={(e) => setForm({ ...form, descricao: e.target.value || null })} maxLength={200} />
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="plan-nome-servidor">Nome do plano no servidor</Label>
+              <Input id="plan-nome-servidor" value={form.nome_servidor || ""} onChange={(e) => setForm({ ...form, nome_servidor: e.target.value || null })} maxLength={100} placeholder="Ex: plano_50mb" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="plan-valor">Valor (R$) *</Label>
