@@ -86,6 +86,30 @@ export function useCustomers() {
   };
 
   const toggleCustomerActive = async (id: string, ativo: boolean) => {
+    // If deactivating, cancel all pending invoices first
+    if (!ativo) {
+      const { data: openInvoices } = await supabase
+        .from("invoices")
+        .select("id")
+        .eq("customer_id", id)
+        .in("status", ["pending", "waiting"]);
+
+      if (openInvoices && openInvoices.length > 0) {
+        const { error: cancelError } = await supabase
+          .from("invoices")
+          .update({ status: "cancelled" })
+          .eq("customer_id", id)
+          .in("status", ["pending", "waiting"]);
+
+        if (cancelError) {
+          console.error("Erro ao cancelar faturas:", cancelError);
+          toast.error("Erro ao cancelar faturas em aberto");
+          return false;
+        }
+        toast.info(`${openInvoices.length} fatura(s) em aberto cancelada(s)`);
+      }
+    }
+
     const { error } = await supabase.from("customers").update({ ativo }).eq("id", id);
     if (error) {
       if (error.code === "23505" && error.message.includes("usuario_pppoe")) {
