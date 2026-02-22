@@ -256,9 +256,11 @@ export default function CSVImportDialog({ open, onOpenChange, onImport, existing
 
       if (cpf) seenCpfs.add(cpf);
 
-      // Generate PPPoE defaults if not mapped
-      let usuario_pppoe = getValue("usuario_pppoe") || cpf;
-      let senha_pppoe = getValue("senha_pppoe") || "myllenet123";
+      // Generate PPPoE from complemento if available (e.g. "406 Norte" -> "406norte")
+      const complementoVal = getValue("complemento");
+      const complementoPPPoE = complementoVal ? complementoVal.toLowerCase().replace(/\s+/g, "") : "";
+      let usuario_pppoe = getValue("usuario_pppoe") || complementoPPPoE || cpf;
+      let senha_pppoe = getValue("senha_pppoe") || complementoPPPoE || "myllenet123";
 
       if (rowValid) {
         valid.push({
