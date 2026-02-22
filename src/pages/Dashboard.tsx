@@ -23,7 +23,7 @@ import { supabase } from "@/integrations/supabase/client";
 export default function Dashboard() {
   const { user, isAdmin, loading: authLoading, signOut } = useAuth();
   const navigate = useNavigate();
-  const { customers, loading, searchTerm, setSearchTerm, addCustomer, updateCustomer, deleteCustomer, toggleCustomerActive, exportCSV, bulkImport } = useCustomers();
+  const { customers, loading, searchTerm, setSearchTerm, addCustomer, updateCustomer, deleteCustomer, toggleCustomerActive, exportCSV, bulkImport, refetch: refetchCustomers } = useCustomers();
   const { invoices, allInvoices, loading: invoicesLoading, invoiceSearch, setInvoiceSearch, createBoleto, checkPayment, cancelInvoice, importFromEfi, bulkImportInvoices, refetch: refetchInvoices } = useInvoices();
   const { plans } = usePlans();
 
@@ -391,6 +391,8 @@ export default function Dashboard() {
         onImport={bulkImportInvoices}
         plans={plans}
         onUpdateCustomer={updateCustomer}
+        onAddCustomer={addCustomer}
+        onRefetchCustomers={async () => { await refetchCustomers(); }}
       />
 
       {/* Customer Detail */}

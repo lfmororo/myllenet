@@ -9,6 +9,7 @@ import { Upload, FileText, AlertTriangle, CheckCircle, Loader2, X } from "lucide
 import { toast } from "sonner";
 import type { Plan } from "@/hooks/usePlans";
 import type { CustomerInput } from "@/hooks/useCustomers";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Props {
   open: boolean;
@@ -17,6 +18,8 @@ interface Props {
   onImport: (invoices: InvoiceRow[]) => Promise<{ success: number; failed: number }>;
   plans: Plan[];
   onUpdateCustomer: (id: string, data: Partial<CustomerInput>) => Promise<boolean>;
+  onAddCustomer: (customer: CustomerInput) => Promise<boolean>;
+  onRefetchCustomers: () => Promise<void>;
 }
 
 export interface InvoiceRow {
@@ -26,16 +29,22 @@ export interface InvoiceRow {
   vencimento: string;
   status: string;
   paid_at?: string | null;
-  _cpf?: string; // internal: used for post-import customer update
+  _cpf?: string;
+  _nome?: string;
+  _email?: string;
+  _complemento?: string;
 }
 
 type Step = "upload" | "mapping" | "preview";
 
-const EXPECTED_FIELDS = ["cpf", "descricao", "valor", "vencimento", "status"] as const;
+const EXPECTED_FIELDS = ["cpf", "nome", "email", "complemento", "descricao", "valor", "vencimento", "status"] as const;
 type FieldKey = typeof EXPECTED_FIELDS[number];
 
 const FIELD_LABELS: Record<FieldKey, string> = {
   cpf: "CPF do Cliente",
+  nome: "Nome do Cliente",
+  email: "E-mail do Cliente",
+  complemento: "Complemento (PPPoE)",
   descricao: "Descrição",
   valor: "Valor (R$)",
   vencimento: "Vencimento",
@@ -90,6 +99,9 @@ function normalizeHeader(h: string): string {
 
 const HEADER_ALIASES: Record<string, FieldKey> = {
   cpf: "cpf", cpf_cnpj: "cpf", documento: "cpf",
+  nome: "nome", name: "nome", nome_completo: "nome", cliente: "nome",
+  email: "email", e_mail: "email",
+  complemento: "complemento",
   descricao: "descricao", description: "descricao", titulo: "descricao",
   valor: "valor", value: "valor", amount: "valor", valor_centavos: "valor", total: "valor",
   vencimento: "vencimento", due_date: "vencimento", data_vencimento: "vencimento", expiration: "vencimento",
@@ -97,7 +109,7 @@ const HEADER_ALIASES: Record<string, FieldKey> = {
 };
 
 function autoMapColumns(headers: string[]): Record<FieldKey, number | null> {
-  const mapping: Record<FieldKey, number | null> = { cpf: null, descricao: null, valor: null, vencimento: null, status: null };
+  const mapping: Record<FieldKey, number | null> = { cpf: null, nome: null, email: null, complemento: null, descricao: null, valor: null, vencimento: null, status: null };
   headers.forEach((h, idx) => {
     const normalized = normalizeHeader(h);
     const field = HEADER_ALIASES[normalized];
@@ -151,11 +163,11 @@ function mapStatus(raw: string): string {
   return "pending";
 }
 
-export default function InvoiceCSVImportDialog({ open, onOpenChange, customers, onImport, plans, onUpdateCustomer }: Props) {
+export default function InvoiceCSVImportDialog({ open, onOpenChange, customers, onImport, plans, onUpdateCustomer, onAddCustomer, onRefetchCustomers }: Props) {
   const [step, setStep] = useState<Step>("upload");
   const [headers, setHeaders] = useState<string[]>([]);
   const [rows, setRows] = useState<string[][]>([]);
-  const [mapping, setMapping] = useState<Record<FieldKey, number | null>>({ cpf: null, descricao: null, valor: null, vencimento: null, status: null });
+  const [mapping, setMapping] = useState<Record<FieldKey, number | null>>({ cpf: null, nome: null, email: null, complemento: null, descricao: null, valor: null, vencimento: null, status: null });
   const [issues, setIssues] = useState<ValidationIssue[]>([]);
   const [validRows, setValidRows] = useState<InvoiceRow[]>([]);
   const [importing, setImporting] = useState(false);
@@ -164,7 +176,7 @@ export default function InvoiceCSVImportDialog({ open, onOpenChange, customers, 
 
   const reset = () => {
     setStep("upload"); setHeaders([]); setRows([]);
-    setMapping({ cpf: null, descricao: null, valor: null, vencimento: null, status: null });
+    setMapping({ cpf: null, nome: null, email: null, complemento: null, descricao: null, valor: null, vencimento: null, status: null });
     setIssues([]); setValidRows([]); setImporting(false); setFileName("");
   };
 
@@ -219,7 +231,22 @@ export default function InvoiceCSVImportDialog({ open, onOpenChange, customers, 
       const cpfRaw = getValue("cpf");
       const cpf = cleanCPF(cpfRaw);
       const customer = cpfToCustomer.get(cpf);
-      if (!customer) { newIssues.push({ row: rowNum, field: "CPF", message: cpf ? "Cliente não encontrado" : "Vazio", type: "error" }); rowValid = false; }
+      if (!customer) {
+        if (!cpf || (cpf.length !== 11 && cpf.length !== 14)) {
+          newIssues.push({ row: rowNum, field: "CPF", message: cpf ? "Formato inválido" : "Vazio", type: "error" });
+          rowValid = false;
+        } else {
+          // Will be auto-created
+          const nome = getValue("nome");
+          const email = getValue("email");
+          if (!nome && !email) {
+            newIssues.push({ row: rowNum, field: "CPF", message: "Cliente não encontrado — mapear Nome e E-mail para cadastrar", type: "error" });
+            rowValid = false;
+          } else {
+            newIssues.push({ row: rowNum, field: "CPF", message: "Cliente será cadastrado automaticamente", type: "warning" });
+          }
+        }
+      }
 
       const valorRaw = getValue("valor");
       const valorCentavos = parseValor(valorRaw);
@@ -234,8 +261,15 @@ export default function InvoiceCSVImportDialog({ open, onOpenChange, customers, 
       const status = statusRaw ? mapStatus(statusRaw) : "pending";
       const paid_at = status === "paid" ? vencimento + "T12:00:00Z" : null;
 
-      if (rowValid && customer && valorCentavos && vencimento) {
-        valid.push({ customer_id: customer.id, descricao, valor_centavos: valorCentavos, vencimento, status, paid_at, _cpf: cpf });
+      if (rowValid && valorCentavos && vencimento) {
+        valid.push({
+          customer_id: customer?.id || "__pending__",
+          descricao, valor_centavos: valorCentavos, vencimento, status, paid_at,
+          _cpf: cpf,
+          _nome: getValue("nome"),
+          _email: getValue("email"),
+          _complemento: getValue("complemento"),
+        });
       }
     });
 
@@ -248,18 +282,64 @@ export default function InvoiceCSVImportDialog({ open, onOpenChange, customers, 
     if (validRows.length === 0) return;
     setImporting(true);
     try {
-      // Strip internal _cpf before sending to DB
-      const dbRows = validRows.map(({ _cpf, ...rest }) => rest);
+      // Step 1: Auto-create missing customers
+      const pendingRows = validRows.filter(r => r.customer_id === "__pending__");
+      if (pendingRows.length > 0) {
+        const cpfsSeen = new Set<string>();
+        let created = 0;
+        for (const row of pendingRows) {
+          const cpf = row._cpf || "";
+          if (cpfsSeen.has(cpf)) continue;
+          cpfsSeen.add(cpf);
+
+          const complementoPPPoE = row._complemento ? row._complemento.toLowerCase().replace(/\s+/g, "") : "";
+          const customerData: CustomerInput = {
+            nome: row._nome || `Cliente ${cpf}`,
+            cpf,
+            email: row._email || `${cpf}@importado.com`,
+            telefone: null,
+            usuario_pppoe: complementoPPPoE || cpf,
+            senha_pppoe: complementoPPPoE || "myllenet123",
+            rua: null, numero: null, complemento: row._complemento || null,
+            bairro: null, cidade: null, estado: null, cep: null,
+            dia_vencimento: 10,
+            plan_id: null,
+            desconto_especial_centavos: 0,
+          };
+          const ok = await onAddCustomer(customerData);
+          if (ok) created++;
+        }
+        if (created > 0) {
+          toast.success(`${created} cliente(s) cadastrado(s) automaticamente`);
+          await onRefetchCustomers();
+        }
+      }
+
+      // Step 2: Re-resolve customer IDs from DB for pending rows
+      const { data: freshCustomers } = await supabase.from("customers").select("id, cpf");
+      const freshCpfMap = new Map((freshCustomers || []).map(c => [cleanCPF(c.cpf), c.id]));
+
+      const resolvedRows = validRows.map(row => {
+        if (row.customer_id === "__pending__" && row._cpf) {
+          return { ...row, customer_id: freshCpfMap.get(row._cpf) || "__pending__" };
+        }
+        return row;
+      });
+
+      // Strip internal fields before sending to DB
+      const dbRows = resolvedRows
+        .filter(r => r.customer_id !== "__pending__")
+        .map(({ _cpf, _nome, _email, _complemento, ...rest }) => rest);
+
       const result = await onImport(dbRows);
       toast.success(`${result.success} cobrança(s) importada(s)!`);
       if (result.failed > 0) toast.error(`${result.failed} falha(s) na importação`);
 
       // Post-import: update dia_vencimento and plan_id on each customer
       if (plans.length > 0) {
-        const customerMap = new Map(customers.map(c => [c.id, c]));
-        // Group invoices by customer, pick latest vencimento
         const byCustomer = new Map<string, InvoiceRow[]>();
-        for (const row of validRows) {
+        for (const row of resolvedRows) {
+          if (row.customer_id === "__pending__") continue;
           const arr = byCustomer.get(row.customer_id) || [];
           arr.push(row);
           byCustomer.set(row.customer_id, arr);
