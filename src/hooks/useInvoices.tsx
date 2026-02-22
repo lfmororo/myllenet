@@ -185,10 +185,26 @@ export function useInvoices() {
     let success = 0;
     let failed = 0;
     let skipped = 0;
+    let updated = 0;
     for (const row of rows) {
       const { error } = await supabase.from("invoices").insert(row);
       if (error) {
         if (error.code === "23505") {
+          // Duplicate found — check if we should update the status
+          if (row.status === "paid") {
+            const { error: updateError } = await supabase
+              .from("invoices")
+              .update({ status: "paid", paid_at: row.paid_at || new Date().toISOString() })
+              .eq("customer_id", row.customer_id)
+              .eq("vencimento", row.vencimento)
+              .eq("valor_centavos", row.valor_centavos)
+              .neq("status", "paid");
+            if (!updateError) {
+              updated++;
+            } else {
+              console.error("Update error:", updateError);
+            }
+          }
           skipped++;
         } else {
           console.error("Insert error:", error);
@@ -199,7 +215,7 @@ export function useInvoices() {
       }
     }
     fetchInvoices();
-    return { success, failed, skipped };
+    return { success, failed, skipped, updated };
   };
 
   const bulkCheckPayments = useCallback(async () => {

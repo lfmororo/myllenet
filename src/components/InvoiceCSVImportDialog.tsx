@@ -15,7 +15,7 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   customers: { id: string; nome: string; cpf: string }[];
-  onImport: (invoices: InvoiceRow[]) => Promise<{ success: number; failed: number }>;
+  onImport: (invoices: InvoiceRow[]) => Promise<{ success: number; failed: number; updated?: number }>;
   plans: Plan[];
   onUpdateCustomer: (id: string, data: Partial<CustomerInput>) => Promise<boolean>;
   onAddCustomer: (customer: CustomerInput) => Promise<boolean>;
@@ -333,6 +333,7 @@ export default function InvoiceCSVImportDialog({ open, onOpenChange, customers, 
 
       const result = await onImport(dbRows);
       toast.success(`${result.success} cobrança(s) importada(s)!`);
+      if (result.updated && result.updated > 0) toast.success(`${result.updated} cobrança(s) atualizada(s) para "pago"`);
       if (result.failed > 0) toast.error(`${result.failed} falha(s) na importação`);
 
       // Post-import: update dia_vencimento and plan_id on each customer
