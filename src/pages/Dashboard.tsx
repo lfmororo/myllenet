@@ -214,6 +214,24 @@ export default function Dashboard() {
                 <Button variant="outline" onClick={exportCSV} className="flex-1 sm:flex-none">
                   <Download className="mr-2 h-4 w-4" /> Exportar CSV
                 </Button>
+                <Button variant="outline" onClick={() => {
+                  if (customers.length === 0) { toast.error("Nenhum cliente"); return; }
+                  const headers = ["Usuário PPPoE", "Senha PPPoE", "Status", "Nome", "CPF"];
+                  const rows = customers.map(c => [
+                    c.usuario_pppoe, c.senha_pppoe, c.ativo ? "Ativo" : "Inativo", c.nome, c.cpf,
+                  ]);
+                  const csv = [headers.join(";"), ...rows.map(r => r.join(";"))].join("\n");
+                  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+                  const url = URL.createObjectURL(blob);
+                  const link = document.createElement("a");
+                  link.href = url;
+                  link.download = `pppoe_status_${new Date().toISOString().slice(0, 10)}.csv`;
+                  link.click();
+                  URL.revokeObjectURL(url);
+                  toast.success("Lista PPPoE exportada!");
+                }} className="flex-1 sm:flex-none">
+                  <Download className="mr-2 h-4 w-4" /> PPPoE Status
+                </Button>
                 <Button variant="outline" onClick={() => setCsvImportOpen(true)} className="flex-1 sm:flex-none">
                   <Upload className="mr-2 h-4 w-4" /> Importar CSV
                 </Button>
