@@ -1,10 +1,12 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { RefreshCw, ExternalLink, Copy, XCircle, Loader2 } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { RefreshCw, ExternalLink, Copy, XCircle, Loader2, MessageCircle } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import type { Invoice } from "@/hooks/useInvoices";
+import { useWhatsApp, type NotificationType } from "@/hooks/useWhatsApp";
 
 interface Props {
   invoices: Invoice[];
@@ -19,8 +21,16 @@ const statusMap: Record<string, { label: string; variant: "default" | "secondary
   cancelled: { label: "Cancelado", variant: "secondary" },
 };
 
+const whatsappOptions: { type: NotificationType; label: string; statusFilter?: string[] }[] = [
+  { type: "boleto_gerado", label: "📄 Boleto gerado", statusFilter: ["pending"] },
+  { type: "lembrete_vencimento", label: "⏰ Lembrete de vencimento", statusFilter: ["pending"] },
+  { type: "pagamento_confirmado", label: "✅ Pagamento confirmado", statusFilter: ["paid"] },
+  { type: "cobranca_atrasada", label: "⚠️ Cobrança atrasada", statusFilter: ["overdue"] },
+];
+
 export default function InvoiceTable({ invoices, onCheckPayment, onCancel }: Props) {
   const [checking, setChecking] = useState<string | null>(null);
+  const { sendInvoiceNotification, sending } = useWhatsApp();
 
   const handleCheck = async (id: string) => {
     setChecking(id);
@@ -39,6 +49,10 @@ export default function InvoiceTable({ invoices, onCheckPayment, onCancel }: Pro
 
   const formatDate = (dateStr: string) => {
     return new Date(dateStr + "T00:00:00").toLocaleDateString("pt-BR");
+  };
+
+  const getAvailableWhatsappOptions = (status: string) => {
+    return whatsappOptions.filter(opt => !opt.statusFilter || opt.statusFilter.includes(status));
   };
 
   if (invoices.length === 0) {
@@ -66,6 +80,7 @@ export default function InvoiceTable({ invoices, onCheckPayment, onCancel }: Pro
         <TableBody>
           {invoices.map((inv) => {
             const status = statusMap[inv.status] || statusMap.pending;
+            const waOptions = getAvailableWhatsappOptions(inv.status);
             return (
               <TableRow key={inv.id} className="hover:bg-muted/30">
                 <TableCell className="font-medium">
@@ -79,6 +94,36 @@ export default function InvoiceTable({ invoices, onCheckPayment, onCancel }: Pro
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-1">
+                    {/* WhatsApp dropdown */}
+                    {waOptions.length > 0 && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-green-600 hover:text-green-700"
+                            title="Enviar WhatsApp"
+                            disabled={sending === inv.id}
+                          >
+                            {sending === inv.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <MessageCircle className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          {waOptions.map(opt => (
+                            <DropdownMenuItem
+                              key={opt.type}
+                              onClick={() => sendInvoiceNotification(inv.id, opt.type)}
+                            >
+                              {opt.label}
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
                     {inv.efi_barcode && (
                       <Button
                         variant="ghost"
