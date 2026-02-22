@@ -14,8 +14,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Loader2, Save, Upload, CheckCircle, XCircle, ShieldAlert, Zap, Plus, Pencil, Trash2, Package, MessageCircle } from "lucide-react";
+import { ArrowLeft, Loader2, Save, Upload, CheckCircle, XCircle, ShieldAlert, Zap, Plus, Pencil, Trash2, Package, MessageCircle, Users } from "lucide-react";
 import { toast } from "sonner";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function Settings() {
   const { user, isAdmin, loading: authLoading } = useAuth();
@@ -33,14 +35,115 @@ export default function Settings() {
   const [uazapiToken, setUazapiToken] = useState("");
   const [savingWhatsapp, setSavingWhatsapp] = useState(false);
 
+  // User management state
+  interface SystemUser {
+    id: string;
+    email: string;
+    full_name: string;
+    role: string;
+    created_at: string;
+    last_sign_in_at: string | null;
+  }
+  const [users, setUsers] = useState<SystemUser[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [userFormOpen, setUserFormOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<SystemUser | null>(null);
+  const [deletingUser, setDeletingUser] = useState<SystemUser | null>(null);
+  const [userForm, setUserForm] = useState({ email: "", password: "", full_name: "", role: "user" });
+  const [savingUser, setSavingUser] = useState(false);
+
   // Plans state
   const { plans, loading: plansLoading, addPlan, updatePlan, deletePlan } = usePlans();
   const [planFormOpen, setPlanFormOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
   const [deletingPlan, setDeletingPlan] = useState<Plan | null>(null);
   useEffect(() => {
-    if (user && isAdmin) loadSettings();
+    if (user && isAdmin) {
+      loadSettings();
+      fetchUsers();
+    }
   }, [user, isAdmin]);
+
+  const getAuthHeaders = async () => {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token;
+    if (!token) { toast.error("Sessão expirada"); return null; }
+    return {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+    };
+  };
+
+  const fetchUsers = async () => {
+    setUsersLoading(true);
+    try {
+      const headers = await getAuthHeaders();
+      if (!headers) return;
+      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+      const res = await fetch(`https://${projectId}.supabase.co/functions/v1/user-management/list`, { headers });
+      const data = await res.json();
+      if (res.ok) setUsers(data);
+      else console.error("Fetch users error:", data);
+    } catch (err) {
+      console.error(err);
+    }
+    setUsersLoading(false);
+  };
+
+  const handleSaveUser = async () => {
+    setSavingUser(true);
+    try {
+      const headers = await getAuthHeaders();
+      if (!headers) { setSavingUser(false); return; }
+      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+
+      if (editingUser) {
+        const body: any = { user_id: editingUser.id, role: userForm.role };
+        if (userForm.full_name !== editingUser.full_name) body.full_name = userForm.full_name;
+        if (userForm.email !== editingUser.email) body.email = userForm.email;
+        if (userForm.password) body.password = userForm.password;
+
+        const res = await fetch(`https://${projectId}.supabase.co/functions/v1/user-management/update`, {
+          method: "POST", headers, body: JSON.stringify(body),
+        });
+        const result = await res.json();
+        if (!res.ok) { toast.error(result.error); setSavingUser(false); return; }
+        toast.success("Usuário atualizado!");
+      } else {
+        const res = await fetch(`https://${projectId}.supabase.co/functions/v1/user-management/create`, {
+          method: "POST", headers, body: JSON.stringify(userForm),
+        });
+        const result = await res.json();
+        if (!res.ok) { toast.error(result.error); setSavingUser(false); return; }
+        toast.success("Usuário criado!");
+      }
+      setUserFormOpen(false);
+      fetchUsers();
+    } catch (err: any) {
+      toast.error(err.message || "Erro");
+    }
+    setSavingUser(false);
+  };
+
+  const handleDeleteUser = async () => {
+    if (!deletingUser) return;
+    try {
+      const headers = await getAuthHeaders();
+      if (!headers) return;
+      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+      const res = await fetch(`https://${projectId}.supabase.co/functions/v1/user-management/delete`, {
+        method: "POST", headers, body: JSON.stringify({ user_id: deletingUser.id }),
+      });
+      const result = await res.json();
+      if (!res.ok) { toast.error(result.error); return; }
+      toast.success("Usuário excluído!");
+      setDeletingUser(null);
+      fetchUsers();
+    } catch (err: any) {
+      toast.error(err.message || "Erro");
+    }
+  };
 
   const loadSettings = async () => {
     setLoadingSettings(true);
@@ -175,6 +278,9 @@ export default function Settings() {
             <TabsTrigger value="efi">API EFI</TabsTrigger>
             <TabsTrigger value="whatsapp">
               <MessageCircle className="mr-1.5 h-4 w-4" /> WhatsApp
+            </TabsTrigger>
+            <TabsTrigger value="users">
+              <Users className="mr-1.5 h-4 w-4" /> Usuários
             </TabsTrigger>
           </TabsList>
 
@@ -399,6 +505,63 @@ export default function Settings() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          {/* Users Tab */}
+          <TabsContent value="users" className="mt-4 space-y-4">
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">{users.length} usuário{users.length !== 1 ? "s" : ""}</p>
+              <Button onClick={() => { setEditingUser(null); setUserForm({ email: "", password: "", full_name: "", role: "user" }); setUserFormOpen(true); }}>
+                <Plus className="mr-2 h-4 w-4" /> Novo Usuário
+              </Button>
+            </div>
+            {usersLoading ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              </div>
+            ) : (
+              <div className="rounded-lg border bg-card">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50">
+                      <TableHead className="font-semibold">Nome</TableHead>
+                      <TableHead className="font-semibold">E-mail</TableHead>
+                      <TableHead className="font-semibold">Perfil</TableHead>
+                      <TableHead className="font-semibold text-right">Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {users.map((u) => (
+                      <TableRow key={u.id}>
+                        <TableCell className="font-medium">{u.full_name || "—"}</TableCell>
+                        <TableCell>{u.email}</TableCell>
+                        <TableCell>
+                          <Badge variant={u.role === "admin" ? "default" : "secondary"}>
+                            {u.role === "admin" ? "Admin" : "Usuário"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
+                              setEditingUser(u);
+                              setUserForm({ email: u.email, password: "", full_name: u.full_name, role: u.role });
+                              setUserFormOpen(true);
+                            }}>
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            {u.id !== user?.id && (
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeletingUser(u)}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </TabsContent>
         </Tabs>
 
         {/* Plan Form */}
@@ -425,6 +588,69 @@ export default function Settings() {
                 onClick={async () => { if (deletingPlan) { await deletePlan(deletingPlan.id); setDeletingPlan(null); } }}
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               >
+                Excluir
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* User Form Dialog */}
+        <Dialog open={userFormOpen} onOpenChange={setUserFormOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{editingUser ? "Editar Usuário" : "Novo Usuário"}</DialogTitle>
+              <DialogDescription>
+                {editingUser ? "Altere os dados do usuário." : "Preencha os dados para criar um novo usuário do sistema."}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Nome completo</Label>
+                <Input value={userForm.full_name} onChange={(e) => setUserForm({ ...userForm, full_name: e.target.value })} placeholder="Nome do usuário" />
+              </div>
+              <div className="space-y-2">
+                <Label>E-mail</Label>
+                <Input type="email" value={userForm.email} onChange={(e) => setUserForm({ ...userForm, email: e.target.value })} placeholder="email@exemplo.com" />
+              </div>
+              <div className="space-y-2">
+                <Label>{editingUser ? "Nova senha (deixe vazio para manter)" : "Senha"}</Label>
+                <Input type="password" value={userForm.password} onChange={(e) => setUserForm({ ...userForm, password: e.target.value })} placeholder="••••••••" required={!editingUser} minLength={6} />
+              </div>
+              <div className="space-y-2">
+                <Label>Perfil</Label>
+                <Select value={userForm.role} onValueChange={(v) => setUserForm({ ...userForm, role: v })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="user">Usuário</SelectItem>
+                    <SelectItem value="admin">Administrador</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setUserFormOpen(false)}>Cancelar</Button>
+              <Button onClick={handleSaveUser} disabled={savingUser}>
+                {savingUser && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {editingUser ? "Salvar" : "Criar"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete User Confirmation */}
+        <AlertDialog open={!!deletingUser} onOpenChange={(open) => !open && setDeletingUser(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Excluir usuário</AlertDialogTitle>
+              <AlertDialogDescription>
+                Tem certeza que deseja excluir <strong>{deletingUser?.email}</strong>? Esta ação não pode ser desfeita.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDeleteUser} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
                 Excluir
               </AlertDialogAction>
             </AlertDialogFooter>
