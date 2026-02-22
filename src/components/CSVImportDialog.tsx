@@ -300,8 +300,8 @@ export default function CSVImportDialog({ open, onOpenChange, onImport, existing
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle>Importar Clientes via CSV</DialogTitle>
           <DialogDescription>
             {step === "upload" && "Selecione ou arraste um arquivo CSV"}
@@ -310,129 +310,158 @@ export default function CSVImportDialog({ open, onOpenChange, onImport, existing
           </DialogDescription>
         </DialogHeader>
 
-        {/* Upload step */}
-        {step === "upload" && (
-          <div
-            className="flex flex-col items-center justify-center gap-4 rounded-lg border-2 border-dashed border-muted-foreground/25 p-12 cursor-pointer hover:border-primary/50 transition-colors"
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={handleDrop}
-            onClick={() => fileRef.current?.click()}
-          >
-            <Upload className="h-10 w-10 text-muted-foreground" />
-            <div className="text-center">
-              <p className="font-medium">Clique ou arraste o arquivo CSV aqui</p>
-              <p className="text-sm text-muted-foreground">Suporta CSV com separador vírgula, ponto-e-vírgula ou tab</p>
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          {/* Upload step */}
+          {step === "upload" && (
+            <div
+              className="flex flex-col items-center justify-center gap-4 rounded-lg border-2 border-dashed border-muted-foreground/25 p-12 cursor-pointer hover:border-primary/50 transition-colors"
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={handleDrop}
+              onClick={() => fileRef.current?.click()}
+            >
+              <Upload className="h-10 w-10 text-muted-foreground" />
+              <div className="text-center">
+                <p className="font-medium">Clique ou arraste o arquivo CSV aqui</p>
+                <p className="text-sm text-muted-foreground">Suporta CSV com separador vírgula, ponto-e-vírgula ou tab</p>
+              </div>
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".csv,.txt"
+                className="hidden"
+                onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
+              />
             </div>
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".csv,.txt"
-              className="hidden"
-              onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
-            />
-          </div>
-        )}
+          )}
 
-        {/* Mapping step */}
-        {step === "mapping" && (
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <FileText className="h-4 w-4" />
-              <span>{fileName} — {rows.length} linhas, {headers.length} colunas</span>
-            </div>
-            <div className="grid gap-3">
-              {EXPECTED_FIELDS.map((field) => (
-                <div key={field} className="flex items-center gap-3">
-                  <span className="w-32 text-sm font-medium">
-                    {FIELD_LABELS[field]}
-                    {REQUIRED_FIELDS.includes(field) && <span className="text-destructive ml-1">*</span>}
-                  </span>
-                  <Select
-                    value={mapping[field] !== null ? String(mapping[field]) : "__none__"}
-                    onValueChange={(v) => handleMapChange(field, v)}
-                  >
-                    <SelectTrigger className="flex-1">
-                      <SelectValue placeholder="Selecionar coluna..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__none__">— Não mapear —</SelectItem>
-                      {headers.map((h, i) => (
-                        <SelectItem key={i} value={String(i)}>{h}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              ))}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Campos sem mapeamento: Usuário PPPoE será o CPF, Senha PPPoE será "myllenet123"
-            </p>
-          </div>
-        )}
+          {/* Mapping step */}
+          {step === "mapping" && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <FileText className="h-4 w-4" />
+                <span>{fileName} — {rows.length} linhas, {headers.length} colunas</span>
+              </div>
 
-        {/* Preview step */}
-        {step === "preview" && (
-          <div className="space-y-4 flex-1 min-h-0">
-            <div className="flex flex-wrap gap-3">
-              <Badge variant="default" className="gap-1">
-                <CheckCircle className="h-3 w-3" /> {validRows.length} válidos
-              </Badge>
-              {errors.length > 0 && (
-                <Badge variant="destructive" className="gap-1">
-                  <X className="h-3 w-3" /> {errors.length} erros
+              <p className="text-xs font-medium text-muted-foreground">Campos obrigatórios</p>
+              <div className="grid gap-2">
+                {EXPECTED_FIELDS.filter(f => REQUIRED_FIELDS.includes(f)).map((field) => (
+                  <div key={field} className="flex items-center gap-3">
+                    <span className="w-28 text-sm font-medium truncate">
+                      {FIELD_LABELS[field]} <span className="text-destructive">*</span>
+                    </span>
+                    <Select
+                      value={mapping[field] !== null ? String(mapping[field]) : "__none__"}
+                      onValueChange={(v) => handleMapChange(field, v)}
+                    >
+                      <SelectTrigger className="flex-1 h-9">
+                        <SelectValue placeholder="Selecionar coluna..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">— Não mapear —</SelectItem>
+                        {headers.map((h, i) => (
+                          <SelectItem key={i} value={String(i)}>{h}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ))}
+              </div>
+
+              <p className="text-xs font-medium text-muted-foreground">Campos opcionais</p>
+              <div className="grid gap-2">
+                {EXPECTED_FIELDS.filter(f => !REQUIRED_FIELDS.includes(f)).map((field) => (
+                  <div key={field} className="flex items-center gap-3">
+                    <span className="w-28 text-sm font-medium truncate">
+                      {FIELD_LABELS[field]}
+                    </span>
+                    <Select
+                      value={mapping[field] !== null ? String(mapping[field]) : "__none__"}
+                      onValueChange={(v) => handleMapChange(field, v)}
+                    >
+                      <SelectTrigger className="flex-1 h-9">
+                        <SelectValue placeholder="Selecionar coluna..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">— Não mapear —</SelectItem>
+                        {headers.map((h, i) => (
+                          <SelectItem key={i} value={String(i)}>{h}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ))}
+              </div>
+
+              <p className="text-xs text-muted-foreground">
+                Campos sem mapeamento: Usuário PPPoE será baseado no complemento ou CPF, Senha PPPoE será baseada no complemento ou "myllenet123"
+              </p>
+            </div>
+          )}
+
+          {/* Preview step */}
+          {step === "preview" && (
+            <div className="space-y-4">
+              <div className="flex flex-wrap gap-3">
+                <Badge variant="default" className="gap-1">
+                  <CheckCircle className="h-3 w-3" /> {validRows.length} válidos
                 </Badge>
-              )}
-              {warnings.length > 0 && (
-                <Badge variant="outline" className="gap-1">
-                  <AlertTriangle className="h-3 w-3" /> {warnings.length} avisos
-                </Badge>
-              )}
-            </div>
+                {errors.length > 0 && (
+                  <Badge variant="destructive" className="gap-1">
+                    <X className="h-3 w-3" /> {errors.length} erros
+                  </Badge>
+                )}
+                {warnings.length > 0 && (
+                  <Badge variant="outline" className="gap-1">
+                    <AlertTriangle className="h-3 w-3" /> {warnings.length} avisos
+                  </Badge>
+                )}
+              </div>
 
-            {issues.length > 0 && (
-              <ScrollArea className="h-32 rounded border p-2">
-                <div className="space-y-1">
-                  {issues.slice(0, 50).map((issue, i) => (
-                    <p key={i} className={`text-xs ${issue.type === "error" ? "text-destructive" : "text-yellow-600"}`}>
-                      Linha {issue.row}: {issue.field} — {issue.message}
-                    </p>
-                  ))}
-                  {issues.length > 50 && (
-                    <p className="text-xs text-muted-foreground">... e mais {issues.length - 50} problemas</p>
-                  )}
-                </div>
-              </ScrollArea>
-            )}
+              {issues.length > 0 && (
+                <ScrollArea className="max-h-32 rounded border p-2">
+                  <div className="space-y-1">
+                    {issues.slice(0, 50).map((issue, i) => (
+                      <p key={i} className={`text-xs ${issue.type === "error" ? "text-destructive" : "text-yellow-600"}`}>
+                        Linha {issue.row}: {issue.field} — {issue.message}
+                      </p>
+                    ))}
+                    {issues.length > 50 && (
+                      <p className="text-xs text-muted-foreground">... e mais {issues.length - 50} problemas</p>
+                    )}
+                  </div>
+                </ScrollArea>
+              )}
 
-            <ScrollArea className="h-48 rounded border">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/50">
-                    <TableHead className="text-xs">Nome</TableHead>
-                    <TableHead className="text-xs">CPF</TableHead>
-                    <TableHead className="text-xs">E-mail</TableHead>
-                    <TableHead className="text-xs">PPPoE</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {validRows.slice(0, 20).map((r, i) => (
-                    <TableRow key={i}>
-                      <TableCell className="text-xs py-1">{r.nome}</TableCell>
-                      <TableCell className="text-xs py-1 font-mono">{r.cpf}</TableCell>
-                      <TableCell className="text-xs py-1">{r.email}</TableCell>
-                      <TableCell className="text-xs py-1 font-mono">{r.usuario_pppoe}</TableCell>
+              <ScrollArea className="max-h-48 rounded border">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50">
+                      <TableHead className="text-xs">Nome</TableHead>
+                      <TableHead className="text-xs">CPF</TableHead>
+                      <TableHead className="text-xs">E-mail</TableHead>
+                      <TableHead className="text-xs">PPPoE</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-              {validRows.length > 20 && (
-                <p className="text-xs text-muted-foreground p-2">Mostrando 20 de {validRows.length}</p>
-              )}
-            </ScrollArea>
-          </div>
-        )}
+                  </TableHeader>
+                  <TableBody>
+                    {validRows.slice(0, 20).map((r, i) => (
+                      <TableRow key={i}>
+                        <TableCell className="text-xs py-1">{r.nome}</TableCell>
+                        <TableCell className="text-xs py-1 font-mono">{r.cpf}</TableCell>
+                        <TableCell className="text-xs py-1">{r.email}</TableCell>
+                        <TableCell className="text-xs py-1 font-mono">{r.usuario_pppoe}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                {validRows.length > 20 && (
+                  <p className="text-xs text-muted-foreground p-2">Mostrando 20 de {validRows.length}</p>
+                )}
+              </ScrollArea>
+            </div>
+          )}
+        </div>
 
-        <DialogFooter className="gap-2">
+        <DialogFooter className="flex-shrink-0 gap-2 pt-4 border-t">
           {step === "mapping" && (
             <>
               <Button variant="outline" onClick={() => setStep("upload")}>Voltar</Button>
