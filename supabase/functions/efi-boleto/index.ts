@@ -298,31 +298,49 @@ async function importFromEfi(req: Request) {
   await verifyAdmin(authHeader);
 
   const url = new URL(req.url);
-  const beginDate = url.searchParams.get("begin_date") || "2020-01-01";
-  const endDate = url.searchParams.get("end_date") || new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+  const userBegin = url.searchParams.get("begin_date") || "2020-01-01";
+  const userEnd = url.searchParams.get("end_date") || todayStr;
 
   const supabase = getSupabaseAdmin();
 
   try {
-    // Fetch charges from EFI with pagination (max 100 per page)
+    // EFI limits date range to 1 year max, so chunk by year
     let allCharges: any[] = [];
-    let offset = 0;
-    const limit = 100;
-    let hasMore = true;
+    let chunkStart = new Date(userBegin + "T00:00:00");
+    const finalEnd = new Date(userEnd + "T00:00:00");
 
-    while (hasMore) {
-      const charges = await efiRequest(
-        `/v1/charges?charge_type=billet&begin_date=${beginDate}&end_date=${endDate}&limit=${limit}&offset=${offset}`,
-        "GET"
-      );
-      const page = charges.data || charges || [];
-      if (Array.isArray(page)) {
-        allCharges = allCharges.concat(page);
-        hasMore = page.length === limit;
-      } else {
-        hasMore = false;
+    while (chunkStart <= finalEnd) {
+      const chunkEnd = new Date(chunkStart);
+      chunkEnd.setFullYear(chunkEnd.getFullYear() + 1);
+      chunkEnd.setDate(chunkEnd.getDate() - 1); // max 364 days
+      const effectiveEnd = chunkEnd > finalEnd ? finalEnd : chunkEnd;
+
+      const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+      const bd = fmt(chunkStart);
+      const ed = fmt(effectiveEnd);
+
+      let offset = 0;
+      const limit = 100;
+      let hasMore = true;
+      while (hasMore) {
+        const charges = await efiRequest(
+          `/v1/charges?charge_type=billet&begin_date=${bd}&end_date=${ed}&limit=${limit}&offset=${offset}`,
+          "GET"
+        );
+        const page = charges.data || charges || [];
+        if (Array.isArray(page)) {
+          allCharges = allCharges.concat(page);
+          hasMore = page.length === limit;
+        } else {
+          hasMore = false;
+        }
+        offset += limit;
       }
-      offset += limit;
+
+      chunkStart = new Date(effectiveEnd);
+      chunkStart.setDate(chunkStart.getDate() + 1);
     }
 
     const chargeList = allCharges;
