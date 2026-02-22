@@ -1,5 +1,7 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Pencil, Trash2, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
 import type { Customer } from "@/hooks/useCustomers";
@@ -8,9 +10,10 @@ interface Props {
   customers: Customer[];
   onEdit: (customer: Customer) => void;
   onDelete: (customer: Customer) => void;
+  onToggleActive: (id: string, ativo: boolean) => Promise<boolean>;
 }
 
-export default function CustomerTable({ customers, onEdit, onDelete }: Props) {
+export default function CustomerTable({ customers, onEdit, onDelete, onToggleActive }: Props) {
   const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
 
   const togglePassword = (id: string) => {
@@ -43,12 +46,13 @@ export default function CustomerTable({ customers, onEdit, onDelete }: Props) {
             <TableHead className="font-semibold hidden lg:table-cell">Telefone</TableHead>
             <TableHead className="font-semibold">Usuário PPPoE</TableHead>
             <TableHead className="font-semibold">Senha PPPoE</TableHead>
+            <TableHead className="font-semibold text-center">Status</TableHead>
             <TableHead className="font-semibold text-right">Ações</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {customers.map((c) => (
-            <TableRow key={c.id} className="hover:bg-muted/30">
+            <TableRow key={c.id} className={`hover:bg-muted/30 ${!c.ativo ? "opacity-50" : ""}`}>
               <TableCell className="font-medium">{c.nome}</TableCell>
               <TableCell className="font-mono text-sm">{formatCPF(c.cpf)}</TableCell>
               <TableCell className="hidden md:table-cell">{c.email}</TableCell>
@@ -62,6 +66,17 @@ export default function CustomerTable({ customers, onEdit, onDelete }: Props) {
                   <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => togglePassword(c.id)}>
                     {showPasswords[c.id] ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
                   </Button>
+                </div>
+              </TableCell>
+              <TableCell className="text-center">
+                <div className="flex items-center justify-center gap-2">
+                  <Switch
+                    checked={c.ativo}
+                    onCheckedChange={(checked) => onToggleActive(c.id, checked)}
+                  />
+                  <Badge variant={c.ativo ? "default" : "secondary"} className="text-xs">
+                    {c.ativo ? "Ativo" : "Inativo"}
+                  </Badge>
                 </div>
               </TableCell>
               <TableCell className="text-right">
