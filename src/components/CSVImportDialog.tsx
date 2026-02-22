@@ -18,7 +18,7 @@ interface Props {
 
 type Step = "upload" | "mapping" | "preview";
 
-const EXPECTED_FIELDS = ["nome", "cpf", "email", "telefone", "usuario_pppoe", "senha_pppoe"] as const;
+const EXPECTED_FIELDS = ["nome", "cpf", "email", "telefone", "usuario_pppoe", "senha_pppoe", "rua", "numero", "complemento", "bairro", "cidade", "estado", "cep"] as const;
 type FieldKey = typeof EXPECTED_FIELDS[number];
 
 const FIELD_LABELS: Record<FieldKey, string> = {
@@ -28,6 +28,13 @@ const FIELD_LABELS: Record<FieldKey, string> = {
   telefone: "Telefone",
   usuario_pppoe: "Usuário PPPoE",
   senha_pppoe: "Senha PPPoE",
+  rua: "Rua",
+  numero: "Número",
+  complemento: "Complemento",
+  bairro: "Bairro",
+  cidade: "Cidade",
+  estado: "Estado",
+  cep: "CEP",
 };
 
 const REQUIRED_FIELDS: FieldKey[] = ["nome", "cpf", "email"];
@@ -100,11 +107,24 @@ const HEADER_ALIASES: Record<string, FieldKey> = {
   senha: "senha_pppoe",
   password: "senha_pppoe",
   password_pppoe: "senha_pppoe",
+  rua: "rua",
+  logradouro: "rua",
+  endereco: "rua",
+  numero: "numero",
+  num: "numero",
+  complemento: "complemento",
+  bairro: "bairro",
+  cidade: "cidade",
+  municipio: "cidade",
+  estado: "estado",
+  uf: "estado",
+  cep: "cep",
 };
 
 function autoMapColumns(headers: string[]): Record<FieldKey, number | null> {
   const mapping: Record<FieldKey, number | null> = {
     nome: null, cpf: null, email: null, telefone: null, usuario_pppoe: null, senha_pppoe: null,
+    rua: null, numero: null, complemento: null, bairro: null, cidade: null, estado: null, cep: null,
   };
 
   headers.forEach((h, idx) => {
@@ -128,6 +148,7 @@ export default function CSVImportDialog({ open, onOpenChange, onImport, existing
   const [rows, setRows] = useState<string[][]>([]);
   const [mapping, setMapping] = useState<Record<FieldKey, number | null>>({
     nome: null, cpf: null, email: null, telefone: null, usuario_pppoe: null, senha_pppoe: null,
+    rua: null, numero: null, complemento: null, bairro: null, cidade: null, estado: null, cep: null,
   });
   const [issues, setIssues] = useState<ValidationIssue[]>([]);
   const [validRows, setValidRows] = useState<CustomerInput[]>([]);
@@ -139,7 +160,8 @@ export default function CSVImportDialog({ open, onOpenChange, onImport, existing
     setStep("upload");
     setHeaders([]);
     setRows([]);
-    setMapping({ nome: null, cpf: null, email: null, telefone: null, usuario_pppoe: null, senha_pppoe: null });
+    setMapping({ nome: null, cpf: null, email: null, telefone: null, usuario_pppoe: null, senha_pppoe: null,
+      rua: null, numero: null, complemento: null, bairro: null, cidade: null, estado: null, cep: null });
     setIssues([]);
     setValidRows([]);
     setImporting(false);
@@ -239,7 +261,16 @@ export default function CSVImportDialog({ open, onOpenChange, onImport, existing
       let senha_pppoe = getValue("senha_pppoe") || "myllenet123";
 
       if (rowValid) {
-        valid.push({ nome, cpf, email, telefone, usuario_pppoe, senha_pppoe });
+        valid.push({
+          nome, cpf, email, telefone, usuario_pppoe, senha_pppoe,
+          rua: getValue("rua") || null,
+          numero: getValue("numero") || null,
+          complemento: getValue("complemento") || null,
+          bairro: getValue("bairro") || null,
+          cidade: getValue("cidade") || null,
+          estado: getValue("estado") || null,
+          cep: getValue("cep") || null,
+        });
       }
     });
 

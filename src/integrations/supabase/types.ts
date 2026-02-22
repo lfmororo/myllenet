@@ -16,33 +16,54 @@ export type Database = {
     Tables: {
       customers: {
         Row: {
+          bairro: string | null
+          cep: string | null
+          cidade: string | null
+          complemento: string | null
           cpf: string
           created_at: string
           email: string
+          estado: string | null
           id: string
           nome: string
+          numero: string | null
+          rua: string | null
           senha_pppoe: string
           telefone: string | null
           updated_at: string
           usuario_pppoe: string
         }
         Insert: {
+          bairro?: string | null
+          cep?: string | null
+          cidade?: string | null
+          complemento?: string | null
           cpf: string
           created_at?: string
           email: string
+          estado?: string | null
           id?: string
           nome: string
+          numero?: string | null
+          rua?: string | null
           senha_pppoe: string
           telefone?: string | null
           updated_at?: string
           usuario_pppoe: string
         }
         Update: {
+          bairro?: string | null
+          cep?: string | null
+          cidade?: string | null
+          complemento?: string | null
           cpf?: string
           created_at?: string
           email?: string
+          estado?: string | null
           id?: string
           nome?: string
+          numero?: string | null
+          rua?: string | null
           senha_pppoe?: string
           telefone?: string | null
           updated_at?: string

@@ -10,6 +10,13 @@ export interface Customer {
   telefone: string | null;
   usuario_pppoe: string;
   senha_pppoe: string;
+  rua: string | null;
+  numero: string | null;
+  complemento: string | null;
+  bairro: string | null;
+  cidade: string | null;
+  estado: string | null;
+  cep: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -89,9 +96,10 @@ export function useCustomers() {
       toast.error("Nenhum cliente para exportar");
       return;
     }
-    const headers = ["Nome", "CPF", "E-mail", "Telefone", "Usuário PPPoE", "Senha PPPoE"];
+    const headers = ["Nome", "CPF", "E-mail", "Telefone", "Usuário PPPoE", "Senha PPPoE", "Rua", "Número", "Complemento", "Bairro", "Cidade", "Estado", "CEP"];
     const rows = customers.map((c) => [
       c.nome, c.cpf, c.email, c.telefone || "", c.usuario_pppoe, c.senha_pppoe,
+      c.rua || "", c.numero || "", c.complemento || "", c.bairro || "", c.cidade || "", c.estado || "", c.cep || "",
     ]);
     const csv = [headers.join(";"), ...rows.map((r) => r.join(";"))].join("\n");
     const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
