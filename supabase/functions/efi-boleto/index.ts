@@ -304,6 +304,124 @@ async function checkPayment(req: Request) {
   }
 }
 
+async function importFromEfi(req: Request) {
+  const authHeader = req.headers.get("Authorization");
+  await verifyAdmin(authHeader);
+
+  const url = new URL(req.url);
+  const beginDate = url.searchParams.get("begin_date") || "2020-01-01";
+  const endDate = url.searchParams.get("end_date") || new Date().toISOString().slice(0, 10);
+
+  const supabase = getSupabaseAdmin();
+
+  try {
+    // Fetch charges from EFI (boleto type)
+    const charges = await efiRequest(
+      `/v1/charges?charge_type=billet&status=all&begin_date=${beginDate}&end_date=${endDate}&limit=500&offset=0`,
+      "GET"
+    );
+
+    const chargeList = charges.data || charges || [];
+    let importedCustomers = 0;
+    let importedInvoices = 0;
+    let skippedInvoices = 0;
+
+    for (const charge of chargeList) {
+      const customer = charge.customer || charge.payment?.banking_billet?.customer;
+      if (!customer) continue;
+
+      const cpf = (customer.cpf || "").replace(/\D/g, "");
+      if (!cpf) continue;
+
+      // Try to find or create customer
+      let { data: existingCustomer } = await supabase
+        .from("customers")
+        .select("id")
+        .eq("cpf", cpf)
+        .maybeSingle();
+
+      if (!existingCustomer) {
+        const phone = customer.phone_number || customer.phone || null;
+        const { data: newCust, error: custErr } = await supabase
+          .from("customers")
+          .insert({
+            nome: customer.name || "Sem nome",
+            cpf,
+            email: customer.email || `${cpf}@importado.efi`,
+            telefone: phone,
+            usuario_pppoe: `pppoe_${cpf}`,
+            senha_pppoe: "importado",
+          })
+          .select("id")
+          .single();
+
+        if (custErr) {
+          console.error("Import customer error:", custErr);
+          continue;
+        }
+        existingCustomer = newCust;
+        importedCustomers++;
+      }
+
+      // Check if charge already imported
+      const chargeId = charge.charge_id || charge.id;
+      const { data: existingInvoice } = await supabase
+        .from("invoices")
+        .select("id")
+        .eq("efi_charge_id", chargeId)
+        .maybeSingle();
+
+      if (existingInvoice) {
+        skippedInvoices++;
+        continue;
+      }
+
+      // Map EFI status
+      let status = "pending";
+      if (charge.status === "paid" || charge.status === "settled") status = "paid";
+      else if (charge.status === "canceled" || charge.status === "refunded") status = "cancelled";
+      else if (charge.status === "expired" || charge.status === "unpaid") status = "overdue";
+
+      const billet = charge.payment?.banking_billet || {};
+      const value = charge.value || charge.total || billet.value || 0;
+
+      const { error: invErr } = await supabase.from("invoices").insert({
+        customer_id: existingCustomer!.id,
+        descricao: charge.message || charge.custom_id || `Cobrança EFI #${chargeId}`,
+        valor_centavos: value,
+        vencimento: billet.expire_at || charge.expire_at || charge.created_at?.slice(0, 10) || new Date().toISOString().slice(0, 10),
+        status,
+        efi_charge_id: chargeId,
+        efi_barcode: billet.barcode || null,
+        efi_link: billet.link || billet.pdf?.charge || null,
+        paid_at: status === "paid" ? (charge.paid_at || new Date().toISOString()) : null,
+      });
+
+      if (invErr) {
+        console.error("Import invoice error:", invErr);
+      } else {
+        importedInvoices++;
+      }
+    }
+
+    return new Response(
+      JSON.stringify({
+        total_charges: chargeList.length,
+        imported_customers: importedCustomers,
+        imported_invoices: importedInvoices,
+        skipped_invoices: skippedInvoices,
+      }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  } catch (err) {
+    console.error("Import error:", err);
+    return new Response(
+      JSON.stringify({ error: err.message || "Erro ao importar da EFI" }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -318,6 +436,8 @@ Deno.serve(async (req) => {
         return await createBoleto(req);
       case "check":
         return await checkPayment(req);
+      case "import":
+        return await importFromEfi(req);
       default:
         return new Response(JSON.stringify({ error: "Not found" }), {
           status: 404,
