@@ -2,12 +2,19 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Navigate, useNavigate } from "react-router-dom";
+import { usePlans } from "@/hooks/usePlans";
+import type { Plan } from "@/hooks/usePlans";
+import PlanFormDialog from "@/components/PlanFormDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Loader2, Save, Upload, CheckCircle, XCircle, ShieldAlert, Zap } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { ArrowLeft, Loader2, Save, Upload, CheckCircle, XCircle, ShieldAlert, Zap, Plus, Pencil, Trash2, Package } from "lucide-react";
 import { toast } from "sonner";
 
 export default function Settings() {
@@ -22,6 +29,11 @@ export default function Settings() {
   const [loadingSettings, setLoadingSettings] = useState(true);
   const [testing, setTesting] = useState(false);
 
+  // Plans state
+  const { plans, loading: plansLoading, addPlan, updatePlan, deletePlan } = usePlans();
+  const [planFormOpen, setPlanFormOpen] = useState(false);
+  const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
+  const [deletingPlan, setDeletingPlan] = useState<Plan | null>(null);
   useEffect(() => {
     if (user && isAdmin) loadSettings();
   }, [user, isAdmin]);
@@ -150,10 +162,93 @@ export default function Settings() {
       </header>
 
       <main className="container mx-auto px-4 py-6 max-w-2xl">
-        <Tabs defaultValue="efi">
+        <Tabs defaultValue="plans">
           <TabsList>
+            <TabsTrigger value="plans">
+              <Package className="mr-1.5 h-4 w-4" /> Planos
+            </TabsTrigger>
             <TabsTrigger value="efi">API EFI</TabsTrigger>
           </TabsList>
+
+          {/* Plans Tab */}
+          <TabsContent value="plans" className="mt-4 space-y-4">
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">{plans.length} plano{plans.length !== 1 ? "s" : ""} cadastrado{plans.length !== 1 ? "s" : ""}</p>
+              <Button onClick={() => { setEditingPlan(null); setPlanFormOpen(true); }}>
+                <Plus className="mr-2 h-4 w-4" /> Novo Plano
+              </Button>
+            </div>
+            {plansLoading ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              </div>
+            ) : plans.length === 0 ? (
+              <Card>
+                <CardContent className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                  <Package className="h-10 w-10 mb-3" />
+                  <p className="font-medium">Nenhum plano cadastrado</p>
+                  <p className="text-sm">Crie um plano para usar nas cobranças.</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="rounded-lg border bg-card">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50">
+                      <TableHead className="font-semibold">Plano</TableHead>
+                      <TableHead className="font-semibold">Valor</TableHead>
+                      <TableHead className="font-semibold hidden md:table-cell">Intervalo</TableHead>
+                      <TableHead className="font-semibold hidden lg:table-cell">Desconto</TableHead>
+                      <TableHead className="font-semibold hidden lg:table-cell">Juros/Multa</TableHead>
+                      <TableHead className="font-semibold text-center">Status</TableHead>
+                      <TableHead className="font-semibold text-right">Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {plans.map((p) => (
+                      <TableRow key={p.id} className={!p.ativo ? "opacity-50" : ""}>
+                        <TableCell>
+                          <div>
+                            <span className="font-medium">{p.nome}</span>
+                            {p.descricao && <p className="text-xs text-muted-foreground">{p.descricao}</p>}
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-mono text-sm">
+                          R$ {(p.valor_centavos / 100).toFixed(2).replace(".", ",")}
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell text-sm">
+                          {p.intervalo_meses === 1 ? "Mensal" : `${p.intervalo_meses} meses`}
+                        </TableCell>
+                        <TableCell className="hidden lg:table-cell text-sm">
+                          {p.desconto_centavos > 0
+                            ? `R$ ${(p.desconto_centavos / 100).toFixed(2).replace(".", ",")} (${p.dias_desconto}d antes)`
+                            : "—"}
+                        </TableCell>
+                        <TableCell className="hidden lg:table-cell text-sm">
+                          {p.juros_mensal > 0 || p.multa_centavos > 0
+                            ? `${p.juros_mensal}%/mês${p.multa_centavos > 0 ? ` + R$ ${(p.multa_centavos / 100).toFixed(2).replace(".", ",")}` : ""}`
+                            : "—"}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant={p.ativo ? "default" : "secondary"}>{p.ativo ? "Ativo" : "Inativo"}</Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditingPlan(p); setPlanFormOpen(true); }}>
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeletingPlan(p)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </TabsContent>
 
           <TabsContent value="efi" className="mt-4">
             <Card>
@@ -241,6 +336,36 @@ export default function Settings() {
             </Card>
           </TabsContent>
         </Tabs>
+
+        {/* Plan Form */}
+        <PlanFormDialog
+          open={planFormOpen}
+          onOpenChange={setPlanFormOpen}
+          plan={editingPlan}
+          onSave={addPlan}
+          onUpdate={updatePlan}
+        />
+
+        {/* Delete Plan Confirmation */}
+        <AlertDialog open={!!deletingPlan} onOpenChange={(open) => !open && setDeletingPlan(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Excluir plano</AlertDialogTitle>
+              <AlertDialogDescription>
+                Tem certeza que deseja excluir o plano <strong>{deletingPlan?.nome}</strong>?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={async () => { if (deletingPlan) { await deletePlan(deletingPlan.id); setDeletingPlan(null); } }}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Excluir
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </main>
     </div>
   );
