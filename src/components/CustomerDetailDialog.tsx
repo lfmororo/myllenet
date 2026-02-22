@@ -3,9 +3,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
+import { Input } from "@/components/ui/input";
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, ExternalLink, Copy, CheckCircle2, Clock, Import } from "lucide-react";
+import { Loader2, ExternalLink, Copy, CheckCircle2, Clock, Import, CalendarCheck, X } from "lucide-react";
 import { toast } from "sonner";
 import type { Customer } from "@/hooks/useCustomers";
 import type { Invoice } from "@/hooks/useInvoices";
@@ -14,12 +15,15 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   customer: Customer | null;
+  onCustomerUpdated?: () => void;
 }
 
-export default function CustomerDetailDialog({ open, onOpenChange, customer }: Props) {
+export default function CustomerDetailDialog({ open, onOpenChange, customer, onCustomerUpdated }: Props) {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(false);
   const [checkingEfi, setCheckingEfi] = useState(false);
+  const [pagoAte, setPagoAte] = useState("");
+  const [savingPagoAte, setSavingPagoAte] = useState(false);
 
   const fetchInvoices = useCallback(() => {
     if (!customer) return;
@@ -42,10 +46,45 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer }: P
   useEffect(() => {
     if (open && customer) {
       fetchInvoices();
+      setPagoAte(customer.pago_ate || "");
     } else {
       setInvoices([]);
+      setPagoAte("");
     }
   }, [open, customer, fetchInvoices]);
+
+  const handleSavePagoAte = async () => {
+    if (!customer) return;
+    setSavingPagoAte(true);
+    const { error } = await supabase
+      .from("customers")
+      .update({ pago_ate: pagoAte || null } as any)
+      .eq("id", customer.id);
+    if (error) {
+      toast.error("Erro ao salvar");
+    } else {
+      toast.success("Pagamento antecipado atualizado!");
+      onCustomerUpdated?.();
+    }
+    setSavingPagoAte(false);
+  };
+
+  const handleClearPagoAte = async () => {
+    if (!customer) return;
+    setSavingPagoAte(true);
+    const { error } = await supabase
+      .from("customers")
+      .update({ pago_ate: null } as any)
+      .eq("id", customer.id);
+    if (error) {
+      toast.error("Erro ao limpar");
+    } else {
+      setPagoAte("");
+      toast.success("Pagamento antecipado removido!");
+      onCustomerUpdated?.();
+    }
+    setSavingPagoAte(false);
+  };
 
   const handleCheckEfi = async () => {
     if (!customer) return;
@@ -132,6 +171,50 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer }: P
               <span className="text-muted-foreground">Endereço:</span>{" "}
               {[customer.rua, customer.numero, customer.complemento, customer.bairro, customer.cidade, customer.estado, customer.cep].filter(Boolean).join(", ")}
             </div>
+          )}
+        </div>
+
+        <Separator />
+
+        {/* Pago Até (Pagamento Antecipado) */}
+        <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <CalendarCheck className="h-4 w-4 text-primary" />
+            Pagamento Antecipado (PIX direto)
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Informe até que mês o cliente já pagou. Meses cobertos não gerarão alerta de "sem boleto".
+          </p>
+          <div className="flex items-center gap-2">
+            <Input
+              type="month"
+              value={pagoAte ? pagoAte.slice(0, 7) : ""}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val) {
+                  // Set to last day of the selected month
+                  const [y, m] = val.split("-").map(Number);
+                  const lastDay = new Date(y, m, 0).getDate();
+                  setPagoAte(`${val}-${String(lastDay).padStart(2, "0")}`);
+                } else {
+                  setPagoAte("");
+                }
+              }}
+              className="w-48"
+            />
+            <Button size="sm" onClick={handleSavePagoAte} disabled={savingPagoAte}>
+              {savingPagoAte ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Salvar"}
+            </Button>
+            {customer.pago_ate && (
+              <Button size="sm" variant="ghost" onClick={handleClearPagoAte} disabled={savingPagoAte}>
+                <X className="h-3.5 w-3.5 mr-1" /> Limpar
+              </Button>
+            )}
+          </div>
+          {customer.pago_ate && (
+            <p className="text-xs text-primary">
+              ✅ Pago até: {new Date(customer.pago_ate + "T12:00:00").toLocaleDateString("pt-BR", { month: "long", year: "numeric" })}
+            </p>
           )}
         </div>
 

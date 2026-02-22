@@ -59,7 +59,18 @@ export default function Dashboard() {
   }, [allInvoices]);
 
   const activeCustomersWithoutBoleto = useMemo(() => {
-    return customers.filter(c => c.ativo && !customerIdsWithInvoiceThisMonth.has(c.id));
+    const now = new Date();
+    const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0); // last day of current month
+    return customers.filter(c => {
+      if (!c.ativo) return false;
+      if (customerIdsWithInvoiceThisMonth.has(c.id)) return false;
+      // If customer has pago_ate and it covers the current month, exclude
+      if (c.pago_ate) {
+        const pagoAte = new Date(c.pago_ate + "T12:00:00");
+        if (pagoAte >= currentMonthEnd) return false;
+      }
+      return true;
+    });
   }, [customers, customerIdsWithInvoiceThisMonth]);
 
   const displayedCustomers = filterNoBoleto
@@ -446,6 +457,7 @@ export default function Dashboard() {
         open={!!detailCustomer}
         onOpenChange={(open) => !open && setDetailCustomer(null)}
         customer={detailCustomer}
+        onCustomerUpdated={refetchCustomers}
       />
 
       {/* Delete confirmation */}

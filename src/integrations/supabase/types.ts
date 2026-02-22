@@ -30,6 +30,7 @@ export type Database = {
           id: string
           nome: string
           numero: string | null
+          pago_ate: string | null
           plan_id: string | null
           rua: string | null
           senha_pppoe: string
@@ -52,6 +53,7 @@ export type Database = {
           id?: string
           nome: string
           numero?: string | null
+          pago_ate?: string | null
           plan_id?: string | null
           rua?: string | null
           senha_pppoe: string
@@ -74,6 +76,7 @@ export type Database = {
           id?: string
           nome?: string
           numero?: string | null
+          pago_ate?: string | null
           plan_id?: string | null
           rua?: string | null
           senha_pppoe?: string

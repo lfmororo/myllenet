@@ -21,11 +21,12 @@ export interface Customer {
   dia_vencimento: number;
   plan_id: string | null;
   desconto_especial_centavos: number;
+  pago_ate: string | null;
   created_at: string;
   updated_at: string;
 }
 
-export type CustomerInput = Omit<Customer, "id" | "created_at" | "updated_at" | "ativo">;
+export type CustomerInput = Omit<Customer, "id" | "created_at" | "updated_at" | "ativo" | "pago_ate">;
 
 export function useCustomers() {
   const [customers, setCustomers] = useState<Customer[]>([]);
