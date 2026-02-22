@@ -372,6 +372,10 @@ export default function Dashboard() {
         onOpenChange={setCsvImportOpen}
         onImport={bulkImport}
         existingCpfs={customers.map((c) => c.cpf)}
+        plans={plans}
+        allInvoices={allInvoices}
+        onUpdateCustomer={updateCustomer}
+        existingCustomers={customers.map(c => ({ id: c.id, cpf: c.cpf }))}
       />
 
       {/* Customer Detail */}

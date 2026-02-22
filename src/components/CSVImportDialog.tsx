@@ -8,12 +8,18 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Upload, FileText, AlertTriangle, CheckCircle, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
 import type { CustomerInput } from "@/hooks/useCustomers";
+import type { Plan } from "@/hooks/usePlans";
+import type { Invoice } from "@/hooks/useInvoices";
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onImport: (customers: CustomerInput[]) => Promise<{ success: number; failed: number }>;
   existingCpfs: string[];
+  plans: Plan[];
+  allInvoices: Invoice[];
+  onUpdateCustomer: (id: string, data: Partial<CustomerInput>) => Promise<boolean>;
+  existingCustomers: { id: string; cpf: string }[];
 }
 
 type Step = "upload" | "mapping" | "preview";
@@ -142,7 +148,7 @@ function cleanCPF(cpf: string): string {
   return cpf.replace(/\D/g, "");
 }
 
-export default function CSVImportDialog({ open, onOpenChange, onImport, existingCpfs }: Props) {
+export default function CSVImportDialog({ open, onOpenChange, onImport, existingCpfs, plans, allInvoices, onUpdateCustomer, existingCustomers }: Props) {
   const [step, setStep] = useState<Step>("upload");
   const [headers, setHeaders] = useState<string[]>([]);
   const [rows, setRows] = useState<string[][]>([]);
@@ -290,6 +296,40 @@ export default function CSVImportDialog({ open, onOpenChange, onImport, existing
       const result = await onImport(validRows);
       toast.success(`${result.success} cliente(s) importado(s)!`);
       if (result.failed > 0) toast.error(`${result.failed} falha(s) na importação`);
+
+      // Post-import: update dia_vencimento and plan_id based on invoices
+      if (allInvoices.length > 0 && plans.length > 0) {
+        let updated = 0;
+        for (const row of validRows) {
+          const cpfClean = cleanCPF(row.cpf);
+          // Find matching customer by CPF
+          const customer = existingCustomers.find(c => cleanCPF(c.cpf) === cpfClean);
+          if (!customer) continue;
+
+          // Find invoices for this customer, sorted by vencimento desc
+          const customerInvoices = allInvoices
+            .filter(inv => inv.customer_id === customer.id && inv.status !== "cancelled")
+            .sort((a, b) => b.vencimento.localeCompare(a.vencimento));
+
+          if (customerInvoices.length === 0) continue;
+
+          const latestInvoice = customerInvoices[0];
+          // Extract day from vencimento date
+          const vencDate = new Date(latestInvoice.vencimento + "T12:00:00");
+          const diaVencimento = vencDate.getDate();
+
+          // Match plan by valor_centavos
+          const matchedPlan = plans.find(p => p.ativo && p.valor_centavos === latestInvoice.valor_centavos);
+
+          const updateData: Partial<CustomerInput> = { dia_vencimento: diaVencimento };
+          if (matchedPlan) updateData.plan_id = matchedPlan.id;
+
+          const ok = await onUpdateCustomer(customer.id, updateData);
+          if (ok) updated++;
+        }
+        if (updated > 0) toast.success(`${updated} cliente(s) atualizado(s) com vencimento e plano das cobranças`);
+      }
+
       handleClose(false);
     } catch {
       toast.error("Erro durante a importação");
