@@ -147,9 +147,13 @@ export type Database = {
         Row: {
           ativo: boolean
           created_at: string
+          desconto_centavos: number
           descricao: string | null
+          dias_desconto: number
           id: string
           intervalo_meses: number
+          juros_mensal: number
+          multa_centavos: number
           nome: string
           updated_at: string
           valor_centavos: number
@@ -157,9 +161,13 @@ export type Database = {
         Insert: {
           ativo?: boolean
           created_at?: string
+          desconto_centavos?: number
           descricao?: string | null
+          dias_desconto?: number
           id?: string
           intervalo_meses?: number
+          juros_mensal?: number
+          multa_centavos?: number
           nome: string
           updated_at?: string
           valor_centavos: number
@@ -167,9 +175,13 @@ export type Database = {
         Update: {
           ativo?: boolean
           created_at?: string
+          desconto_centavos?: number
           descricao?: string | null
+          dias_desconto?: number
           id?: string
           intervalo_meses?: number
+          juros_mensal?: number
+          multa_centavos?: number
           nome?: string
           updated_at?: string
           valor_centavos?: number
