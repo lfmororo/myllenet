@@ -460,6 +460,21 @@ Deno.serve(async (req) => {
         return await checkPayment(req);
       case "import":
         return await importFromEfi(req);
+      case "test": {
+        const authHeader = req.headers.get("Authorization");
+        await verifyAdmin(authHeader);
+        try {
+          const token = await getEfiToken();
+          return new Response(JSON.stringify({ success: true, message: "Conexão com a EFI estabelecida com sucesso!", token_preview: token.slice(0, 10) + "..." }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        } catch (err) {
+          return new Response(JSON.stringify({ success: false, error: err.message || "Falha ao conectar com a EFI" }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      }
       default:
         return new Response(JSON.stringify({ error: "Not found" }), {
           status: 404,

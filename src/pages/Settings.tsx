@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Loader2, Save, Upload, CheckCircle, XCircle, ShieldAlert } from "lucide-react";
+import { ArrowLeft, Loader2, Save, Upload, CheckCircle, XCircle, ShieldAlert, Zap } from "lucide-react";
 import { toast } from "sonner";
 
 export default function Settings() {
@@ -20,6 +20,7 @@ export default function Settings() {
   const [certUploaded, setCertUploaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loadingSettings, setLoadingSettings] = useState(true);
+  const [testing, setTesting] = useState(false);
 
   useEffect(() => {
     if (user && isAdmin) loadSettings();
@@ -82,6 +83,34 @@ export default function Settings() {
       toast.error("Erro ao salvar: " + (err.message || "Erro desconhecido"));
     }
     setSaving(false);
+  };
+
+  const handleTestConnection = async () => {
+    setTesting(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+      const res = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/efi-boleto/test`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      const result = await res.json();
+      if (result.success) {
+        toast.success(result.message);
+      } else {
+        toast.error("Falha: " + (result.error || "Erro desconhecido"));
+      }
+    } catch (err: any) {
+      toast.error("Erro ao testar: " + (err.message || "Erro desconhecido"));
+    }
+    setTesting(false);
   };
 
   if (authLoading) {
@@ -188,14 +217,24 @@ export default function Settings() {
                       </div>
                     </div>
 
-                    <Button onClick={handleSave} disabled={saving} className="w-full sm:w-auto">
-                      {saving ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      ) : (
-                        <Save className="mr-2 h-4 w-4" />
-                      )}
-                      Salvar Configurações
-                    </Button>
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <Button onClick={handleSave} disabled={saving} className="w-full sm:w-auto">
+                        {saving ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <Save className="mr-2 h-4 w-4" />
+                        )}
+                        Salvar Configurações
+                      </Button>
+                      <Button variant="outline" onClick={handleTestConnection} disabled={testing} className="w-full sm:w-auto">
+                        {testing ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <Zap className="mr-2 h-4 w-4" />
+                        )}
+                        Testar Conexão
+                      </Button>
+                    </div>
                   </div>
                 )}
               </CardContent>
