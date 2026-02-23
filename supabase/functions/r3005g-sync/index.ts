@@ -86,20 +86,26 @@ async function getRouterInfo(baseUrl: string): Promise<{ sn: string; csrfprotect
 
 async function loginR3005G(
   baseUrl: string,
-  encodedUser: string,
-  encodedPass: string
+  plainUser: string,
+  plainPass: string
 ): Promise<string> {
-  const { csrfprotect, captchaActive } = await getRouterInfo(baseUrl);
+  const { sn, csrfprotect, captchaActive } = await getRouterInfo(baseUrl);
 
   if (captchaActive) {
     throw new Error("Router captcha is active. Please wait a few minutes or manually log in via browser to reset.");
   }
 
-  // Send credentials exactly as the browser does - pre-encoded values
+  // Encrypt credentials using AES with SN-derived key, exactly like the browser does
+  const { keyStr, ivStr } = deriveKeyIV(sn);
+  const encryptedUser = aesEncrypt(plainUser, keyStr, ivStr);
+  const encryptedPass = aesEncrypt(plainPass, keyStr, ivStr);
+
+  console.log("R3005G: SN =", sn, "| keyStr =", keyStr.substring(0, 4) + "...", "| ivStr =", ivStr.substring(0, 4) + "...");
+
   const payload = {
     csrfprotect,
-    user: encodedUser,
-    password: encodedPass,
+    user: encryptedUser,
+    password: encryptedPass,
     base64: 1,
     tm: Date.now() / 1000,
   };
