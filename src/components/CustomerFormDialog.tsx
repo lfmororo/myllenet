@@ -95,7 +95,8 @@ export default function CustomerFormDialog({ open, onOpenChange, customer, onSav
       return;
     }
     setSaving(true);
-    const data = { ...form, cpf: cpfClean, telefone: form.telefone || null };
+    const phoneDigits = form.telefone ? form.telefone.replace(/\D/g, "") : "";
+    const data = { ...form, cpf: cpfClean, telefone: phoneDigits || null };
 
     let success = false;
     if (customer && onUpdate) {
