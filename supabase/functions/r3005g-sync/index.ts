@@ -41,30 +41,44 @@ function encodeCredential(input: string): string {
   return btoa(binary);
 }
 
-// Try decrypt double-base64 + AES-CBC
+// Try decrypt with multiple padding strategies and base64 layers
 function tryDecrypt(encryptedDoubleB64: string, key: CryptoJS.lib.WordArray, iv: CryptoJS.lib.WordArray): string | null {
-  try {
-    const innerB64 = atob(encryptedDoubleB64);
-    const decrypted = CryptoJS.AES.decrypt(innerB64, key, {
-      iv, mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.ZeroPadding,
-    });
-    const result = decrypted.toString(CryptoJS.enc.Utf8).replace(/\0/g, "").trim();
-    if (result && result.length > 0) return result;
-  } catch { /* */ }
+  const paddings = [CryptoJS.pad.ZeroPadding, CryptoJS.pad.Pkcs7, CryptoJS.pad.NoPadding];
+  // Try double-base64 first, then single-base64
+  const candidates = [encryptedDoubleB64];
+  try { const inner = atob(encryptedDoubleB64); candidates.push(inner); } catch { /* skip */ }
+  
+  for (const input of candidates) {
+    for (const padding of paddings) {
+      try {
+        const decrypted = CryptoJS.AES.decrypt(input, key, {
+          iv, mode: CryptoJS.mode.CBC, padding,
+        });
+        const result = decrypted.toString(CryptoJS.enc.Utf8).replace(/\0/g, "").trim();
+        if (result && result.length > 1 && /^[a-zA-Z0-9._@\-]+$/.test(result)) return result;
+      } catch { /* */ }
+    }
+  }
   return null;
 }
 
-// Encrypt a plaintext string to match router's format (for encrypt-and-compare)
-function tryEncrypt(plaintext: string, key: CryptoJS.lib.WordArray, iv: CryptoJS.lib.WordArray): string {
-  const encrypted = CryptoJS.AES.encrypt(plaintext, key, {
-    iv, mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.ZeroPadding,
-  });
-  const innerB64 = encrypted.toString(); // base64 of ciphertext
-  // Double base64 encode to match router format
-  const bytes = new TextEncoder().encode(innerB64);
-  let binary = "";
-  for (const b of bytes) binary += String.fromCharCode(b);
-  return btoa(binary);
+// Encrypt a plaintext string and return all possible encoded variants
+function tryEncryptVariants(plaintext: string, key: CryptoJS.lib.WordArray, iv: CryptoJS.lib.WordArray): string[] {
+  const results: string[] = [];
+  for (const padding of [CryptoJS.pad.ZeroPadding, CryptoJS.pad.Pkcs7]) {
+    const encrypted = CryptoJS.AES.encrypt(plaintext, key, {
+      iv, mode: CryptoJS.mode.CBC, padding,
+    });
+    const innerB64 = encrypted.toString();
+    // Double base64
+    const bytes = new TextEncoder().encode(innerB64);
+    let binary = "";
+    for (const b of bytes) binary += String.fromCharCode(b);
+    results.push(btoa(binary));
+    // Single base64
+    results.push(innerB64);
+  }
+  return results;
 }
 
 function getAllKeyApproaches(serialNumber: string): Array<{ name: string; key: CryptoJS.lib.WordArray; iv: CryptoJS.lib.WordArray }> {
@@ -76,6 +90,7 @@ function getAllKeyApproaches(serialNumber: string): Array<{ name: string; key: C
   const sha256Hex = sha256.toString();
   const md5Serial = CryptoJS.MD5(serialNumber);
   const md5Const = CryptoJS.MD5(AES_CONSTANT);
+  const md5ConstOnly = CryptoJS.MD5(AES_CONSTANT);
 
   return [
     { name: "MD5(sn+const) key=iv", key: CryptoJS.enc.Hex.parse(md5Hash.toString()), iv: CryptoJS.enc.Hex.parse(md5Hash.toString()) },
@@ -86,6 +101,14 @@ function getAllKeyApproaches(serialNumber: string): Array<{ name: string; key: C
     { name: "MD5(serial) key, MD5(const) IV", key: CryptoJS.enc.Hex.parse(md5Serial.toString()), iv: CryptoJS.enc.Hex.parse(md5Const.toString()) },
     { name: "MD5(const+sn) key=iv", key: CryptoJS.enc.Hex.parse(md5Rev.toString()), iv: CryptoJS.enc.Hex.parse(md5Rev.toString()) },
     { name: "combined[:16] key, zero IV", key: CryptoJS.enc.Utf8.parse(combined.substring(0, 16)), iv: CryptoJS.enc.Hex.parse("00000000000000000000000000000000") },
+    // Approaches without SN - just the constant
+    { name: "MD5(const) key=iv", key: CryptoJS.enc.Hex.parse(md5ConstOnly.toString()), iv: CryptoJS.enc.Hex.parse(md5ConstOnly.toString()) },
+    { name: "const[:16] key=iv", key: CryptoJS.enc.Utf8.parse(AES_CONSTANT.substring(0, 16)), iv: CryptoJS.enc.Utf8.parse(AES_CONSTANT.substring(0, 16)) },
+    { name: "const[:16] key, zero IV", key: CryptoJS.enc.Utf8.parse(AES_CONSTANT.substring(0, 16)), iv: CryptoJS.enc.Hex.parse("00000000000000000000000000000000") },
+    { name: "MD5(const) key, zero IV", key: CryptoJS.enc.Hex.parse(md5ConstOnly.toString()), iv: CryptoJS.enc.Hex.parse("00000000000000000000000000000000") },
+    // SN as raw key
+    { name: "sn[:16] key=iv", key: CryptoJS.enc.Utf8.parse(serialNumber.padEnd(16, "\0").substring(0, 16)), iv: CryptoJS.enc.Utf8.parse(serialNumber.padEnd(16, "\0").substring(0, 16)) },
+    { name: "sn[:16] key, zero IV", key: CryptoJS.enc.Utf8.parse(serialNumber.padEnd(16, "\0").substring(0, 16)), iv: CryptoJS.enc.Hex.parse("00000000000000000000000000000000") },
   ];
 }
 
@@ -431,19 +454,27 @@ Deno.serve(async (req) => {
         // Try all SN candidates including mem-derived ones
         const allSNs = [...snCandidates, ...additionalSNs].filter(Boolean) as string[];
         
+        // Log a sample encrypted username for debugging
+        if (knownUsernames.length > 0) {
+          console.log(`R3005G ENCRYPT-COMPARE: Testing ${knownUsernames.length} known usernames: ${knownUsernames.slice(0, 3).join(", ")}`);
+          console.log(`R3005G ENCRYPT-COMPARE: Router has ${routerEncryptedUsers.size} encrypted users, sample: ${[...routerEncryptedUsers].slice(0, 2).join(", ")}`);
+        }
+
         for (const sn of allSNs) {
           for (const approach of getAllKeyApproaches(sn)) {
             let matches = 0;
             for (const username of knownUsernames) {
-              const encrypted = tryEncrypt(username, approach.key, approach.iv);
-              if (routerEncryptedUsers.has(encrypted)) {
-                matches++;
+              const variants = tryEncryptVariants(username, approach.key, approach.iv);
+              for (const enc of variants) {
+                if (routerEncryptedUsers.has(enc)) {
+                  matches++;
+                  break;
+                }
               }
             }
             if (matches > 0) {
               console.log(`R3005G ENCRYPT-COMPARE: ✅ SN="${sn.substring(0, 20)}", approach="${approach.name}" matched ${matches}/${knownUsernames.length}`);
               workingApproach = { key: approach.key, iv: approach.iv };
-              // Now decrypt all router users with this approach
               for (const ru of routerUsers) {
                 const ruObj = ru as Record<string, unknown>;
                 const dec = tryDecrypt(ruObj.user as string, approach.key, approach.iv);
