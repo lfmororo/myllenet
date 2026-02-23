@@ -77,6 +77,10 @@ export default function Dashboard() {
     });
   }, [customers, customerIdsWithInvoiceThisMonth]);
 
+  const activeCustomersWithoutPlan = useMemo(() => {
+    return customers.filter(c => c.ativo && !c.plan_id);
+  }, [customers]);
+
   const displayedCustomers = filterNoBoleto
     ? customers.filter(c => {
         if (customerIdsWithInvoiceThisMonth.has(c.id)) return false;
@@ -251,6 +255,15 @@ export default function Dashboard() {
                     {bulkGenerating ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Zap className="mr-1.5 h-3.5 w-3.5" />}
                     Gerar em lote
                   </Button>
+                </div>
+              </div>
+            )}
+
+            {activeCustomersWithoutPlan.length > 0 && !loading && (
+              <div className="flex items-center gap-3 rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-3">
+                <AlertTriangle className="h-5 w-5 text-yellow-600 shrink-0" />
+                <div className="flex-1 text-sm">
+                  <strong>{activeCustomersWithoutPlan.length}</strong> cliente{activeCustomersWithoutPlan.length !== 1 ? "s" : ""} ativo{activeCustomersWithoutPlan.length !== 1 ? "s" : ""} sem plano configurado.
                 </div>
               </div>
             )}
