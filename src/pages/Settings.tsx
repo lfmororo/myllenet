@@ -39,6 +39,7 @@ export default function Settings() {
   const [r3005gUrl, setR3005gUrl] = useState("");
   const [r3005gUser, setR3005gUser] = useState("");
   const [r3005gPass, setR3005gPass] = useState("");
+  const [r3005gSN, setR3005gSN] = useState("");
   const [savingR3005g, setSavingR3005g] = useState(false);
 
   // User management state
@@ -157,7 +158,7 @@ export default function Settings() {
     const { data } = await supabase
       .from("settings")
       .select("key, value")
-      .in("key", ["efi_client_id", "efi_client_secret", "efi_certificate_path", "uazapi_token", "r3005g_url", "r3005g_username", "r3005g_password"]);
+      .in("key", ["efi_client_id", "efi_client_secret", "efi_certificate_path", "uazapi_token", "r3005g_url", "r3005g_username", "r3005g_password", "r3005g_serial_number"]);
 
     if (data) {
       for (const row of data) {
@@ -168,6 +169,7 @@ export default function Settings() {
         if (row.key === "r3005g_url") setR3005gUrl(row.value || "");
         if (row.key === "r3005g_username") setR3005gUser(row.value || "");
         if (row.key === "r3005g_password") setR3005gPass(row.value || "");
+        if (row.key === "r3005g_serial_number") setR3005gSN(row.value || "");
       }
     }
     setLoadingSettings(false);
@@ -598,29 +600,36 @@ export default function Settings() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="r3005g_user">Usuário (codificado)</Label>
+                      <Label htmlFor="r3005g_user">Usuário</Label>
                       <Input
                         id="r3005g_user"
                         value={r3005gUser}
                         onChange={(e) => setR3005gUser(e.target.value)}
-                        placeholder="Valor codificado do campo 'user' do login"
+                        placeholder="Usuário de login do roteador"
                       />
-                      <p className="text-xs text-muted-foreground">
-                        Copie o valor do campo "user" capturado no DevTools (F12) do navegador ao fazer login no roteador.
-                      </p>
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="r3005g_pass">Senha (codificada)</Label>
+                      <Label htmlFor="r3005g_pass">Senha</Label>
                       <Input
                         id="r3005g_pass"
                         type="password"
                         value={r3005gPass}
                         onChange={(e) => setR3005gPass(e.target.value)}
-                        placeholder="Valor codificado do campo 'password' do login"
+                        placeholder="Senha de login do roteador"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="r3005g_sn">Serial Number (SN)</Label>
+                      <Input
+                        id="r3005g_sn"
+                        value={r3005gSN}
+                        onChange={(e) => setR3005gSN(e.target.value)}
+                        placeholder="Ex: INT1234567890"
                       />
                       <p className="text-xs text-muted-foreground">
-                        Copie o valor do campo "password" capturado no DevTools (F12) do navegador ao fazer login no roteador.
+                        Encontre na etiqueta do roteador ou em Status → Informações do Sistema na interface web. Necessário para descriptografar os dados PPPoE.
                       </p>
                     </div>
 
@@ -631,6 +640,7 @@ export default function Settings() {
                           await upsertSetting("r3005g_url", r3005gUrl);
                           await upsertSetting("r3005g_username", r3005gUser);
                           await upsertSetting("r3005g_password", r3005gPass);
+                          await upsertSetting("r3005g_serial_number", r3005gSN);
                           toast.success("Configurações R3005G salvas!");
                         } catch (err: any) {
                           toast.error("Erro ao salvar: " + (err.message || "Erro desconhecido"));

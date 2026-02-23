@@ -174,10 +174,27 @@ async function fetchSerialNumber(baseUrl: string, cookie: string): Promise<strin
 
 // Also try to extract SN/key from router's JavaScript files
 async function fetchKeyFromJS(baseUrl: string, cookie: string): Promise<string | null> {
-  const jsFiles = [
+  // First, discover actual JS paths from index.html
+  const jsFiles: string[] = [];
+  try {
+    const htmlRes = await fetch(`${baseUrl}/index.html`, { headers: { Cookie: cookie } });
+    if (htmlRes.ok) {
+      const html = await htmlRes.text();
+      // Extract script src attributes
+      const scriptMatches = html.matchAll(/src=["']([^"']*\.js[^"']*?)["']/g);
+      for (const m of scriptMatches) {
+        const path = m[1].replace(/^\//, "");
+        jsFiles.push(path);
+        console.log(`R3005G JS: Found script in HTML: ${path}`);
+      }
+    }
+  } catch { /* skip */ }
+  
+  // Add common paths as fallback
+  jsFiles.push(
     "static/js/chunk-common.js", "static/js/app.js", "js/chunk-common.js", "js/app.js",
     "static/js/chunk-vendors.js", "js/main.js", "static/js/main.js",
-  ];
+  );
 
   for (const jsFile of jsFiles) {
     try {
@@ -185,13 +202,13 @@ async function fetchKeyFromJS(baseUrl: string, cookie: string): Promise<string |
       if (!res.ok) continue;
       const text = await res.text();
 
-      // Look for serial number pattern or AES key in JS
-      // Common patterns: .sn= , serialNumber: , "sn":"xxx"
+      // Look for serial number or AES key patterns
       const patterns = [
         /["\']sn["\']\s*[:=]\s*["\']([A-Za-z0-9]+)["\']/,
         /serial[Nn]umber\s*[:=]\s*["\']([A-Za-z0-9]+)["\']/,
         /device_sn\s*[:=]\s*["\']([A-Za-z0-9]+)["\']/,
-        /AES\.decrypt[^)]*["\']([A-Fa-f0-9]{32})["\']/,
+        /\.sn\s*=\s*["\']([A-Za-z0-9]+)["\']/,
+        /sn:\s*["\']([A-Za-z0-9]{8,})["\']/,
       ];
 
       for (const pat of patterns) {
@@ -202,18 +219,15 @@ async function fetchKeyFromJS(baseUrl: string, cookie: string): Promise<string |
         }
       }
 
-      // Look for the constant string near AES logic
-      if (text.includes(AES_CONSTANT) || text.includes("c3W1KF2N")) {
-        // Find surrounding code (200 chars around the match)
+      // Look for how the AES constant is used - find the SN variable near it
+      if (text.includes("c3W1KF2N")) {
         const idx = text.indexOf("c3W1KF2N");
-        const snippet = text.substring(Math.max(0, idx - 200), idx + 300);
-        console.log(`R3005G JS: Found AES constant in ${jsFile}, context:`, snippet);
-      }
-
-      // Also look for how sn is used
-      const snUsageMatch = text.match(/\.sn\b[^;]{0,100}/);
-      if (snUsageMatch) {
-        console.log(`R3005G JS: .sn usage in ${jsFile}:`, snUsageMatch[0]);
+        const snippet = text.substring(Math.max(0, idx - 300), idx + 400);
+        console.log(`R3005G JS: AES constant context in ${jsFile}:`, snippet.substring(0, 600));
+        
+        // Try to find how SN is referenced near the constant
+        const snRefMatch = snippet.match(/(\w+)\.sn\b/);
+        if (snRefMatch) console.log(`R3005G JS: SN reference: ${snRefMatch[0]}`);
       }
 
       console.log(`R3005G JS: ${jsFile} loaded (${text.length} bytes)`);
@@ -285,13 +299,14 @@ Deno.serve(async (req) => {
     }
 
     const serviceClient = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-    const { data: settingsData } = await serviceClient.from("settings").select("key, value").in("key", ["r3005g_url", "r3005g_username", "r3005g_password"]);
+    const { data: settingsData } = await serviceClient.from("settings").select("key, value").in("key", ["r3005g_url", "r3005g_username", "r3005g_password", "r3005g_serial_number"]);
     const settings: Record<string, string> = {};
     for (const row of settingsData || []) { if (row.key && row.value) settings[row.key] = row.value; }
 
     const baseUrl = settings["r3005g_url"] || Deno.env.get("R3005G_URL");
     const routerUser = settings["r3005g_username"] || Deno.env.get("R3005G_USERNAME");
     const routerPass = settings["r3005g_password"] || Deno.env.get("R3005G_PASSWORD");
+    const configSN = settings["r3005g_serial_number"] || null;
 
     if (!baseUrl || !routerUser || !routerPass) {
       return new Response(JSON.stringify({ error: "R3005G não configurado." }), {
@@ -329,7 +344,7 @@ Deno.serve(async (req) => {
         fetchRawUsers(baseUrl, cookie),
       ]);
 
-      const effectiveSN = loginSN || serialNumber || jsKey;
+      const effectiveSN = configSN || loginSN || serialNumber || jsKey;
       const firstUser = routerUsers[0] as Record<string, unknown> | undefined;
       const testEncrypted = firstUser?.user as string || "";
 
@@ -360,7 +375,7 @@ Deno.serve(async (req) => {
         fetchRawUsers(baseUrl, cookie),
       ]);
 
-      const snCandidates = [loginSN, serialNumber, jsKey].filter(Boolean) as string[];
+      const snCandidates = [configSN, loginSN, serialNumber, jsKey].filter(Boolean) as string[];
       console.log(`R3005G STATUS: SN candidates=[${snCandidates.join(", ") || "NONE"}], users=${routerUsers.length}`);
 
       // Try each SN candidate with each key approach
