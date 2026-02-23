@@ -6,6 +6,20 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+function isValidCPF(cpf: string): boolean {
+  if (cpf.length !== 11 || /^(\d)\1{10}$/.test(cpf)) return false;
+  let sum = 0;
+  for (let i = 0; i < 9; i++) sum += parseInt(cpf[i]) * (10 - i);
+  let rest = (sum * 10) % 11;
+  if (rest === 10) rest = 0;
+  if (rest !== parseInt(cpf[9])) return false;
+  sum = 0;
+  for (let i = 0; i < 10; i++) sum += parseInt(cpf[i]) * (11 - i);
+  rest = (sum * 10) % 11;
+  if (rest === 10) rest = 0;
+  return rest === parseInt(cpf[10]);
+}
+
 // EFI API endpoints (production)
 const EFI_BASE_URL = "https://cobrancas.api.efipay.com.br";
 const EFI_AUTH_URL = `${EFI_BASE_URL}/v1/authorize`;
@@ -169,6 +183,15 @@ async function createBoleto(req: Request) {
   if (custErr || !customer) {
     return new Response(JSON.stringify({ error: "Cliente não encontrado" }), {
       status: 404,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  // Validate CPF
+  const cpfClean = customer.cpf.replace(/\D/g, "");
+  if (!isValidCPF(cpfClean)) {
+    return new Response(JSON.stringify({ error: `CPF inválido: ${cpfClean}. Corrija o cadastro do cliente antes de gerar boleto.` }), {
+      status: 400,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
