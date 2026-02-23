@@ -84,34 +84,70 @@ async function loginR3005G(
   password: string
 ): Promise<string> {
   const { sn, csrfprotect } = await getRouterInfo(baseUrl);
+  const { keyStr, ivStr } = deriveKeyIV(sn);
 
-  // The base64:1 flag tells the router credentials are Base64-encoded
-  const encodedUser = toBase64(username);
-  const encodedPass = toBase64(password);
+  // The Vue frontend encrypts then decrypts (identity), so router receives plaintext
+  // But base64:1 flag is always sent
+  console.log("R3005G: Logging in, csrfprotect:", csrfprotect, "user_len:", username.length, "pass_len:", password.length);
 
-  console.log("R3005G: Logging in with Base64-encoded credentials, csrfprotect:", csrfprotect);
+  // Try AES-encrypted credentials (what the browser actually sends before deCode)
+  const encUser = aesEncrypt(username, keyStr, ivStr);
+  const encPass = aesEncrypt(password, keyStr, ivStr);
 
-  const payload = {
-    csrfprotect,
-    user: encodedUser,
-    password: encodedPass,
-    tm: Date.now() / 1000,
-    base64: 1,
-  };
+  // Attempt 1: Try with AES encrypted (the browser sends enCode result, then deCode reverses it, 
+  // but maybe deCode on Vue instance is NOT the AES decrypt - maybe it's something else)
+  const payloads = [
+    // Try plaintext without base64 flag
+    { csrfprotect, user: username, password: password, tm: Date.now() / 1000 },
+    // Try plaintext with base64 flag
+    { csrfprotect, user: username, password: password, tm: Date.now() / 1000, base64: 1 },
+    // Try AES encrypted
+    { csrfprotect, user: encUser, password: encPass, tm: Date.now() / 1000, base64: 1 },
+  ];
 
-  const loginUrl = `${baseUrl}/log_in.cgi?csrfprotect=${csrfprotect}`;
-  console.log("R3005G login to:", loginUrl);
+  for (let i = 0; i < payloads.length; i++) {
+    const payload = payloads[i];
+    // Refresh csrfprotect for each attempt
+    if (i > 0) {
+      const info = await getRouterInfo(baseUrl);
+      payload.csrfprotect = info.csrfprotect;
+    }
 
-  const res = await fetch(loginUrl, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json;charset=UTF-8",
-      Accept: "application/json, text/plain, */*",
-      Origin: baseUrl,
-      Referer: `${baseUrl}/login.html`,
-    },
-    body: JSON.stringify(payload),
-  });
+    const loginUrl = `${baseUrl}/log_in.cgi`;
+    console.log(`R3005G login attempt ${i + 1}:`, JSON.stringify(payload).substring(0, 100));
+
+    const res = await fetch(loginUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json;charset=UTF-8",
+        Accept: "application/json, text/plain, */*",
+        Origin: baseUrl,
+        Referer: `${baseUrl}/login.html`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const body = await res.text();
+    console.log(`R3005G login attempt ${i + 1} response:`, res.status, body);
+
+    let json: { code: number; error?: string };
+    try {
+      json = JSON.parse(body);
+    } catch {
+      continue;
+    }
+
+    if (json.code === 0) {
+      const setCookie = res.headers.get("set-cookie");
+      const cookie = setCookie ? setCookie.split(";")[0] : "";
+      console.log("R3005G login success on attempt", i + 1, "cookie:", cookie ? "present" : "none");
+      return cookie;
+    }
+    
+    console.log(`R3005G attempt ${i + 1} failed:`, json.error);
+  }
+
+  throw new Error("Login failed: All credential encoding attempts failed");
 
   const body = await res.text();
   console.log("R3005G login response:", res.status, body);
@@ -236,18 +272,47 @@ Deno.serve(async (req) => {
     const url = new URL(req.url);
     const action = url.pathname.split("/").pop();
 
-    // Login to router
-    const cookie = await loginR3005G(baseUrl, routerUser, routerPass);
-
     if (action === "debug") {
-      // Debug endpoint - return router info without modifying anything
+      // Debug endpoint - return router info WITHOUT logging in
       const { sn, csrfprotect } = await getRouterInfo(baseUrl);
       const { keyStr, ivStr } = deriveKeyIV(sn);
+      
+      // Also fetch raw csrfprotect.data to see what's returned
+      let rawCsrf = "fetch_failed";
+      try {
+        const csrfRes = await fetch(`${baseUrl}/csrfprotect.data`);
+        rawCsrf = await csrfRes.text();
+      } catch (e) {
+        rawCsrf = `error: ${e.message}`;
+      }
+      
+      // Also fetch raw base_mini.data
+      let rawBase = "fetch_failed";
+      try {
+        const baseRes = await fetch(`${baseUrl}/base_mini.data`);
+        rawBase = await baseRes.text();
+      } catch (e) {
+        rawBase = `error: ${e.message}`;
+      }
+
       return new Response(
-        JSON.stringify({ sn_prefix: sn.substring(0, 6), csrfprotect, key_prefix: keyStr.substring(0, 4), iv_prefix: ivStr.substring(0, 4) }),
+        JSON.stringify({ 
+          sn_prefix: sn.substring(0, 8), 
+          sn_length: sn.length,
+          csrfprotect, 
+          key_prefix: keyStr.substring(0, 6), 
+          iv_prefix: ivStr.substring(0, 6),
+          raw_csrf: rawCsrf.substring(0, 200),
+          raw_base: rawBase.substring(0, 200),
+          user_prefix: routerUser!.substring(0, 3),
+          pass_length: routerPass!.length,
+        }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    // Login to router
+    const cookie = await loginR3005G(baseUrl, routerUser, routerPass);
 
     // Fetch PPPoE users
     const routerUsers = await fetchPPPoEUsers(baseUrl, cookie);
