@@ -55,11 +55,16 @@ export default function Dashboard() {
     const now = new Date();
     const year = now.getFullYear();
     const month = now.getMonth();
+    // Also check next month since boletos may be generated for it
+    const nextMonth = month === 11 ? 0 : month + 1;
+    const nextYear = month === 11 ? year + 1 : year;
     const ids = new Set<string>();
     for (const inv of allInvoices) {
       if (inv.status === "cancelled") continue;
       const d = new Date(inv.vencimento + "T12:00:00");
-      if (d.getFullYear() === year && d.getMonth() === month) {
+      const invYear = d.getFullYear();
+      const invMonth = d.getMonth();
+      if ((invYear === year && invMonth === month) || (invYear === nextYear && invMonth === nextMonth)) {
         ids.add(inv.customer_id);
       }
     }
