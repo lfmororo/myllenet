@@ -14,6 +14,16 @@ function decodeBase64(encoded: string): string {
   }
 }
 
+function toBase64(str: string): string {
+  // Handle UTF-8 properly by encoding bytes first
+  const bytes = new TextEncoder().encode(str);
+  let binary = "";
+  for (const b of bytes) {
+    binary += String.fromCharCode(b);
+  }
+  return btoa(binary);
+}
+
 async function loginR3005G(
   baseUrl: string,
   username: string,
@@ -22,10 +32,17 @@ async function loginR3005G(
   const csrfprotect = Math.floor(Date.now() / 1000).toString();
   const tm = Date.now() / 1000;
 
+  const userB64 = toBase64(username);
+  const passB64 = toBase64(password);
+
+  // Debug: log first 4 chars of encoded values to verify encoding
+  console.log("R3005G debug - user length:", username.length, "user_b64_prefix:", userB64.substring(0, 6));
+  console.log("R3005G debug - pass length:", password.length, "pass_b64_prefix:", passB64.substring(0, 6));
+
   const payload = {
     csrfprotect,
-    user: btoa(username),
-    password: btoa(password),
+    user: userB64,
+    password: passB64,
     tm,
     base64: 1,
   };
