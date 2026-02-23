@@ -40,6 +40,7 @@ export default function Dashboard() {
   const [invoiceCsvImportOpen, setInvoiceCsvImportOpen] = useState(false);
   const [importing, setImporting] = useState(false);
   const [filterNoBoleto, setFilterNoBoleto] = useState(false);
+  const [filterNoPlan, setFilterNoPlan] = useState(false);
   const [notifyNoBoletoOpen, setNotifyNoBoletoOpen] = useState(false);
   const [bulkGenerating, setBulkGenerating] = useState(false);
   const [notifyOverdueOpen, setNotifyOverdueOpen] = useState(false);
@@ -107,8 +108,13 @@ export default function Dashboard() {
       });
     }
 
+    // Filter by no plan
+    if (filterNoPlan) {
+      filtered = filtered.filter(c => c.ativo && !c.plan_id);
+    }
+
     return filtered;
-  }, [customers, customerActiveFilter, filterNoBoleto, customerIdsWithInvoiceThisMonth]);
+  }, [customers, customerActiveFilter, filterNoBoleto, filterNoPlan, customerIdsWithInvoiceThisMonth]);
 
   if (authLoading) {
     return (
@@ -280,6 +286,14 @@ export default function Dashboard() {
                 <div className="flex-1 text-sm">
                   <strong>{activeCustomersWithoutPlan.length}</strong> cliente{activeCustomersWithoutPlan.length !== 1 ? "s" : ""} ativo{activeCustomersWithoutPlan.length !== 1 ? "s" : ""} sem plano configurado.
                 </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setFilterNoPlan(!filterNoPlan)}
+                >
+                  <Filter className="mr-1.5 h-3.5 w-3.5" />
+                  {filterNoPlan ? "Mostrar todos" : "Filtrar"}
+                </Button>
               </div>
             )}
 
