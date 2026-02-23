@@ -278,43 +278,47 @@ Deno.serve(async (req) => {
     const action = url.pathname.split("/").pop();
 
     if (action === "debug") {
-      // Debug endpoint - return router info WITHOUT logging in
-      const { sn, csrfprotect, captchaActive } = await getRouterInfo(baseUrl);
-      const { keyStr, ivStr } = deriveKeyIV(sn);
+      // Fetch login.js to see the actual login flow
+      const results: Record<string, string> = {};
       
-      // Show what base64 and AES encodings produce for comparison
-      const b64User = toBase64(routerUser!);
-      const b64Pass = toBase64(routerPass!);
-      const aesUser = aesEncrypt(routerUser!, keyStr, ivStr);
-      const aesPass = aesEncrypt(routerPass!, keyStr, ivStr);
-
-      // Also fetch raw csrfprotect.data to see what's returned
-      let rawCsrf = "fetch_failed";
-      try {
-        const csrfRes = await fetch(`${baseUrl}/csrfprotect.data`);
-        rawCsrf = await csrfRes.text();
-      } catch (e) {
-        rawCsrf = `error: ${e.message}`;
+      // Fetch login.a8237273.js specifically - this has the login logic
+      const targetFiles = ["static/js/login.a8237273.js"];
+      for (const file of targetFiles) {
+        try {
+          const jsRes = await fetch(`${baseUrl}/${file}`);
+          if (jsRes.ok) {
+            const js = await jsRes.text();
+            // Search for login API call patterns
+            for (const term of ["log_in", "enCode", "deCode", "password", "base64", "csrfprotect"]) {
+              const idx = js.indexOf(term);
+              if (idx >= 0) {
+                const start = Math.max(0, idx - 400);
+                const end = Math.min(js.length, idx + 800);
+                results[`login_js__${term}_at_${idx}`] = js.substring(start, end);
+              }
+            }
+            results["login_js_size"] = js.length.toString();
+          }
+        } catch (e) { results[`error_${file}`] = (e as Error).message; }
       }
 
+      // Also look for Base64 module in chunk-common 
+      try {
+        const jsRes = await fetch(`${baseUrl}/static/js/chunk-common.b1df80ed.js`);
+        if (jsRes.ok) {
+          const js = await jsRes.text();
+          // Find the Base64 encode implementation
+          const b64Idx = js.indexOf("Base64");
+          if (b64Idx >= 0) {
+            const start = Math.max(0, b64Idx - 100);
+            const end = Math.min(js.length, b64Idx + 600);
+            results["base64_impl"] = js.substring(start, end);
+          }
+        }
+      } catch (e) { /* skip */ }
+
       return new Response(
-        JSON.stringify({ 
-          sn,
-          sn_length: sn.length,
-          csrfprotect, 
-          captcha_active: captchaActive,
-          key: keyStr,
-          iv: ivStr,
-          encodings: {
-            b64_user: b64User,
-            b64_pass_prefix: b64Pass.substring(0, 10),
-            aes_user: aesUser,
-            aes_pass_prefix: aesPass.substring(0, 10),
-          },
-          raw_csrf: rawCsrf.substring(0, 300),
-          user: routerUser,
-          pass_length: routerPass!.length,
-        }),
+        JSON.stringify(results),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
