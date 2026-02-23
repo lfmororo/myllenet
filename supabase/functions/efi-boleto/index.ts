@@ -225,7 +225,10 @@ async function createBoleto(req: Request) {
     const efiResponse = await efiRequest("/v1/charge/one-step", "POST", chargeBody, "criar_boleto");
 
     const chargeData = efiResponse.data || efiResponse;
-    const billet = chargeData.payment?.banking_billet || chargeData.banking_billet || {};
+    // EFI one-step returns barcode/pix at data level, not inside payment.banking_billet
+    const billet = chargeData.payment?.banking_billet || chargeData;
+
+    console.log("EFI charge parsed - barcode:", billet.barcode, "pix:", !!billet.pix, "link:", billet.link, "pdf:", billet.pdf);
 
     // Save invoice to database
     const invoicePayload = {
@@ -236,10 +239,10 @@ async function createBoleto(req: Request) {
       vencimento: expireAt,
       status: "pending",
       efi_charge_id: chargeData.charge_id || chargeData.id,
-      efi_barcode: billet.barcode,
-      efi_pix_qrcode: billet.pix?.qrcode,
-      efi_pix_copiacola: billet.pix?.qrcode_image,
-      efi_link: billet.link || billet.pdf?.charge,
+      efi_barcode: billet.barcode || null,
+      efi_pix_qrcode: billet.pix?.qrcode || null,
+      efi_pix_copiacola: billet.pix?.qrcode || null,
+      efi_link: billet.link || billet.pdf?.charge || null,
     };
 
     let { data: invoice, error: invErr } = await supabase
@@ -259,10 +262,10 @@ async function createBoleto(req: Request) {
           status: "pending",
           plan_id: plan_id || null,
           efi_charge_id: chargeData.charge_id || chargeData.id,
-          efi_barcode: billet.barcode,
-          efi_pix_qrcode: billet.pix?.qrcode,
-          efi_pix_copiacola: billet.pix?.qrcode_image,
-          efi_link: billet.link || billet.pdf?.charge,
+          efi_barcode: billet.barcode || null,
+          efi_pix_qrcode: billet.pix?.qrcode || null,
+          efi_pix_copiacola: billet.pix?.qrcode || null,
+          efi_link: billet.link || billet.pdf?.charge || null,
         })
         .eq("customer_id", customer_id)
         .eq("vencimento", expireAt)
@@ -363,11 +366,21 @@ async function checkPayment(req: Request) {
       newStatus = "overdue";
     }
 
+    // Extract billet data if available
+    const billet = chargeData.payment?.banking_billet || chargeData;
+    const updatePayload: Record<string, any> = { status: newStatus, paid_at: paidAt };
+    
+    // Fill in missing billet data
+    if (billet.barcode && !invoice.efi_barcode) updatePayload.efi_barcode = billet.barcode;
+    if (billet.pix?.qrcode && !invoice.efi_pix_qrcode) updatePayload.efi_pix_qrcode = billet.pix.qrcode;
+    if (billet.pix?.qrcode && !invoice.efi_pix_copiacola) updatePayload.efi_pix_copiacola = billet.pix.qrcode;
+    if ((billet.link || billet.pdf?.charge) && !invoice.efi_link) updatePayload.efi_link = billet.link || billet.pdf?.charge;
+
     // Update invoice
-    if (newStatus !== invoice.status) {
+    if (newStatus !== invoice.status || Object.keys(updatePayload).length > 2) {
       await supabase
         .from("invoices")
-        .update({ status: newStatus, paid_at: paidAt })
+        .update(updatePayload)
         .eq("id", invoiceId);
 
       // Send notification if newly paid
