@@ -496,12 +496,21 @@ Deno.serve(async (req) => {
       const { data: customers } = await serviceClient.from("customers").select("id, nome, usuario_pppoe, ativo");
       const customerPPPoEs = new Set((customers || []).map(c => c.usuario_pppoe?.toLowerCase()).filter(Boolean));
 
+      const isOnline = (ru: Record<string, unknown>): boolean => {
+        // "t" or "tm" > 0 means active session (uptime in seconds)
+        const t = Number(ru.t ?? ru.tm ?? 0);
+        if (t > 0) return true;
+        // Fallback checks
+        if (ru.cstate === 97 || ru.state === "on" || ru.online === true || ru.online === 1) return true;
+        return false;
+      };
+
       const result = (customers || []).map((c) => {
         const pppoeUser = c.usuario_pppoe?.toLowerCase() || "";
         const routerMatch = routerUserMap.get(pppoeUser);
         return {
           id: c.id, nome: c.nome, usuario_pppoe: c.usuario_pppoe, ativo: c.ativo,
-          online: routerMatch ? (routerMatch.cstate === 97 || routerMatch.state === "on" || routerMatch.online === true || routerMatch.online === 1) : false,
+          online: routerMatch ? isOnline(routerMatch) : false,
           found_in_router: !!routerMatch,
         };
       });
@@ -511,17 +520,22 @@ Deno.serve(async (req) => {
         if (!customerPPPoEs.has(username)) {
           notInSystem.push({ 
             usuario_pppoe: username, 
-            online: ruObj.cstate === 97 || ruObj.state === "on" || ruObj.online === true || ruObj.online === 1,
+            online: isOnline(ruObj),
           });
         }
       }
 
+      const isOnlineRaw = (u: Record<string, unknown>): boolean => {
+        const t = Number(u.t ?? u.tm ?? 0);
+        if (t > 0) return true;
+        if (u.cstate === 97 || u.state === "on" || u.online === true || u.online === 1) return true;
+        return false;
+      };
+
       return new Response(JSON.stringify({
         customers: result, not_in_system: notInSystem,
         total_router_users: routerUsers.length,
-        total_connected: routerUsers.filter((u: Record<string, unknown>) => 
-          u.cstate === 97 || u.state === "on" || u.online === true || u.online === 1
-        ).length,
+        total_connected: routerUsers.filter((u: Record<string, unknown>) => isOnlineRaw(u)).length,
         decryption_success: routerUserMap.size > 0, decrypted_count: routerUserMap.size,
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
