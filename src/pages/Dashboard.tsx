@@ -11,13 +11,14 @@ import InvoiceCSVImportDialog from "@/components/InvoiceCSVImportDialog";
 import InvoiceTable from "@/components/InvoiceTable";
 import CreateBoletoDialog from "@/components/CreateBoletoDialog";
 import NoInvoiceNotificationDialog from "@/components/NoInvoiceNotificationDialog";
+import OverdueNotificationDialog from "@/components/OverdueNotificationDialog";
 import NotificationLogTable from "@/components/NotificationLogTable";
 import CustomerDetailDialog from "@/components/CustomerDetailDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Wifi, Plus, Search, Download, LogOut, Loader2, ShieldAlert, FileText, Import, Settings as SettingsIcon, Upload, AlertTriangle, Zap, Filter, RefreshCw, MessageCircle, Bell } from "lucide-react";
+import { Wifi, Plus, Search, Download, LogOut, Loader2, ShieldAlert, FileText, Import, Settings as SettingsIcon, Upload, AlertTriangle, Zap, Filter, RefreshCw, MessageCircle, Bell, Clock } from "lucide-react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -40,6 +41,7 @@ export default function Dashboard() {
   const [filterNoBoleto, setFilterNoBoleto] = useState(false);
   const [notifyNoBoletoOpen, setNotifyNoBoletoOpen] = useState(false);
   const [bulkGenerating, setBulkGenerating] = useState(false);
+  const [notifyOverdueOpen, setNotifyOverdueOpen] = useState(false);
   const [bulkCheckingEfi, setBulkCheckingEfi] = useState(false);
   const [bulkCheckProgress, setBulkCheckProgress] = useState({ done: 0, total: 0, imported: 0 });
   // Compute which customers have invoices this month
@@ -396,6 +398,9 @@ export default function Dashboard() {
                 <Button variant="outline" onClick={() => setInvoiceCsvImportOpen(true)}>
                   <Upload className="mr-2 h-4 w-4" /> Importar CSV
                 </Button>
+                <Button variant="outline" onClick={() => setNotifyOverdueOpen(true)}>
+                  <Clock className="mr-2 h-4 w-4" /> Notificar Atrasos
+                </Button>
                 <Button onClick={() => setBoletoOpen(true)}>
                   <Plus className="mr-2 h-4 w-4" /> Gerar Boleto
                 </Button>
@@ -493,6 +498,14 @@ export default function Dashboard() {
         open={notifyNoBoletoOpen}
         onOpenChange={setNotifyNoBoletoOpen}
         customers={activeCustomersWithoutBoleto}
+      />
+
+      {/* Overdue Notification */}
+      <OverdueNotificationDialog
+        open={notifyOverdueOpen}
+        onOpenChange={setNotifyOverdueOpen}
+        customers={customers}
+        allInvoices={allInvoices}
       />
     </div>
   );
