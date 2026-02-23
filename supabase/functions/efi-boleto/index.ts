@@ -176,6 +176,24 @@ async function createBoleto(req: Request) {
   // Format date for EFI (YYYY-MM-DD)
   const expireAt = vencimento;
 
+  // Check if invoice already exists for this customer+vencimento
+  const { data: existingInvoice } = await supabase
+    .from("invoices")
+    .select("*")
+    .eq("customer_id", customer_id)
+    .eq("vencimento", expireAt)
+    .maybeSingle();
+
+  if (existingInvoice && existingInvoice.efi_charge_id && ["pending", "waiting"].includes(existingInvoice.status)) {
+    return new Response(JSON.stringify({ 
+      error: `Já existe uma cobrança para este cliente no vencimento ${expireAt}. Cancele a existente antes de gerar uma nova.`,
+      existing_invoice_id: existingInvoice.id 
+    }), {
+      status: 409,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   // Create charge on EFI - one step
   const chargeBody = {
     items: [
