@@ -210,23 +210,57 @@ async function createBoleto(req: Request) {
     const billet = chargeData.payment?.banking_billet || chargeData.banking_billet || {};
 
     // Save invoice to database
-    const { data: invoice, error: invErr } = await supabase
+    const invoicePayload = {
+      customer_id,
+      plan_id: plan_id || null,
+      descricao,
+      valor_centavos,
+      vencimento: expireAt,
+      status: "pending",
+      efi_charge_id: chargeData.charge_id || chargeData.id,
+      efi_barcode: billet.barcode,
+      efi_pix_qrcode: billet.pix?.qrcode,
+      efi_pix_copiacola: billet.pix?.qrcode_image,
+      efi_link: billet.link || billet.pdf?.charge,
+    };
+
+    let { data: invoice, error: invErr } = await supabase
       .from("invoices")
-      .insert({
-        customer_id,
-        plan_id: plan_id || null,
-        descricao,
-        valor_centavos,
-        vencimento: expireAt,
-        status: "pending",
-        efi_charge_id: chargeData.charge_id || chargeData.id,
-        efi_barcode: billet.barcode,
-        efi_pix_qrcode: billet.pix?.qrcode,
-        efi_pix_copiacola: billet.pix?.qrcode_image,
-        efi_link: billet.link || billet.pdf?.charge,
-      })
+      .insert(invoicePayload)
       .select()
       .single();
+
+    // If duplicate key, update the existing invoice instead
+    if (invErr && invErr.code === "23505") {
+      console.log("Duplicate invoice found, updating existing record");
+      const { data: updated, error: updErr } = await supabase
+        .from("invoices")
+        .update({
+          descricao,
+          valor_centavos,
+          status: "pending",
+          plan_id: plan_id || null,
+          efi_charge_id: chargeData.charge_id || chargeData.id,
+          efi_barcode: billet.barcode,
+          efi_pix_qrcode: billet.pix?.qrcode,
+          efi_pix_copiacola: billet.pix?.qrcode_image,
+          efi_link: billet.link || billet.pdf?.charge,
+        })
+        .eq("customer_id", customer_id)
+        .eq("vencimento", expireAt)
+        .select()
+        .single();
+      
+      if (updErr) {
+        console.error("DB update error:", updErr);
+        return new Response(JSON.stringify({ error: "Erro ao salvar fatura" }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      invoice = updated;
+      invErr = null;
+    }
 
     if (invErr) {
       console.error("DB insert error:", invErr);
