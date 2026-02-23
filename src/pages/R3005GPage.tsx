@@ -33,7 +33,9 @@ interface SyncResult {
 export default function R3005GPage() {
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [extracting, setExtracting] = useState(false);
   const [data, setData] = useState<SyncResult | null>(null);
+  const [jsData, setJsData] = useState<Record<string, string> | null>(null);
   const [search, setSearch] = useState("");
 
   const fetchStatus = async () => {
@@ -104,6 +106,40 @@ export default function R3005GPage() {
     }
   };
 
+  const extractJS = async () => {
+    setExtracting(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      if (!token) { toast.error("Sessão expirada"); return; }
+
+      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+      const res = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/r3005g-sync/extract-js`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+        }
+      );
+
+      const result = await res.json();
+      if (!res.ok) {
+        toast.error(result.error || "Erro ao extrair JS");
+        return;
+      }
+
+      setJsData(result);
+      toast.success("JavaScript extraído com sucesso");
+    } catch (err) {
+      console.error(err);
+      toast.error("Erro ao extrair JavaScript do roteador");
+    } finally {
+      setExtracting(false);
+    }
+  };
+
   const term = search.trim().toLowerCase();
   const filteredCustomers = data?.customers?.filter(
     (c) =>
@@ -126,6 +162,10 @@ export default function R3005GPage() {
           <Button onClick={fetchStatus} disabled={loading}>
             {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
             Sincronizar Status
+          </Button>
+          <Button variant="secondary" onClick={extractJS} disabled={extracting}>
+            {extracting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Download className="h-4 w-4 mr-2" />}
+            Extrair JS
           </Button>
           {data && data.not_in_system.length > 0 && (
             <Button variant="outline" onClick={importUsers} disabled={importing}>
@@ -300,6 +340,25 @@ export default function R3005GPage() {
             <div>
               <p className="font-medium">Nenhum dado carregado</p>
               <p className="text-sm text-muted-foreground">Clique em "Sincronizar Status" para buscar dados do roteador</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {jsData && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">JavaScript Extraído do Roteador</CardTitle>
+            <CardDescription>Snippets relacionados à criptografia encontrados nos arquivos JS</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3 max-h-[600px] overflow-auto">
+              {Object.entries(jsData).map(([key, value]) => (
+                <div key={key} className="border rounded p-3">
+                  <p className="text-xs font-mono font-bold text-primary mb-1">{key}</p>
+                  <pre className="text-xs font-mono whitespace-pre-wrap break-all text-muted-foreground bg-muted p-2 rounded max-h-[200px] overflow-auto">{value}</pre>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>

@@ -651,7 +651,92 @@ Deno.serve(async (req) => {
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    return new Response(JSON.stringify({ error: "Use /status ou /discover" }), {
+    // ACTION: extract-js - download and analyze router JS files for decryption logic
+    if (action === "extract-js") {
+      const jsSnippets: Record<string, string> = {};
+      
+      // 1. Get index.html to find JS paths
+      const jsFiles: string[] = [];
+      try {
+        const htmlRes = await fetch(`${baseUrl}/index.html`, { headers: { Cookie: cookie } });
+        if (htmlRes.ok) {
+          const html = await htmlRes.text();
+          jsSnippets["index.html_scripts"] = [...html.matchAll(/src=["']([^"']*\.js[^"']*?)["']/g)].map(m => m[1]).join("\n");
+          const scriptMatches = html.matchAll(/src=["']([^"']*\.js[^"']*?)["']/g);
+          for (const m of scriptMatches) jsFiles.push(m[1].replace(/^\//, ""));
+        }
+      } catch (e) { jsSnippets["html_error"] = String(e); }
+
+      // Also try login.html
+      try {
+        const loginRes = await fetch(`${baseUrl}/login.html`, { headers: { Cookie: cookie } });
+        if (loginRes.ok) {
+          const html = await loginRes.text();
+          const scriptMatches = html.matchAll(/src=["']([^"']*\.js[^"']*?)["']/g);
+          for (const m of scriptMatches) {
+            const path = m[1].replace(/^\//, "");
+            if (!jsFiles.includes(path)) jsFiles.push(path);
+          }
+        }
+      } catch { /* */ }
+
+      // Add common fallback paths
+      for (const f of ["static/js/chunk-common.js", "static/js/app.js", "js/chunk-common.js", "js/app.js", "js/main.js", "static/js/chunk-vendors.js"]) {
+        if (!jsFiles.includes(f)) jsFiles.push(f);
+      }
+
+      jsSnippets["js_files_found"] = jsFiles.join(", ");
+
+      // 2. Download each JS file and extract crypto-related code
+      const cryptoKeywords = ["decrypt", "encrypt", "AES", "CryptoJS", "crypto", "aes", "c3W1KF", "sn", "serial", "decipher", "cipher", "md5", "MD5", "key", "iv "];
+      
+      for (const jsFile of jsFiles) {
+        try {
+          const res = await fetch(`${baseUrl}/${jsFile}`, { headers: { Cookie: cookie } });
+          if (!res.ok) { jsSnippets[`${jsFile}_status`] = String(res.status); continue; }
+          const text = await res.text();
+          jsSnippets[`${jsFile}_size`] = `${text.length} bytes`;
+
+          // Search for crypto-related snippets
+          for (const kw of cryptoKeywords) {
+            let idx = -1;
+            let searchFrom = 0;
+            let snippetCount = 0;
+            while ((idx = text.indexOf(kw, searchFrom)) !== -1 && snippetCount < 3) {
+              const start = Math.max(0, idx - 200);
+              const end = Math.min(text.length, idx + 300);
+              const snippet = text.substring(start, end);
+              jsSnippets[`${jsFile}__${kw}_${snippetCount}`] = snippet;
+              searchFrom = idx + kw.length;
+              snippetCount++;
+            }
+          }
+
+          // Also look for function definitions around decrypt/encrypt
+          const funcPatterns = [
+            /function\s+\w*[Dd]ecrypt\w*\s*\([^)]*\)\s*\{[^}]{0,2000}\}/g,
+            /function\s+\w*[Ee]ncrypt\w*\s*\([^)]*\)\s*\{[^}]{0,2000}\}/g,
+            /function\s+\w*[Aa]es\w*\s*\([^)]*\)\s*\{[^}]{0,2000}\}/g,
+            /\w+\s*=\s*function\s*\([^)]*\)\s*\{[^}]*(?:decrypt|encrypt|AES|aes)[^}]{0,2000}\}/g,
+            /(?:var|let|const)\s+\w+\s*=\s*(?:CryptoJS|crypto)[^;]{0,500}/g,
+          ];
+          for (const pat of funcPatterns) {
+            const matches = text.matchAll(pat);
+            let i = 0;
+            for (const m of matches) {
+              jsSnippets[`${jsFile}__func_${pat.source.substring(0,20)}_${i}`] = m[0].substring(0, 2000);
+              i++;
+            }
+          }
+        } catch (e) { jsSnippets[`${jsFile}_error`] = String(e); }
+      }
+
+      return new Response(JSON.stringify(jsSnippets, null, 2), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    return new Response(JSON.stringify({ error: "Use /status, /discover ou /extract-js" }), {
       status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
