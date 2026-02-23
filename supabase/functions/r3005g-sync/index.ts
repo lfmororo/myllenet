@@ -14,29 +14,12 @@ function decodeBase64(encoded: string): string {
   }
 }
 
-async function getCsrfToken(baseUrl: string): Promise<string> {
-  try {
-    const res = await fetch(`${baseUrl}/login.html`, { redirect: "follow" });
-    const html = await res.text();
-    // Try to find csrfprotect in the HTML/JS
-    const match = html.match(/csrfprotect["']?\s*[:=]\s*["']?([0-9a-zA-Z]+)["']?/);
-    if (match) {
-      console.log("CSRF token found:", match[1]);
-      return match[1];
-    }
-  } catch (e) {
-    console.log("Could not fetch CSRF token:", e);
-  }
-  // Fallback: use timestamp like the browser does
-  return Math.floor(Date.now() / 1000).toString();
-}
-
 async function loginR3005G(
   baseUrl: string,
   username: string,
   password: string
 ): Promise<string> {
-  const csrfprotect = await getCsrfToken(baseUrl);
+  const csrfprotect = Math.floor(Date.now() / 1000).toString();
   const tm = Date.now() / 1000;
 
   const payload = {
@@ -47,9 +30,11 @@ async function loginR3005G(
     base64: 1,
   };
 
-  console.log("R3005G login to:", `${baseUrl}/log_in.cgi`, "csrf:", csrfprotect);
+  // Try with csrfprotect as query param (Intelbras firmware pattern)
+  const loginUrl = `${baseUrl}/log_in.cgi?csrfprotect=${csrfprotect}`;
+  console.log("R3005G login to:", loginUrl);
 
-  const res = await fetch(`${baseUrl}/log_in.cgi`, {
+  const res = await fetch(loginUrl, {
     method: "POST",
     headers: {
       "Content-Type": "application/json;charset=UTF-8",
@@ -74,7 +59,6 @@ async function loginR3005G(
     throw new Error(`Login failed: ${json.error || body}`);
   }
 
-  // Get cookie if present
   const setCookie = res.headers.get("set-cookie");
   const cookie = setCookie ? setCookie.split(";")[0] : "";
   console.log("R3005G login success, cookie:", cookie ? "present" : "none");
