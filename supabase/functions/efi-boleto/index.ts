@@ -34,7 +34,34 @@ async function getEfiToken(): Promise<string> {
   return data.access_token;
 }
 
-async function efiRequest(path: string, method: string, body?: unknown) {
+async function logEfiApiCall(
+  supabase: any,
+  method: string,
+  endpoint: string,
+  statusCode: number | null,
+  requestBody: string | null,
+  responseBody: string | null,
+  errorMessage: string | null,
+  durationMs: number,
+  context: string | null
+) {
+  try {
+    await supabase.from("efi_api_logs").insert({
+      method,
+      endpoint,
+      status_code: statusCode,
+      request_body: requestBody?.slice(0, 2000),
+      response_body: responseBody?.slice(0, 2000),
+      error_message: errorMessage?.slice(0, 1000),
+      duration_ms: durationMs,
+      context,
+    });
+  } catch (e) {
+    console.error("Failed to log EFI API call:", e);
+  }
+}
+
+async function efiRequest(path: string, method: string, body?: unknown, context?: string) {
   const token = await getEfiToken();
 
   const options: RequestInit = {
@@ -45,13 +72,27 @@ async function efiRequest(path: string, method: string, body?: unknown) {
     },
   };
 
-  if (body) options.body = JSON.stringify(body);
+  const bodyStr = body ? JSON.stringify(body) : null;
+  if (bodyStr) options.body = bodyStr;
 
   const fullUrl = `${EFI_BASE_URL}${path}`;
   console.log("EFI request:", method, fullUrl);
 
-  const response = await fetch(fullUrl, options);
-  const responseText = await response.text();
+  const startTime = Date.now();
+  let response: Response;
+  let responseText: string;
+  
+  try {
+    response = await fetch(fullUrl, options);
+    responseText = await response.text();
+  } catch (fetchErr) {
+    const duration = Date.now() - startTime;
+    const admin = getSupabaseAdmin();
+    await logEfiApiCall(admin, method, path, null, bodyStr, null, fetchErr.message, duration, context || null);
+    throw fetchErr;
+  }
+
+  const duration = Date.now() - startTime;
   console.log("EFI response:", response.status, responseText.slice(0, 500));
 
   let data;
@@ -61,6 +102,10 @@ async function efiRequest(path: string, method: string, body?: unknown) {
     const errMsg = typeof data.error_description === 'object' 
       ? JSON.stringify(data.error_description) 
       : (data.error_description || data.message || `EFI API error: ${response.status}`);
+    
+    const admin = getSupabaseAdmin();
+    await logEfiApiCall(admin, method, path, response.status, bodyStr, responseText.slice(0, 2000), errMsg, duration, context || null);
+    
     throw new Error(errMsg);
   }
 
@@ -159,7 +204,7 @@ async function createBoleto(req: Request) {
   };
 
   try {
-    const efiResponse = await efiRequest("/v1/charge/one-step", "POST", chargeBody);
+    const efiResponse = await efiRequest("/v1/charge/one-step", "POST", chargeBody, "criar_boleto");
 
     const chargeData = efiResponse.data || efiResponse;
     const billet = chargeData.payment?.banking_billet || chargeData.banking_billet || {};
@@ -245,7 +290,9 @@ async function checkPayment(req: Request) {
   try {
     const efiResponse = await efiRequest(
       `/v1/charge/${invoice.efi_charge_id}`,
-      "GET"
+      "GET",
+      undefined,
+      "verificar_pagamento"
     );
 
     const chargeData = efiResponse.data || efiResponse;
@@ -462,7 +509,7 @@ async function cancelCharge(req: Request) {
   }
 
   try {
-    await efiRequest(`/v1/charge/${charge_id}/cancel`, "PUT");
+    await efiRequest(`/v1/charge/${charge_id}/cancel`, "PUT", undefined, "cancelar_cobranca");
     return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
@@ -726,7 +773,7 @@ async function bulkCheckPayments(req: Request) {
 
   for (const inv of pendingInvoices) {
     try {
-      const efiResponse = await efiRequest(`/v1/charge/${inv.efi_charge_id}`, "GET");
+      const efiResponse = await efiRequest(`/v1/charge/${inv.efi_charge_id}`, "GET", undefined, "bulk_check");
       const chargeData = efiResponse.data || efiResponse;
       const efiStatus = chargeData.status;
 

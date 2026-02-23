@@ -13,6 +13,7 @@ import CreateBoletoDialog from "@/components/CreateBoletoDialog";
 import NoInvoiceNotificationDialog from "@/components/NoInvoiceNotificationDialog";
 import OverdueNotificationDialog from "@/components/OverdueNotificationDialog";
 import NotificationLogTable from "@/components/NotificationLogTable";
+import EfiApiLogTable from "@/components/EfiApiLogTable";
 import CustomerDetailDialog from "@/components/CustomerDetailDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -195,6 +196,10 @@ export default function Dashboard() {
             <TabsTrigger value="notifications">
               <Bell className="mr-1.5 h-4 w-4" />
               Notificações
+            </TabsTrigger>
+            <TabsTrigger value="efi-logs">
+              <AlertTriangle className="mr-1.5 h-4 w-4" />
+              Logs EFI
             </TabsTrigger>
           </TabsList>
 
@@ -505,6 +510,9 @@ export default function Dashboard() {
           {/* Notifications Tab */}
           <TabsContent value="notifications" className="space-y-4">
             <NotificationLogTable />
+          </TabsContent>
+          <TabsContent value="efi-logs" className="space-y-4">
+            <EfiApiLogTable />
           </TabsContent>
         </Tabs>
       </main>
