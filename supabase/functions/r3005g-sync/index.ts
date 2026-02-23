@@ -19,21 +19,22 @@ async function loginR3005G(
   username: string,
   password: string
 ): Promise<string> {
-  const res = await fetch(`${baseUrl}/user.login`, {
+  const res = await fetch(`${baseUrl}/log_in.cgi`, {
     method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`,
+    headers: {
+      "Content-Type": "application/json;charset=UTF-8",
+      "Accept": "application/json, text/plain, */*",
+    },
+    body: JSON.stringify({ username, password }),
     redirect: "manual",
   });
 
   const setCookie = res.headers.get("set-cookie");
   if (!setCookie) {
-    // Some routers return cookie even on 200, try reading body
     const body = await res.text();
     throw new Error(`Login failed, no cookie. Status: ${res.status}, Body: ${body}`);
   }
 
-  // Extract session cookie
   const cookie = setCookie.split(";")[0];
   return cookie;
 }
