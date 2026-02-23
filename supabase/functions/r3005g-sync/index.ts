@@ -48,6 +48,35 @@ function aesEncrypt(plaintext: string, keyStr: string, ivStr: string): string {
   return encrypted.toString();
 }
 
+function getRandomString(len: number): string {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  let result = "";
+  for (let i = 0; i < len; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
+
+function encodeCredential(input: string): string {
+  // Matches getEncryptionData -> deCode flow from router JS
+  // 1. Generate 10 random chars as prefix
+  // 2. Shift each input char by +2/-2 alternating
+  // 3. Concatenate and base64 encode
+  // The AES encrypt/decrypt in the browser cancels out, so final value is just base64
+  const randomPrefix = getRandomString(10);
+  let shifted = "";
+  for (let i = 0; i < input.length; i++) {
+    const charCode = input.charCodeAt(i);
+    shifted += String.fromCharCode(i % 2 === 0 ? charCode + 2 : charCode - 2);
+  }
+  const combined = randomPrefix + shifted;
+  // Convert to bytes and base64 encode (same as convertBase64 in router JS)
+  const bytes = new TextEncoder().encode(combined);
+  let binary = "";
+  for (const b of bytes) binary += String.fromCharCode(b);
+  return btoa(binary);
+}
+
 async function getRouterInfo(baseUrl: string): Promise<{ sn: string; csrfprotect: string; captchaActive: boolean }> {
   // Fetch serial number from base_mini.data
   let sn = "";
@@ -95,17 +124,17 @@ async function loginR3005G(
     throw new Error("Router captcha is active. Please wait a few minutes or manually log in via browser to reset.");
   }
 
-  // Encrypt credentials using AES with SN-derived key, exactly like the browser does
-  const { keyStr, ivStr } = deriveKeyIV(sn);
-  const encryptedUser = aesEncrypt(plainUser, keyStr, ivStr);
-  const encryptedPass = aesEncrypt(plainPass, keyStr, ivStr);
+  // Encode credentials using the same scheme as the browser:
+  // random prefix + char shift + base64 (AES encrypt/decrypt cancels out in browser)
+  const encodedUser = encodeCredential(plainUser);
+  const encodedPass = encodeCredential(plainPass);
 
-  console.log("R3005G: SN =", sn, "| keyStr =", keyStr.substring(0, 4) + "...", "| ivStr =", ivStr.substring(0, 4) + "...");
+  console.log("R3005G: using encodeCredential scheme, user length =", plainUser.length);
 
   const payload = {
     csrfprotect,
-    user: encryptedUser,
-    password: encryptedPass,
+    user: encodedUser,
+    password: encodedPass,
     base64: 1,
     tm: Date.now() / 1000,
   };
@@ -264,44 +293,40 @@ Deno.serve(async (req) => {
     const action = url.pathname.split("/").pop();
 
     if (action === "debug") {
-      // Fetch login.js to see the actual login flow
       const results: Record<string, string> = {};
       
-      // Fetch login.a8237273.js specifically - this has the login logic
-      const targetFiles = ["static/js/login.a8237273.js"];
-      for (const file of targetFiles) {
-        try {
-          const jsRes = await fetch(`${baseUrl}/${file}`);
-          if (jsRes.ok) {
-            const js = await jsRes.text();
-            // Search for login API call patterns
-            for (const term of ["log_in", "enCode", "deCode", "password", "base64", "csrfprotect"]) {
-              const idx = js.indexOf(term);
-              if (idx >= 0) {
-                const start = Math.max(0, idx - 400);
-                const end = Math.min(js.length, idx + 800);
-                results[`login_js__${term}_at_${idx}`] = js.substring(start, end);
-              }
-            }
-            results["login_js_size"] = js.length.toString();
-          }
-        } catch (e) { results[`error_${file}`] = (e as Error).message; }
-      }
-
-      // Also look for Base64 module in chunk-common 
+      // Search chunk-common for getEncryptionData and deCode
       try {
         const jsRes = await fetch(`${baseUrl}/static/js/chunk-common.b1df80ed.js`);
         if (jsRes.ok) {
           const js = await jsRes.text();
-          // Find the Base64 encode implementation
-          const b64Idx = js.indexOf("Base64");
-          if (b64Idx >= 0) {
-            const start = Math.max(0, b64Idx - 100);
-            const end = Math.min(js.length, b64Idx + 600);
-            results["base64_impl"] = js.substring(start, end);
+          results["chunk_size"] = js.length.toString();
+          for (const term of ["getEncryptionData", "deCode", "enCode", "AES", "encrypt", "ZeroPadding", "Pkcs7", "CBC"]) {
+            const idx = js.indexOf(term);
+            if (idx >= 0) {
+              const start = Math.max(0, idx - 200);
+              const end = Math.min(js.length, idx + 600);
+              results[`chunk__${term}_at_${idx}`] = js.substring(start, end);
+            }
           }
         }
-      } catch (e) { /* skip */ }
+      } catch (e) { results["chunk_error"] = (e as Error).message; }
+
+      // Also search login.js for these
+      try {
+        const jsRes = await fetch(`${baseUrl}/static/js/login.a8237273.js`);
+        if (jsRes.ok) {
+          const js = await jsRes.text();
+          for (const term of ["getEncryptionData", "deCode", "enCode"]) {
+            const idx = js.indexOf(term);
+            if (idx >= 0) {
+              const start = Math.max(0, idx - 200);
+              const end = Math.min(js.length, idx + 600);
+              results[`login__${term}_at_${idx}`] = js.substring(start, end);
+            }
+          }
+        }
+      } catch (e) { results["login_error"] = (e as Error).message; }
 
       return new Response(
         JSON.stringify(results),
