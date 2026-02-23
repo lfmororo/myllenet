@@ -41,9 +41,10 @@ function encodeCredential(input: string): string {
   return btoa(binary);
 }
 
-// Try decrypt with multiple padding strategies and base64 layers
-function tryDecrypt(encryptedDoubleB64: string, key: CryptoJS.lib.WordArray, iv: CryptoJS.lib.WordArray): string | null {
+// Try decrypt with multiple padding strategies, base64 layers, and modes
+function tryDecrypt(encryptedDoubleB64: string, key: CryptoJS.lib.WordArray, iv: CryptoJS.lib.WordArray, mode?: typeof CryptoJS.mode.CBC): string | null {
   const paddings = [CryptoJS.pad.ZeroPadding, CryptoJS.pad.Pkcs7, CryptoJS.pad.NoPadding];
+  const aesMode = mode || CryptoJS.mode.CBC;
   // Try double-base64 first, then single-base64
   const candidates = [encryptedDoubleB64];
   try { const inner = atob(encryptedDoubleB64); candidates.push(inner); } catch { /* skip */ }
@@ -51,9 +52,26 @@ function tryDecrypt(encryptedDoubleB64: string, key: CryptoJS.lib.WordArray, iv:
   for (const input of candidates) {
     for (const padding of paddings) {
       try {
-        const decrypted = CryptoJS.AES.decrypt(input, key, {
-          iv, mode: CryptoJS.mode.CBC, padding,
-        });
+        const opts: Record<string, unknown> = { mode: aesMode, padding };
+        if (aesMode !== CryptoJS.mode.ECB) opts.iv = iv;
+        const decrypted = CryptoJS.AES.decrypt(input, key, opts);
+        const result = decrypted.toString(CryptoJS.enc.Utf8).replace(/\0/g, "").trim();
+        if (result && result.length > 1 && /^[a-zA-Z0-9._@\-]+$/.test(result)) return result;
+      } catch { /* */ }
+    }
+  }
+  return null;
+}
+
+// Try passphrase-based decryption (OpenSSL EVP key derivation)
+function tryDecryptPassphrase(encryptedDoubleB64: string, passphrase: string): string | null {
+  const candidates = [encryptedDoubleB64];
+  try { const inner = atob(encryptedDoubleB64); candidates.push(inner); } catch { /* skip */ }
+  
+  for (const input of candidates) {
+    for (const padding of [CryptoJS.pad.Pkcs7, CryptoJS.pad.ZeroPadding]) {
+      try {
+        const decrypted = CryptoJS.AES.decrypt(input, passphrase, { padding });
         const result = decrypted.toString(CryptoJS.enc.Utf8).replace(/\0/g, "").trim();
         if (result && result.length > 1 && /^[a-zA-Z0-9._@\-]+$/.test(result)) return result;
       } catch { /* */ }
@@ -81,7 +99,9 @@ function tryEncryptVariants(plaintext: string, key: CryptoJS.lib.WordArray, iv: 
   return results;
 }
 
-function getAllKeyApproaches(serialNumber: string): Array<{ name: string; key: CryptoJS.lib.WordArray; iv: CryptoJS.lib.WordArray }> {
+interface KeyApproach { name: string; key: CryptoJS.lib.WordArray; iv: CryptoJS.lib.WordArray; mode?: typeof CryptoJS.mode.CBC }
+
+function getAllKeyApproaches(serialNumber: string): KeyApproach[] {
   const combined = serialNumber + AES_CONSTANT;
   const reversed = AES_CONSTANT + serialNumber;
   const md5Hash = CryptoJS.MD5(combined);
@@ -90,25 +110,44 @@ function getAllKeyApproaches(serialNumber: string): Array<{ name: string; key: C
   const sha256Hex = sha256.toString();
   const md5Serial = CryptoJS.MD5(serialNumber);
   const md5Const = CryptoJS.MD5(AES_CONSTANT);
-  const md5ConstOnly = CryptoJS.MD5(AES_CONSTANT);
+  const md5Hex = md5Hash.toString(); // 32 hex chars
+  const md5RevHex = md5Rev.toString();
+  const zeroIV = CryptoJS.enc.Hex.parse("00000000000000000000000000000000");
 
   return [
-    { name: "MD5(sn+const) key=iv", key: CryptoJS.enc.Hex.parse(md5Hash.toString()), iv: CryptoJS.enc.Hex.parse(md5Hash.toString()) },
-    { name: "MD5(sn+const), zero IV", key: CryptoJS.enc.Hex.parse(md5Hash.toString()), iv: CryptoJS.enc.Hex.parse("00000000000000000000000000000000") },
+    // CBC approaches - Hex-parsed MD5
+    { name: "MD5(sn+const) key=iv", key: CryptoJS.enc.Hex.parse(md5Hex), iv: CryptoJS.enc.Hex.parse(md5Hex) },
+    { name: "MD5(sn+const), zero IV", key: CryptoJS.enc.Hex.parse(md5Hex), iv: zeroIV },
+    { name: "MD5(const+sn) key=iv", key: CryptoJS.enc.Hex.parse(md5RevHex), iv: CryptoJS.enc.Hex.parse(md5RevHex) },
+    // CBC - UTF8-parsed MD5 hex (very common in Intelbras!)
+    { name: "MD5hex(sn+const)[:16] utf8 key=iv", key: CryptoJS.enc.Utf8.parse(md5Hex.substring(0, 16)), iv: CryptoJS.enc.Utf8.parse(md5Hex.substring(0, 16)) },
+    { name: "MD5hex(sn+const) utf8 key[:16]=iv[16:]", key: CryptoJS.enc.Utf8.parse(md5Hex.substring(0, 16)), iv: CryptoJS.enc.Utf8.parse(md5Hex.substring(16, 32)) },
+    { name: "MD5hex(const+sn)[:16] utf8 key=iv", key: CryptoJS.enc.Utf8.parse(md5RevHex.substring(0, 16)), iv: CryptoJS.enc.Utf8.parse(md5RevHex.substring(0, 16)) },
+    { name: "MD5hex(const+sn) utf8 key[:16]=iv[16:]", key: CryptoJS.enc.Utf8.parse(md5RevHex.substring(0, 16)), iv: CryptoJS.enc.Utf8.parse(md5RevHex.substring(16, 32)) },
+    // CBC - raw string keys
     { name: "serial key, const IV", key: CryptoJS.enc.Utf8.parse(serialNumber.padEnd(16, "\0").substring(0, 16)), iv: CryptoJS.enc.Utf8.parse(AES_CONSTANT.substring(0, 16)) },
     { name: "const key, serial IV", key: CryptoJS.enc.Utf8.parse(AES_CONSTANT.substring(0, 16)), iv: CryptoJS.enc.Utf8.parse(serialNumber.padEnd(16, "\0").substring(0, 16)) },
     { name: "SHA256 split", key: CryptoJS.enc.Hex.parse(sha256Hex.substring(0, 32)), iv: CryptoJS.enc.Hex.parse(sha256Hex.substring(32, 64)) },
     { name: "MD5(serial) key, MD5(const) IV", key: CryptoJS.enc.Hex.parse(md5Serial.toString()), iv: CryptoJS.enc.Hex.parse(md5Const.toString()) },
-    { name: "MD5(const+sn) key=iv", key: CryptoJS.enc.Hex.parse(md5Rev.toString()), iv: CryptoJS.enc.Hex.parse(md5Rev.toString()) },
-    { name: "combined[:16] key, zero IV", key: CryptoJS.enc.Utf8.parse(combined.substring(0, 16)), iv: CryptoJS.enc.Hex.parse("00000000000000000000000000000000") },
-    // Approaches without SN - just the constant
-    { name: "MD5(const) key=iv", key: CryptoJS.enc.Hex.parse(md5ConstOnly.toString()), iv: CryptoJS.enc.Hex.parse(md5ConstOnly.toString()) },
+    { name: "combined[:16] key, zero IV", key: CryptoJS.enc.Utf8.parse(combined.substring(0, 16)), iv: zeroIV },
+    // Constant-only approaches
+    { name: "MD5(const) key=iv", key: CryptoJS.enc.Hex.parse(md5Const.toString()), iv: CryptoJS.enc.Hex.parse(md5Const.toString()) },
     { name: "const[:16] key=iv", key: CryptoJS.enc.Utf8.parse(AES_CONSTANT.substring(0, 16)), iv: CryptoJS.enc.Utf8.parse(AES_CONSTANT.substring(0, 16)) },
-    { name: "const[:16] key, zero IV", key: CryptoJS.enc.Utf8.parse(AES_CONSTANT.substring(0, 16)), iv: CryptoJS.enc.Hex.parse("00000000000000000000000000000000") },
-    { name: "MD5(const) key, zero IV", key: CryptoJS.enc.Hex.parse(md5ConstOnly.toString()), iv: CryptoJS.enc.Hex.parse("00000000000000000000000000000000") },
+    { name: "const[:16] key, zero IV", key: CryptoJS.enc.Utf8.parse(AES_CONSTANT.substring(0, 16)), iv: zeroIV },
+    { name: "MD5(const) key, zero IV", key: CryptoJS.enc.Hex.parse(md5Const.toString()), iv: zeroIV },
     // SN as raw key
     { name: "sn[:16] key=iv", key: CryptoJS.enc.Utf8.parse(serialNumber.padEnd(16, "\0").substring(0, 16)), iv: CryptoJS.enc.Utf8.parse(serialNumber.padEnd(16, "\0").substring(0, 16)) },
-    { name: "sn[:16] key, zero IV", key: CryptoJS.enc.Utf8.parse(serialNumber.padEnd(16, "\0").substring(0, 16)), iv: CryptoJS.enc.Hex.parse("00000000000000000000000000000000") },
+    { name: "sn[:16] key, zero IV", key: CryptoJS.enc.Utf8.parse(serialNumber.padEnd(16, "\0").substring(0, 16)), iv: zeroIV },
+    // MD5 hex UTF8 with zero IV
+    { name: "MD5hex(sn+const)[:16] utf8, zero IV", key: CryptoJS.enc.Utf8.parse(md5Hex.substring(0, 16)), iv: zeroIV },
+    { name: "MD5hex(const+sn)[:16] utf8, zero IV", key: CryptoJS.enc.Utf8.parse(md5RevHex.substring(0, 16)), iv: zeroIV },
+    // ECB mode (no IV needed)
+    { name: "ECB MD5(sn+const)", key: CryptoJS.enc.Hex.parse(md5Hex), iv: zeroIV, mode: CryptoJS.mode.ECB },
+    { name: "ECB MD5hex[:16] utf8", key: CryptoJS.enc.Utf8.parse(md5Hex.substring(0, 16)), iv: zeroIV, mode: CryptoJS.mode.ECB },
+    { name: "ECB sn[:16]", key: CryptoJS.enc.Utf8.parse(serialNumber.padEnd(16, "\0").substring(0, 16)), iv: zeroIV, mode: CryptoJS.mode.ECB },
+    { name: "ECB const[:16]", key: CryptoJS.enc.Utf8.parse(AES_CONSTANT.substring(0, 16)), iv: zeroIV, mode: CryptoJS.mode.ECB },
+    { name: "ECB MD5(const)", key: CryptoJS.enc.Hex.parse(md5Const.toString()), iv: zeroIV, mode: CryptoJS.mode.ECB },
+    { name: "ECB MD5(serial)", key: CryptoJS.enc.Hex.parse(md5Serial.toString()), iv: zeroIV, mode: CryptoJS.mode.ECB },
   ];
 }
 
@@ -377,9 +416,17 @@ Deno.serve(async (req) => {
       const decryptionResults: Record<string, string | null> = {};
       if (effectiveSN && testEncrypted) {
         for (const a of getAllKeyApproaches(effectiveSN)) {
-          const result = tryDecrypt(testEncrypted, a.key, a.iv);
+          const result = tryDecrypt(testEncrypted, a.key, a.iv, a.mode);
           decryptionResults[a.name] = result;
           if (result) console.log(`R3005G DISCOVER: ✅ "${a.name}" => "${result}"`);
+        }
+        // Also try passphrase-based
+        const passphrases = [effectiveSN, AES_CONSTANT, effectiveSN + AES_CONSTANT, AES_CONSTANT + effectiveSN,
+          CryptoJS.MD5(effectiveSN + AES_CONSTANT).toString(), CryptoJS.MD5(AES_CONSTANT + effectiveSN).toString()];
+        for (const pp of passphrases) {
+          const result = tryDecryptPassphrase(testEncrypted, pp);
+          decryptionResults[`passphrase:${pp.substring(0,20)}`] = result;
+          if (result) console.log(`R3005G DISCOVER: ✅ passphrase "${pp.substring(0,20)}" => "${result}"`);
         }
       }
 
@@ -402,20 +449,47 @@ Deno.serve(async (req) => {
       console.log(`R3005G STATUS: SN candidates=[${snCandidates.join(", ") || "NONE"}], users=${routerUsers.length}`);
 
       // Try each SN candidate with each key approach
-      let workingApproach: { key: CryptoJS.lib.WordArray; iv: CryptoJS.lib.WordArray } | null = null;
+      let workingApproach: { key: CryptoJS.lib.WordArray; iv: CryptoJS.lib.WordArray; mode?: typeof CryptoJS.mode.CBC } | null = null;
+      let workingPassphrase: string | null = null;
       const testEnc = (routerUsers[0] as Record<string, unknown>)?.user as string;
       
       if (testEnc) {
+        // Log what we're trying to decrypt
+        let innerB64 = testEnc;
+        try { innerB64 = atob(testEnc); } catch { /* */ }
+        console.log(`R3005G STATUS: Test encrypted="${testEnc.substring(0,40)}", inner="${innerB64.substring(0,40)}"`);
+        
+        // Try key-based approaches
         for (const sn of snCandidates) {
           for (const a of getAllKeyApproaches(sn)) {
-            const result = tryDecrypt(testEnc, a.key, a.iv);
+            const result = tryDecrypt(testEnc, a.key, a.iv, a.mode);
             if (result && /^[a-zA-Z0-9._@\-]+$/.test(result)) {
               console.log(`R3005G STATUS: ✅ SN="${sn}", approach="${a.name}", test="${result}"`);
-              workingApproach = { key: a.key, iv: a.iv };
+              workingApproach = { key: a.key, iv: a.iv, mode: a.mode };
               break;
             }
           }
           if (workingApproach) break;
+        }
+        
+        // Try passphrase-based decryption
+        if (!workingApproach) {
+          const passphrases = [
+            ...snCandidates,
+            AES_CONSTANT,
+            ...snCandidates.map(sn => sn + AES_CONSTANT),
+            ...snCandidates.map(sn => AES_CONSTANT + sn),
+            ...snCandidates.map(sn => CryptoJS.MD5(sn + AES_CONSTANT).toString()),
+            ...snCandidates.map(sn => CryptoJS.MD5(AES_CONSTANT + sn).toString()),
+          ];
+          for (const pp of passphrases) {
+            const result = tryDecryptPassphrase(testEnc, pp);
+            if (result) {
+              console.log(`R3005G STATUS: ✅ Passphrase="${pp.substring(0,30)}..." => "${result}"`);
+              workingPassphrase = pp;
+              break;
+            }
+          }
         }
       }
 
@@ -424,7 +498,13 @@ Deno.serve(async (req) => {
       if (workingApproach) {
         for (const ru of routerUsers) {
           const ruObj = ru as Record<string, unknown>;
-          const dec = tryDecrypt(ruObj.user as string, workingApproach.key, workingApproach.iv);
+          const dec = tryDecrypt(ruObj.user as string, workingApproach.key, workingApproach.iv, workingApproach.mode);
+          if (dec) routerUserMap.set(dec.toLowerCase(), ruObj);
+        }
+      } else if (workingPassphrase) {
+        for (const ru of routerUsers) {
+          const ruObj = ru as Record<string, unknown>;
+          const dec = tryDecryptPassphrase(ruObj.user as string, workingPassphrase);
           if (dec) routerUserMap.set(dec.toLowerCase(), ruObj);
         }
       }
