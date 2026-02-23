@@ -58,7 +58,7 @@ export function useCustomers() {
   }, [fetchCustomers]);
 
   const addCustomer = async (customer: CustomerInput) => {
-    const { error } = await supabase.from("customers").insert(customer);
+    const { error, data: inserted } = await supabase.from("customers").insert(customer).select("id").single();
     if (error) {
       if (error.code === "23505") {
         if (error.message.includes("cpf")) toast.error("CPF já cadastrado");
@@ -74,7 +74,8 @@ export function useCustomers() {
     fetchCustomers();
 
     // Send welcome notification via WhatsApp
-    if (customer.telefone) {
+    const phone = customer.telefone;
+    if (phone && phone.trim()) {
       try {
         const { data: sessionData } = await supabase.auth.getSession();
         const token = sessionData?.session?.access_token;
@@ -91,14 +92,18 @@ export function useCustomers() {
                 apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
               },
               body: JSON.stringify({
-                phone: customer.telefone,
+                phone,
                 message,
+                customer_id: inserted?.id,
                 customer_name: customer.nome,
               }),
             }
           );
           if (res.ok) {
             toast.success("Boas-vindas enviadas via WhatsApp!");
+          } else {
+            const err = await res.json();
+            console.warn("WhatsApp welcome error:", err);
           }
         }
       } catch (e) {
