@@ -295,15 +295,25 @@ export function useInvoices() {
       const { error } = await supabase.from("invoices").insert(row);
       if (error) {
         if (error.code === "23505") {
-          // Duplicate found — check if we should update the status
+          // Duplicate found — build update payload for allowed fields only
+          const updatePayload: Record<string, any> = {};
+          
+          // Update efi_link if provided
+          if (row.efi_link) {
+            updatePayload.efi_link = row.efi_link;
+          }
+          // Update status to paid if applicable
           if (row.status === "paid") {
+            updatePayload.status = "paid";
+            updatePayload.paid_at = row.paid_at || new Date().toISOString();
+          }
+
+          if (Object.keys(updatePayload).length > 0) {
             const { error: updateError } = await supabase
               .from("invoices")
-              .update({ status: "paid", paid_at: row.paid_at || new Date().toISOString() })
+              .update(updatePayload)
               .eq("customer_id", row.customer_id)
-              .eq("vencimento", row.vencimento)
-              .eq("valor_centavos", row.valor_centavos)
-              .neq("status", "paid");
+              .eq("vencimento", row.vencimento);
             if (!updateError) {
               updated++;
             } else {
