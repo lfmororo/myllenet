@@ -14,6 +14,7 @@ import BillingPage from "./pages/BillingPage";
 import NotificationsPage from "./pages/NotificationsPage";
 import EfiLogsPage from "./pages/EfiLogsPage";
 import Settings from "./pages/Settings";
+import R3005GPage from "./pages/R3005GPage";
 
 const queryClient = new QueryClient();
 
@@ -33,6 +34,7 @@ const App = () => (
               <Route path="/cobrancas" element={<BillingPage />} />
               <Route path="/notificacoes" element={<NotificationsPage />} />
               <Route path="/logs-efi" element={<EfiLogsPage />} />
+              <Route path="/r3005g" element={<R3005GPage />} />
               <Route path="/settings" element={<Settings />} />
             </Route>
             <Route path="*" element={<NotFound />} />

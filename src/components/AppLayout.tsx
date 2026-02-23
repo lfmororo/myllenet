@@ -23,6 +23,7 @@ import {
   LogOut,
   Loader2,
   ShieldAlert,
+  Router,
 } from "lucide-react";
 import logoImg from "@/assets/logo.png";
 
@@ -31,6 +32,7 @@ const navItems = [
   { title: "Clientes", url: "/clientes", icon: Users },
   { title: "Cobranças", url: "/cobrancas", icon: FileText },
   { title: "Notificações", url: "/notificacoes", icon: Bell },
+  { title: "R3005G", url: "/r3005g", icon: Router },
   { title: "Logs EFI", url: "/logs-efi", icon: AlertTriangle },
   { title: "Configurações", url: "/settings", icon: Settings },
 ];
@@ -40,6 +42,7 @@ const pageTitles: Record<string, string> = {
   "/clientes": "Clientes",
   "/cobrancas": "Cobranças",
   "/notificacoes": "Notificações",
+  "/r3005g": "R3005G - PPPoE",
   "/logs-efi": "Logs EFI",
   "/settings": "Configurações",
 };
