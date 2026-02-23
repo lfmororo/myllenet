@@ -291,44 +291,47 @@ export function useInvoices() {
     let failed = 0;
     let skipped = 0;
     let updated = 0;
-    for (const row of rows) {
-      const { error } = await supabase.from("invoices").insert(row);
-      if (error) {
-        if (error.code === "23505") {
-          // Duplicate found — build update payload for allowed fields only
-          const updatePayload: Record<string, any> = {};
-          
-          // Update efi_link if provided
-          if (row.efi_link) {
-            updatePayload.efi_link = row.efi_link;
-          }
-          // Update status to paid if applicable
-          if (row.status === "paid") {
-            updatePayload.status = "paid";
-            updatePayload.paid_at = row.paid_at || new Date().toISOString();
-          }
 
-          if (Object.keys(updatePayload).length > 0) {
-            const { error: updateError } = await supabase
-              .from("invoices")
-              .update(updatePayload)
-              .eq("customer_id", row.customer_id)
-              .eq("vencimento", row.vencimento);
-            if (!updateError) {
-              updated++;
-            } else {
-              console.error("Update error:", updateError);
+    // Separate rows that have efi_link (update-only) from new rows
+    const BATCH_SIZE = 50;
+
+    for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+      const batch = rows.slice(i, i + BATCH_SIZE);
+      
+      for (const row of batch) {
+        // Try insert first
+        const { error } = await supabase.from("invoices").insert(row);
+        if (error) {
+          if (error.code === "23505") {
+            // Duplicate — update only efi_link and/or paid status
+            const updatePayload: Record<string, any> = {};
+            if (row.efi_link) updatePayload.efi_link = row.efi_link;
+            if (row.status === "paid") {
+              updatePayload.status = "paid";
+              updatePayload.paid_at = row.paid_at || new Date().toISOString();
             }
+
+            if (Object.keys(updatePayload).length > 0) {
+              const { error: updateError } = await supabase
+                .from("invoices")
+                .update(updatePayload)
+                .eq("customer_id", row.customer_id)
+                .eq("vencimento", row.vencimento);
+              if (!updateError) updated++;
+            }
+            skipped++;
+          } else {
+            console.error("Insert error:", error);
+            failed++;
           }
-          skipped++;
         } else {
-          console.error("Insert error:", error);
-          failed++;
+          success++;
         }
-      } else {
-        success++;
       }
+      // Yield to UI thread between batches
+      await new Promise(r => setTimeout(r, 10));
     }
+
     fetchInvoices();
     return { success, failed, skipped, updated };
   };
