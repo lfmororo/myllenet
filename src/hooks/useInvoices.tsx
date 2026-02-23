@@ -147,6 +147,21 @@ export function useInvoices() {
     return true;
   };
 
+  const markAsPaid = async (invoiceId: string) => {
+    const { error } = await supabase
+      .from("invoices")
+      .update({ status: "paid", paid_at: new Date().toISOString() })
+      .eq("id", invoiceId);
+
+    if (error) {
+      toast.error("Erro ao marcar como pago");
+      return false;
+    }
+    toast.success("Fatura marcada como paga");
+    fetchInvoices();
+    return true;
+  };
+
   const importFromEfi = async (beginDate?: string, endDate?: string) => {
     try {
       const { data: sessionData } = await supabase.auth.getSession();
@@ -274,5 +289,5 @@ export function useInvoices() {
     return nome.includes(term) || usuario.includes(term);
   });
 
-  return { invoices: filteredInvoices, allInvoices: invoices, loading, invoiceSearch, setInvoiceSearch, createBoleto, checkPayment, cancelInvoice, importFromEfi, bulkImportInvoices, bulkCheckPayments, bulkChecking, refetch: fetchInvoices };
+  return { invoices: filteredInvoices, allInvoices: invoices, loading, invoiceSearch, setInvoiceSearch, createBoleto, checkPayment, cancelInvoice, markAsPaid, importFromEfi, bulkImportInvoices, bulkCheckPayments, bulkChecking, refetch: fetchInvoices };
 }

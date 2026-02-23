@@ -2,7 +2,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { RefreshCw, ExternalLink, Copy, XCircle, Loader2, MessageCircle } from "lucide-react";
+import { RefreshCw, ExternalLink, Copy, XCircle, Loader2, MessageCircle, CheckCircle2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import type { Invoice } from "@/hooks/useInvoices";
@@ -12,6 +12,7 @@ interface Props {
   invoices: Invoice[];
   onCheckPayment: (id: string) => Promise<unknown>;
   onCancel: (id: string) => Promise<boolean>;
+  onMarkAsPaid: (id: string) => Promise<boolean>;
 }
 
 const statusMap: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
@@ -28,7 +29,7 @@ const whatsappOptions: { type: NotificationType; label: string; statusFilter?: s
   { type: "cobranca_atrasada", label: "⚠️ Cobrança atrasada", statusFilter: ["overdue"] },
 ];
 
-export default function InvoiceTable({ invoices, onCheckPayment, onCancel }: Props) {
+export default function InvoiceTable({ invoices, onCheckPayment, onCancel, onMarkAsPaid }: Props) {
   const [checking, setChecking] = useState<string | null>(null);
   const { sendInvoiceNotification, sending } = useWhatsApp();
 
@@ -146,21 +147,32 @@ export default function InvoiceTable({ invoices, onCheckPayment, onCancel }: Pro
                         <ExternalLink className="h-4 w-4" />
                       </Button>
                     )}
-                    {inv.status === "pending" && (
+                    {inv.status !== "paid" && inv.status !== "cancelled" && (
                       <>
+                        {inv.efi_charge_id && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            title="Verificar pagamento"
+                            disabled={checking === inv.id}
+                            onClick={() => handleCheck(inv.id)}
+                          >
+                            {checking === inv.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <RefreshCw className="h-4 w-4" />
+                            )}
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8"
-                          title="Verificar pagamento"
-                          disabled={checking === inv.id}
-                          onClick={() => handleCheck(inv.id)}
+                          className="h-8 w-8 text-green-600 hover:text-green-700"
+                          title="Marcar como pago"
+                          onClick={() => onMarkAsPaid(inv.id)}
                         >
-                          {checking === inv.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <RefreshCw className="h-4 w-4" />
-                          )}
+                          <CheckCircle2 className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="ghost"
