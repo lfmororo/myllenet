@@ -84,17 +84,17 @@ async function loginR3005G(
   password: string
 ): Promise<string> {
   const { sn, csrfprotect } = await getRouterInfo(baseUrl);
-  const { keyStr, ivStr } = deriveKeyIV(sn);
 
-  const encUser = aesEncrypt(username, keyStr, ivStr);
-  const encPass = aesEncrypt(password, keyStr, ivStr);
+  // The base64:1 flag tells the router credentials are Base64-encoded
+  const encodedUser = toBase64(username);
+  const encodedPass = toBase64(password);
 
-  console.log("R3005G: AES key prefix:", keyStr.substring(0, 4), "enc_user prefix:", encUser.substring(0, 10));
+  console.log("R3005G: Logging in with Base64-encoded credentials, csrfprotect:", csrfprotect);
 
   const payload = {
     csrfprotect,
-    user: encUser,
-    password: encPass,
+    user: encodedUser,
+    password: encodedPass,
     tm: Date.now() / 1000,
     base64: 1,
   };
