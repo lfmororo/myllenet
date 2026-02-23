@@ -6,8 +6,13 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
-import Dashboard from "./pages/Dashboard";
 import NotFound from "./pages/NotFound";
+import AppLayout from "./components/AppLayout";
+import DashboardHome from "./pages/DashboardHome";
+import CustomersPage from "./pages/CustomersPage";
+import BillingPage from "./pages/BillingPage";
+import NotificationsPage from "./pages/NotificationsPage";
+import EfiLogsPage from "./pages/EfiLogsPage";
 import Settings from "./pages/Settings";
 
 const queryClient = new QueryClient();
@@ -22,8 +27,14 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/settings" element={<Settings />} />
+            <Route element={<AppLayout />}>
+              <Route path="/dashboard" element={<DashboardHome />} />
+              <Route path="/clientes" element={<CustomersPage />} />
+              <Route path="/cobrancas" element={<BillingPage />} />
+              <Route path="/notificacoes" element={<NotificationsPage />} />
+              <Route path="/logs-efi" element={<EfiLogsPage />} />
+              <Route path="/settings" element={<Settings />} />
+            </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
