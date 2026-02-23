@@ -72,6 +72,40 @@ export function useCustomers() {
     }
     toast.success("Cliente cadastrado com sucesso!");
     fetchCustomers();
+
+    // Send welcome notification via WhatsApp
+    if (customer.telefone) {
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const token = sessionData?.session?.access_token;
+        if (token) {
+          const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+          const message = `Olá ${customer.nome}! 🌐\n\nSeja bem-vindo(a) à *Myllenet*! 🎉\n\nSeu acesso à internet já está ativo.\n\n👤 Usuário: ${customer.usuario_pppoe}\n\nEm caso de dúvidas, estamos à disposição!\nObrigado por escolher a Myllenet! 🚀`;
+          const res = await fetch(
+            `https://${projectId}.supabase.co/functions/v1/whatsapp-send/send-text`,
+            {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+                apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+              },
+              body: JSON.stringify({
+                phone: customer.telefone,
+                message,
+                customer_name: customer.nome,
+              }),
+            }
+          );
+          if (res.ok) {
+            toast.success("Boas-vindas enviadas via WhatsApp!");
+          }
+        }
+      } catch (e) {
+        console.warn("Erro ao enviar boas-vindas WhatsApp:", e);
+      }
+    }
+
     return true;
   };
 
