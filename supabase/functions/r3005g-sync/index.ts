@@ -48,6 +48,23 @@ function aesEncrypt(plaintext: string, keyStr: string, ivStr: string): string {
   return encrypted.toString();
 }
 
+function aesDecrypt(cipherBase64: string, keyStr: string, ivStr: string): string {
+  try {
+    const key = CryptoJS.enc.Utf8.parse(keyStr);
+    const iv = CryptoJS.enc.Utf8.parse(ivStr);
+    const decrypted = CryptoJS.AES.decrypt(
+      cipherBase64,
+      key,
+      { iv, mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.ZeroPadding }
+    );
+    const result = decrypted.toString(CryptoJS.enc.Utf8);
+    // Remove null bytes from ZeroPadding
+    return result.replace(/\0+$/g, "");
+  } catch {
+    return cipherBase64;
+  }
+}
+
 function getRandomString(len: number): string {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
   let result = "";
@@ -334,20 +351,24 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Login to router
+    // Login to router and get SN for decryption
+    const { sn } = await getRouterInfo(baseUrl);
     const cookie = await loginR3005G(baseUrl, routerUser, routerPass);
+    const { keyStr, ivStr } = deriveKeyIV(sn);
 
     // Fetch PPPoE users
     const routerUsers = await fetchPPPoEUsers(baseUrl, cookie);
 
     const decodedUsers = routerUsers.map((u) => ({
-      usuario_pppoe: fromBase64(u.user),
-      senha_pppoe: fromBase64(u.pwd),
+      usuario_pppoe: aesDecrypt(u.user, keyStr, ivStr),
+      senha_pppoe: aesDecrypt(u.pwd, keyStr, ivStr),
       cstate: u.cstate,
       gid: u.gid,
       connected: u.cstate === 97,
       enable: u.enable,
     }));
+
+    console.log("R3005G: decoded first 3 users:", decodedUsers.slice(0, 3).map(u => u.usuario_pppoe));
 
     if (action === "status") {
 
