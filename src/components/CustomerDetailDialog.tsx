@@ -274,17 +274,22 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
                         <Badge variant={st.variant} className="text-xs">{st.label}</Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
+                        <div className="flex justify-end gap-1 flex-wrap">
                           {inv.efi_link && (
-                            <Button variant="ghost" size="icon" className="h-7 w-7" asChild>
+                            <Button variant="outline" size="sm" className="h-7 text-xs px-2" asChild>
                               <a href={inv.efi_link} target="_blank" rel="noopener noreferrer" title="Abrir boleto">
-                                <ExternalLink className="h-3.5 w-3.5" />
+                                <ExternalLink className="h-3 w-3 mr-1" /> Boleto
                               </a>
                             </Button>
                           )}
                           {inv.efi_pix_copiacola && (
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => copyToClipboard(inv.efi_pix_copiacola!)} title="Copiar PIX">
-                              <Copy className="h-3.5 w-3.5" />
+                            <Button variant="outline" size="sm" className="h-7 text-xs px-2" onClick={() => copyToClipboard(inv.efi_pix_copiacola!)} title="Copiar PIX Copia e Cola">
+                              <Copy className="h-3 w-3 mr-1" /> PIX
+                            </Button>
+                          )}
+                          {inv.efi_barcode && (
+                            <Button variant="outline" size="sm" className="h-7 text-xs px-2" onClick={() => copyToClipboard(inv.efi_barcode!)} title="Copiar código de barras">
+                              <Copy className="h-3 w-3 mr-1" /> Barras
                             </Button>
                           )}
                           {inv.status !== "paid" && inv.status !== "cancelled" && (
