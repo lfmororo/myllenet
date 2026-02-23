@@ -14,28 +14,54 @@ function decodeBase64(encoded: string): string {
   }
 }
 
+function toBase64(str: string): string {
+  return btoa(str);
+}
+
 async function loginR3005G(
   baseUrl: string,
   username: string,
   password: string
 ): Promise<string> {
+  const now = Date.now() / 1000;
+  const csrfprotect = Math.floor(now).toString();
+  
+  const payload = {
+    csrfprotect,
+    user: toBase64(username),
+    password: toBase64(password),
+    tm: now,
+    base64: 1,
+  };
+
+  console.log("R3005G login payload (without creds):", { csrfprotect, tm: now, base64: 1 });
+
   const res = await fetch(`${baseUrl}/log_in.cgi`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json;charset=UTF-8",
       "Accept": "application/json, text/plain, */*",
     },
-    body: JSON.stringify({ username, password }),
-    redirect: "manual",
+    body: JSON.stringify(payload),
   });
 
-  const setCookie = res.headers.get("set-cookie");
-  if (!setCookie) {
-    const body = await res.text();
-    throw new Error(`Login failed, no cookie. Status: ${res.status}, Body: ${body}`);
+  const body = await res.text();
+  console.log("R3005G login response:", res.status, body);
+
+  let json: { code: number; error?: string; data?: unknown };
+  try {
+    json = JSON.parse(body);
+  } catch {
+    throw new Error(`Login parse error. Status: ${res.status}, Body: ${body}`);
   }
 
-  const cookie = setCookie.split(";")[0];
+  if (json.code !== 0) {
+    throw new Error(`Login failed: ${json.error || body}`);
+  }
+
+  // Try to get cookie if present, otherwise proceed without
+  const setCookie = res.headers.get("set-cookie");
+  const cookie = setCookie ? setCookie.split(";")[0] : "";
   return cookie;
 }
 
