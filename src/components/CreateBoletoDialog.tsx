@@ -119,7 +119,7 @@ export default function CreateBoletoDialog({ open, onOpenChange, customers, plan
                 <SelectValue placeholder="Selecione o cliente" />
               </SelectTrigger>
               <SelectContent>
-                {customers.map((c) => (
+                {customers.filter(c => !c.cortesia).map((c) => (
                   <SelectItem key={c.id} value={c.id}>
                     {c.nome} — {c.cpf}
                   </SelectItem>

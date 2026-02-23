@@ -54,7 +54,7 @@ export default function CustomersPage() {
     const now = new Date();
     const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
     return customers.filter(c => {
-      if (!c.ativo) return false;
+      if (!c.ativo || c.cortesia) return false;
       if (customerIdsWithInvoiceThisMonth.has(c.id)) return false;
       if (c.pago_ate) {
         const pagoAte = new Date(c.pago_ate + "T12:00:00");

@@ -21,6 +21,7 @@ export type Database = {
           cep: string | null
           cidade: string | null
           complemento: string | null
+          cortesia: boolean
           cpf: string
           created_at: string
           desconto_especial_centavos: number
@@ -44,6 +45,7 @@ export type Database = {
           cep?: string | null
           cidade?: string | null
           complemento?: string | null
+          cortesia?: boolean
           cpf: string
           created_at?: string
           desconto_especial_centavos?: number
@@ -67,6 +69,7 @@ export type Database = {
           cep?: string | null
           cidade?: string | null
           complemento?: string | null
+          cortesia?: boolean
           cpf?: string
           created_at?: string
           desconto_especial_centavos?: number

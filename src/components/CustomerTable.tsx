@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Pencil, Trash2, Eye, EyeOff, FileSearch, FileText, AlertCircle } from "lucide-react";
+import { Pencil, Trash2, Eye, EyeOff, FileSearch, FileText, AlertCircle, Gift } from "lucide-react";
 import { useState } from "react";
 import type { Customer } from "@/hooks/useCustomers";
 import type { Plan } from "@/hooks/usePlans";
@@ -67,7 +67,16 @@ export default function CustomerTable({ customers, onEdit, onDelete, onToggleAct
               const hasInvoice = hasPagoAte || (customerIdsWithInvoice?.has(c.id) ?? false);
               return (
                 <TableRow key={c.id} className={`hover:bg-muted/30 ${!c.ativo ? "opacity-50" : ""}`}>
-                  <TableCell className="font-medium">{c.nome}</TableCell>
+                  <TableCell className="font-medium">
+                    <span className="flex items-center gap-1.5">
+                      {c.nome}
+                      {c.cortesia && (
+                        <Badge variant="outline" className="text-xs gap-0.5 px-1.5 py-0 border-primary/30 text-primary">
+                          <Gift className="h-3 w-3" /> Cortesia
+                        </Badge>
+                      )}
+                    </span>
+                  </TableCell>
                   <TableCell className="font-mono text-sm">{formatCPF(c.cpf)}</TableCell>
                   <TableCell className="hidden md:table-cell">{c.email}</TableCell>
                   <TableCell className="hidden lg:table-cell">{c.telefone || "—"}</TableCell>
@@ -85,22 +94,28 @@ export default function CustomerTable({ customers, onEdit, onDelete, onToggleAct
                   </TableCell>
                   {customerIdsWithInvoice && (
                     <TableCell className="text-center">
-                      <Tooltip>
-                        <TooltipTrigger>
-                          {hasInvoice ? (
-                            <Badge variant="default" className="text-xs gap-1">
-                              <FileText className="h-3 w-3" /> Emitido
-                            </Badge>
-                          ) : (
-                            <Badge variant="destructive" className="text-xs gap-1">
-                              <AlertCircle className="h-3 w-3" /> Sem boleto
-                            </Badge>
-                          )}
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          {hasInvoice ? "Boleto emitido no mês atual" : "Sem boleto emitido no mês atual"}
-                        </TooltipContent>
-                      </Tooltip>
+                      {c.cortesia ? (
+                        <Badge variant="outline" className="text-xs gap-1 border-primary/30 text-primary">
+                          <Gift className="h-3 w-3" /> Cortesia
+                        </Badge>
+                      ) : (
+                        <Tooltip>
+                          <TooltipTrigger>
+                            {hasInvoice ? (
+                              <Badge variant="default" className="text-xs gap-1">
+                                <FileText className="h-3 w-3" /> Emitido
+                              </Badge>
+                            ) : (
+                              <Badge variant="destructive" className="text-xs gap-1">
+                                <AlertCircle className="h-3 w-3" /> Sem boleto
+                              </Badge>
+                            )}
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            {hasInvoice ? "Boleto emitido no mês atual" : "Sem boleto emitido no mês atual"}
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
                     </TableCell>
                   )}
                   <TableCell className="text-center">
