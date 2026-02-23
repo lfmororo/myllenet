@@ -84,32 +84,79 @@ async function loginR3005G(
   password: string
 ): Promise<string> {
   const { sn, csrfprotect } = await getRouterInfo(baseUrl);
+  const { keyStr, ivStr } = deriveKeyIV(sn);
 
-  console.log("R3005G: Logging in, csrfprotect:", csrfprotect, "user_len:", username.length, "pass_len:", password.length);
+  // The router's Vue frontend uses enCode(AES encrypt) then deCode(AES decrypt) which cancel out,
+  // so the router actually receives plaintext. But base64:1 flag must be present.
+  // We also include `code: ""` as the router checks for verification code field.
+  
+  // Try AES-encrypted first (what the browser JS sends before the Vue deCode reverses it)
+  const encUser = aesEncrypt(username, keyStr, ivStr);
+  const encPass = aesEncrypt(password, keyStr, ivStr);
 
-  const payload = {
-    csrfprotect,
-    user: username,
-    password: password,
-    tm: Date.now() / 1000,
-    base64: 1,
-  };
+  // Attempt 1: plaintext + code field (most likely what works)
+  // Attempt 2: AES encrypted  
+  const attempts = [
+    { user: username, password: password, base64: 1, code: "" },
+    { user: username, password: password, code: "" },
+    { user: encUser, password: encPass, base64: 1, code: "" },
+  ];
 
   const loginUrl = `${baseUrl}/log_in.cgi`;
 
-  const res = await fetch(loginUrl, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json;charset=UTF-8",
-      Accept: "application/json, text/plain, */*",
-      Origin: baseUrl,
-      Referer: `${baseUrl}/login.html`,
-    },
-    body: JSON.stringify(payload),
-  });
+  for (let i = 0; i < attempts.length; i++) {
+    // Get fresh CSRF for each attempt
+    let csrf = csrfprotect;
+    if (i > 0) {
+      const info = await getRouterInfo(baseUrl);
+      csrf = info.csrfprotect;
+    }
 
-  const body = await res.text();
-  console.log("R3005G login response:", res.status, body);
+    const payload = {
+      csrfprotect: csrf,
+      ...attempts[i],
+      tm: Date.now() / 1000,
+    };
+
+    console.log(`R3005G login attempt ${i + 1}:`, JSON.stringify(payload).substring(0, 120));
+
+    const res = await fetch(loginUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json;charset=UTF-8",
+        Accept: "application/json, text/plain, */*",
+        Origin: baseUrl,
+        Referer: `${baseUrl}/login.html`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const body = await res.text();
+    console.log(`R3005G login attempt ${i + 1} response:`, res.status, body);
+
+    let json: { code: number; error?: string };
+    try {
+      json = JSON.parse(body);
+    } catch {
+      continue;
+    }
+
+    if (json.code === 0) {
+      const setCookie = res.headers.get("set-cookie");
+      const cookie = setCookie ? setCookie.split(";")[0] : "";
+      console.log(`R3005G login success on attempt ${i + 1}, cookie:`, cookie ? "present" : "none");
+      return cookie;
+    }
+
+    console.log(`R3005G attempt ${i + 1} failed:`, json.error);
+    
+    // If rate limited, stop trying
+    if (json.error?.includes("restantes 1") || json.error?.includes("restantes 0")) {
+      throw new Error(`Login rate limited: ${json.error}`);
+    }
+  }
+
+  throw new Error("Login failed: all attempts exhausted");
 
   let json: { code: number; error?: string };
   try {
