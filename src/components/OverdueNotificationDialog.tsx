@@ -105,6 +105,7 @@ export default function OverdueNotificationDialog({ open, onOpenChange, customer
     const now = new Date();
     const map = new Map<string, { days: number; link: string; vencimento: string; tier: TierKey }>();
 
+    // First pass: find worst overdue per customer
     for (const inv of allInvoices) {
       if (!["overdue", "waiting", "pending"].includes(inv.status)) continue;
       const venc = new Date(inv.vencimento + "T12:00:00");
@@ -115,19 +116,39 @@ export default function OverdueNotificationDialog({ open, onOpenChange, customer
 
       const existing = map.get(inv.customer_id);
       if (!existing || diffDays > existing.days) {
-        const linkParts: string[] = [];
-        if (inv.efi_link) linkParts.push(`📄 Boleto: ${inv.efi_link}`);
-        if (inv.efi_pix_copiacola) linkParts.push(`💠 PIX Copia e Cola: ${inv.efi_pix_copiacola}`);
-        if (linkParts.length === 0) linkParts.push("Entre em contato para obter os dados de pagamento.");
-
         map.set(inv.customer_id, {
           days: diffDays,
-          link: linkParts.join("\n"),
+          link: "",
           vencimento: venc.toLocaleDateString("pt-BR"),
           tier: getTierForDays(diffDays),
         });
       }
     }
+
+    // Second pass: collect payment links from ALL overdue invoices per customer
+    for (const inv of allInvoices) {
+      if (!["overdue", "waiting", "pending"].includes(inv.status)) continue;
+      const info = map.get(inv.customer_id);
+      if (!info) continue;
+
+      if (inv.efi_link || inv.efi_pix_copiacola) {
+        const linkParts: string[] = [];
+        if (inv.efi_link) linkParts.push(`📄 Boleto: ${inv.efi_link}`);
+        if (inv.efi_pix_copiacola) linkParts.push(`💠 PIX Copia e Cola: ${inv.efi_pix_copiacola}`);
+        // Use the first invoice that has a link
+        if (!info.link) {
+          info.link = linkParts.join("\n");
+        }
+      }
+    }
+
+    // Set fallback for customers with no links found
+    for (const [, info] of map) {
+      if (!info.link) {
+        info.link = "Entre em contato para obter os dados de pagamento.";
+      }
+    }
+
     return map;
   }, [allInvoices]);
 
