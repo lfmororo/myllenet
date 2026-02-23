@@ -286,7 +286,7 @@ export function useInvoices() {
     }
   };
 
-  const bulkImportInvoices = async (rows: { customer_id: string; descricao: string; valor_centavos: number; vencimento: string; status: string; paid_at?: string | null }[]) => {
+  const bulkImportInvoices = async (rows: { customer_id: string; descricao: string; valor_centavos: number; vencimento: string; status: string; paid_at?: string | null; efi_link?: string | null }[]) => {
     let success = 0;
     let failed = 0;
     let skipped = 0;
