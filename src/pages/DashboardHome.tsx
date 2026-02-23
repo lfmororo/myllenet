@@ -16,7 +16,14 @@ export default function DashboardHome() {
     const inactiveCustomers = customers.filter(c => !c.ativo).length;
     const totalInvoices = allInvoices.length;
     const paidInvoices = allInvoices.filter(i => i.status === "paid");
-    const pendingInvoices = allInvoices.filter(i => i.status === "waiting" || i.status === "pending");
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    const pendingInvoices = allInvoices.filter(i => {
+      if (i.status !== "waiting" && i.status !== "pending") return false;
+      const d = new Date(i.vencimento + "T12:00:00");
+      return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+    });
     const overdueInvoices = allInvoices.filter(i => {
       if (i.status === "paid" || i.status === "cancelled") return false;
       return new Date(i.vencimento + "T23:59:59") < new Date();
