@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import CryptoJS from "https://esm.sh/crypto-js@4.2.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -6,22 +7,75 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-function decodeBase64(encoded: string): string {
+const AES_CONSTANT = "c3W1KF2N=5O47M6ba0E9P8yRdQefjxHSTGpqhrgoIiusmUvzwtVlknBXJALCZDY";
+
+function toBase64(str: string): string {
+  const bytes = new TextEncoder().encode(str);
+  let binary = "";
+  for (const b of bytes) binary += String.fromCharCode(b);
+  return btoa(binary);
+}
+
+function fromBase64(b64: string): string {
   try {
-    return atob(encoded);
+    const binary = atob(b64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return new TextDecoder().decode(bytes);
   } catch {
-    return encoded;
+    return b64;
   }
 }
 
-function toBase64(str: string): string {
-  // Handle UTF-8 properly by encoding bytes first
-  const bytes = new TextEncoder().encode(str);
-  let binary = "";
-  for (const b of bytes) {
-    binary += String.fromCharCode(b);
+function deriveKeyIV(serialNumber: string): { keyStr: string; ivStr: string } {
+  let sn = serialNumber;
+  if (/^(没有序列号|no-ssid)$/i.test(sn)) sn = "";
+  const combined = toBase64(sn) + AES_CONSTANT;
+  return {
+    keyStr: combined.slice(0, 16),
+    ivStr: combined.slice(16, 32),
+  };
+}
+
+function aesEncrypt(plaintext: string, keyStr: string, ivStr: string): string {
+  const key = CryptoJS.enc.Utf8.parse(keyStr);
+  const iv = CryptoJS.enc.Utf8.parse(ivStr);
+  const encrypted = CryptoJS.AES.encrypt(
+    CryptoJS.enc.Utf8.parse(plaintext),
+    key,
+    { iv, mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.ZeroPadding }
+  );
+  return encrypted.toString();
+}
+
+async function getRouterInfo(baseUrl: string): Promise<{ sn: string; csrfprotect: string }> {
+  // Fetch serial number from base_mini.data
+  let sn = "";
+  try {
+    const baseRes = await fetch(`${baseUrl}/base_mini.data`);
+    const baseJson = await baseRes.json();
+    if (baseJson?.data) {
+      const decoded = JSON.parse(fromBase64(baseJson.data));
+      sn = decoded.gwsn || decoded.sn || "";
+      console.log("R3005G: SN found:", sn ? sn.substring(0, 4) + "..." : "empty");
+    }
+  } catch (e) {
+    console.error("R3005G: Failed to fetch base_mini.data:", e);
   }
-  return btoa(binary);
+
+  // Fetch CSRF token
+  let csrfprotect = Math.floor(Date.now() / 1000).toString();
+  try {
+    const csrfRes = await fetch(`${baseUrl}/csrfprotect.data`);
+    const csrfJson = await csrfRes.json();
+    if (csrfJson?.data?.csrfprotect) {
+      csrfprotect = csrfJson.data.csrfprotect;
+    }
+  } catch (e) {
+    console.error("R3005G: Failed to fetch csrfprotect.data:", e);
+  }
+
+  return { sn, csrfprotect };
 }
 
 async function loginR3005G(
@@ -29,25 +83,22 @@ async function loginR3005G(
   username: string,
   password: string
 ): Promise<string> {
-  const csrfprotect = Math.floor(Date.now() / 1000).toString();
-  const tm = Date.now() / 1000;
+  const { sn, csrfprotect } = await getRouterInfo(baseUrl);
+  const { keyStr, ivStr } = deriveKeyIV(sn);
 
-  const userB64 = toBase64(username);
-  const passB64 = toBase64(password);
+  const encUser = aesEncrypt(username, keyStr, ivStr);
+  const encPass = aesEncrypt(password, keyStr, ivStr);
 
-  // Debug: log first 4 chars of encoded values to verify encoding
-  console.log("R3005G debug - user length:", username.length, "user_b64_prefix:", userB64.substring(0, 6));
-  console.log("R3005G debug - pass length:", password.length, "pass_b64_prefix:", passB64.substring(0, 6));
+  console.log("R3005G: AES key prefix:", keyStr.substring(0, 4), "enc_user prefix:", encUser.substring(0, 10));
 
   const payload = {
     csrfprotect,
-    user: userB64,
-    password: passB64,
-    tm,
+    user: encUser,
+    password: encPass,
+    tm: Date.now() / 1000,
     base64: 1,
   };
 
-  // Try with csrfprotect as query param (Intelbras firmware pattern)
   const loginUrl = `${baseUrl}/log_in.cgi?csrfprotect=${csrfprotect}`;
   console.log("R3005G login to:", loginUrl);
 
@@ -55,9 +106,9 @@ async function loginR3005G(
     method: "POST",
     headers: {
       "Content-Type": "application/json;charset=UTF-8",
-      "Accept": "application/json, text/plain, */*",
-      "Origin": baseUrl,
-      "Referer": `${baseUrl}/login.html`,
+      Accept: "application/json, text/plain, */*",
+      Origin: baseUrl,
+      Referer: `${baseUrl}/login.html`,
     },
     body: JSON.stringify(payload),
   });
@@ -65,7 +116,7 @@ async function loginR3005G(
   const body = await res.text();
   console.log("R3005G login response:", res.status, body);
 
-  let json: { code: number; error?: string; data?: unknown };
+  let json: { code: number; error?: string };
   try {
     json = JSON.parse(body);
   } catch {
@@ -85,7 +136,7 @@ async function loginR3005G(
 async function fetchPPPoEUsers(
   baseUrl: string,
   cookie: string
-): Promise<Array<{ user: string; pwd: string; cstate: number; gid: number }>> {
+): Promise<Array<{ user: string; pwd: string; cstate: number; gid: number; enable?: number }>> {
   const res = await fetch(`${baseUrl}/user.data`, {
     headers: { Cookie: cookie },
   });
@@ -103,13 +154,52 @@ async function fetchPPPoEUsers(
   return json.data.all;
 }
 
+async function togglePPPoEUser(
+  baseUrl: string,
+  cookie: string,
+  csrfprotect: string,
+  targetUser: string,
+  enable: boolean
+): Promise<{ success: boolean; message: string }> {
+  // Try common Intelbras API patterns for toggling user status
+  const endpoints = [
+    { url: `${baseUrl}/config.data?csrfprotect=${csrfprotect}`, body: { module: "pppoe_server", action: "set_user_status", data: { user: targetUser, enable: enable ? 1 : 0 } } },
+    { url: `${baseUrl}/user.data?csrfprotect=${csrfprotect}`, body: { action: "set", data: { user: targetUser, enable: enable ? 1 : 0 } } },
+  ];
+
+  for (const ep of endpoints) {
+    try {
+      console.log("R3005G toggle attempt:", ep.url);
+      const res = await fetch(ep.url, {
+        method: "POST",
+        headers: {
+          Cookie: cookie,
+          "Content-Type": "application/json;charset=UTF-8",
+          Origin: baseUrl,
+          Referer: `${baseUrl}/index.html`,
+        },
+        body: JSON.stringify(ep.body),
+      });
+      const text = await res.text();
+      console.log("R3005G toggle response:", res.status, text);
+      const json = JSON.parse(text);
+      if (json.code === 0) {
+        return { success: true, message: `User ${targetUser} ${enable ? "enabled" : "disabled"} successfully` };
+      }
+    } catch (e) {
+      console.error("R3005G toggle error:", e);
+    }
+  }
+
+  return { success: false, message: "Could not toggle user. Router API endpoint unknown." };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Auth check
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -124,9 +214,8 @@ Deno.serve(async (req) => {
       { global: { headers: { Authorization: authHeader } } }
     );
 
-    const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsErr } = await supabase.auth.getClaims(token);
-    if (claimsErr || !claimsData?.claims) {
+    const { data: { user }, error: userErr } = await supabase.auth.getUser();
+    if (userErr || !user) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -150,20 +239,29 @@ Deno.serve(async (req) => {
     // Login to router
     const cookie = await loginR3005G(baseUrl, routerUser, routerPass);
 
+    if (action === "debug") {
+      // Debug endpoint - return router info without modifying anything
+      const { sn, csrfprotect } = await getRouterInfo(baseUrl);
+      const { keyStr, ivStr } = deriveKeyIV(sn);
+      return new Response(
+        JSON.stringify({ sn_prefix: sn.substring(0, 6), csrfprotect, key_prefix: keyStr.substring(0, 4), iv_prefix: ivStr.substring(0, 4) }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // Fetch PPPoE users
     const routerUsers = await fetchPPPoEUsers(baseUrl, cookie);
 
-    // Decode usernames
     const decodedUsers = routerUsers.map((u) => ({
-      usuario_pppoe: decodeBase64(u.user),
-      senha_pppoe: decodeBase64(u.pwd),
+      usuario_pppoe: fromBase64(u.user),
+      senha_pppoe: fromBase64(u.pwd),
       cstate: u.cstate,
       gid: u.gid,
-      connected: u.cstate === 97, // 97 = connected
+      connected: u.cstate === 97,
+      enable: u.enable,
     }));
 
     if (action === "status") {
-      // Just return status - match with existing customers
       const serviceClient = createClient(
         Deno.env.get("SUPABASE_URL")!,
         Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
@@ -189,7 +287,6 @@ Deno.serve(async (req) => {
         };
       });
 
-      // Also find users in router but not in system
       const customerUsernames = new Set(
         (customers || []).map((c) => c.usuario_pppoe?.toLowerCase())
       );
@@ -213,7 +310,6 @@ Deno.serve(async (req) => {
     }
 
     if (action === "import") {
-      // Import users not yet in system
       const serviceClient = createClient(
         Deno.env.get("SUPABASE_URL")!,
         Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
@@ -257,8 +353,29 @@ Deno.serve(async (req) => {
       );
     }
 
+    if (action === "toggle") {
+      // Toggle PPPoE user enable/disable on router
+      const body = await req.json();
+      const { usuario_pppoe, enable } = body;
+
+      if (!usuario_pppoe) {
+        return new Response(
+          JSON.stringify({ error: "usuario_pppoe is required" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const { csrfprotect } = await getRouterInfo(baseUrl);
+      const result = await togglePPPoEUser(baseUrl, cookie, csrfprotect, usuario_pppoe, !!enable);
+
+      return new Response(JSON.stringify(result), {
+        status: result.success ? 200 : 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     return new Response(
-      JSON.stringify({ error: "Unknown action. Use /status or /import" }),
+      JSON.stringify({ error: "Unknown action. Use /status, /import, /toggle, or /debug" }),
       { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {
