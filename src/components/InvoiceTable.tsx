@@ -2,7 +2,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { RefreshCw, ExternalLink, Copy, XCircle, Loader2, MessageCircle, CheckCircle2 } from "lucide-react";
+import { RefreshCw, ExternalLink, Copy, XCircle, Loader2, MessageCircle, CheckCircle2, Send } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import type { Invoice } from "@/hooks/useInvoices";
@@ -124,6 +124,24 @@ export default function InvoiceTable({ invoices, onCheckPayment, onCancel, onMar
                           ))}
                         </DropdownMenuContent>
                       </DropdownMenu>
+                    )}
+                    {/* Send link button - prominent when efi_link exists */}
+                    {inv.efi_link && inv.status !== "paid" && inv.status !== "cancelled" && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 text-xs px-2 text-green-600 border-green-200 hover:bg-green-50 hover:text-green-700"
+                        title="Enviar link do boleto via WhatsApp"
+                        disabled={sending === inv.id}
+                        onClick={() => sendInvoiceNotification(inv.id, "boleto_gerado")}
+                      >
+                        {sending === inv.id ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
+                        ) : (
+                          <Send className="h-3.5 w-3.5 mr-1" />
+                        )}
+                        Enviar Link
+                      </Button>
                     )}
                     {inv.efi_barcode && (
                       <Button
