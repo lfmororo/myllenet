@@ -82,6 +82,10 @@ export function useInvoices() {
 
       const result = await response.json();
       if (!response.ok) {
+        if (response.status === 409) {
+          toast.info(result.error || "Cobrança já existe para este vencimento");
+          return true; // Not a failure, just already exists
+        }
         toast.error(result.error || "Erro ao gerar boleto");
         return false;
       }
