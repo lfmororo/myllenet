@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Wifi, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import logoImg from "@/assets/logo.png";
 
 export default function Auth() {
   const { user, loading: authLoading, signIn } = useAuth();
@@ -37,8 +38,8 @@ export default function Auth() {
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md shadow-lg">
         <CardHeader className="text-center space-y-3">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-            <Wifi className="h-7 w-7" />
+          <div className="mx-auto flex h-14 w-14 items-center justify-center">
+            <img src={logoImg} alt="MylleNet" className="h-14 w-14 object-contain" />
           </div>
           <CardTitle className="text-2xl font-bold tracking-tight">Myllenet</CardTitle>
           <CardDescription>Acesse o painel de gerenciamento</CardDescription>
