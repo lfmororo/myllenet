@@ -225,10 +225,20 @@ async function createBoleto(req: Request) {
     const efiResponse = await efiRequest("/v1/charge/one-step", "POST", chargeBody, "criar_boleto");
 
     const chargeData = efiResponse.data || efiResponse;
-    // EFI one-step returns barcode/pix at data level, not inside payment.banking_billet
+    // Log full keys to debug response structure
+    console.log("EFI one-step response keys:", JSON.stringify({
+      topKeys: Object.keys(chargeData),
+      hasPayment: !!chargeData.payment,
+      paymentKeys: chargeData.payment ? Object.keys(chargeData.payment) : [],
+      hasBankingBillet: !!chargeData.payment?.banking_billet,
+      billetKeys: chargeData.payment?.banking_billet ? Object.keys(chargeData.payment.banking_billet) : [],
+      directBarcode: chargeData.barcode?.substring(0, 20),
+      directLink: chargeData.link?.substring(0, 50),
+      directPix: !!chargeData.pix,
+    }));
     const billet = chargeData.payment?.banking_billet || chargeData;
 
-    console.log("EFI charge parsed - barcode:", billet.barcode, "pix:", !!billet.pix, "link:", billet.link, "pdf:", billet.pdf);
+    console.log("EFI charge parsed - barcode:", billet.barcode?.substring(0, 20), "pix:", !!billet.pix, "link:", billet.link?.substring(0, 50), "pdf:", billet.pdf);
 
     // Save invoice to database
     const invoicePayload = {
@@ -366,8 +376,15 @@ async function checkPayment(req: Request) {
       newStatus = "overdue";
     }
 
-    // Extract billet data if available
-    const billet = chargeData.payment?.banking_billet || chargeData;
+    // Extract billet data if available - EFI GET returns it inside payment.banking_billet
+    const billet = chargeData.payment?.banking_billet || {};
+    console.log("checkPayment billet data:", JSON.stringify({ 
+      has_payment: !!chargeData.payment, 
+      has_banking_billet: !!chargeData.payment?.banking_billet,
+      barcode: billet.barcode?.substring(0, 20),
+      link: billet.link?.substring(0, 50),
+      pix: !!billet.pix,
+    }));
     const updatePayload: Record<string, any> = { status: newStatus, paid_at: paidAt };
     
     // Fill in missing billet data
@@ -375,9 +392,12 @@ async function checkPayment(req: Request) {
     if (billet.pix?.qrcode && !invoice.efi_pix_qrcode) updatePayload.efi_pix_qrcode = billet.pix.qrcode;
     if (billet.pix?.qrcode && !invoice.efi_pix_copiacola) updatePayload.efi_pix_copiacola = billet.pix.qrcode;
     if ((billet.link || billet.pdf?.charge) && !invoice.efi_link) updatePayload.efi_link = billet.link || billet.pdf?.charge;
+    
+    // Force update if we have new billet data
+    const hasBilletUpdates = Object.keys(updatePayload).length > 2;
 
     // Update invoice
-    if (newStatus !== invoice.status || Object.keys(updatePayload).length > 2) {
+    if (newStatus !== invoice.status || hasBilletUpdates) {
       await supabase
         .from("invoices")
         .update(updatePayload)
