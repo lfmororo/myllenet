@@ -24,6 +24,7 @@ import {
   Loader2,
   ShieldAlert,
   Router,
+  GitCompare,
 } from "lucide-react";
 import logoImg from "@/assets/logo.png";
 
@@ -33,6 +34,7 @@ const navItems = [
   { title: "Cobranças", url: "/cobrancas", icon: FileText },
   { title: "Notificações", url: "/notificacoes", icon: Bell },
   { title: "R3005G", url: "/r3005g", icon: Router },
+  { title: "Comparação PPPoE", url: "/pppoe-compare", icon: GitCompare },
   { title: "Logs EFI", url: "/logs-efi", icon: AlertTriangle },
   { title: "Configurações", url: "/settings", icon: Settings },
 ];
@@ -43,6 +45,7 @@ const pageTitles: Record<string, string> = {
   "/cobrancas": "Cobranças",
   "/notificacoes": "Notificações",
   "/r3005g": "R3005G - PPPoE",
+  "/pppoe-compare": "Comparação PPPoE",
   "/logs-efi": "Logs EFI",
   "/settings": "Configurações",
 };
