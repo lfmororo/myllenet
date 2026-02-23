@@ -27,7 +27,7 @@ export default function Dashboard() {
   const { user, isAdmin, loading: authLoading, signOut } = useAuth();
   const navigate = useNavigate();
   const { customers, loading, searchTerm, setSearchTerm, addCustomer, updateCustomer, deleteCustomer, toggleCustomerActive, exportCSV, bulkImport, refetch: refetchCustomers } = useCustomers();
-  const { invoices, allInvoices, loading: invoicesLoading, invoiceSearch, setInvoiceSearch, createBoleto, checkPayment, cancelInvoice, importFromEfi, bulkImportInvoices, bulkCheckPayments, bulkChecking, refetch: refetchInvoices } = useInvoices();
+  const { invoices, allInvoices, loading: invoicesLoading, invoiceSearch, setInvoiceSearch, createBoleto, checkPayment, cancelInvoice, markAsPaid, importFromEfi, bulkImportInvoices, bulkCheckPayments, bulkChecking, refetch: refetchInvoices } = useInvoices();
   const { plans } = usePlans();
 
   const [formOpen, setFormOpen] = useState(false);
@@ -207,21 +207,36 @@ export default function Dashboard() {
                         toast.error("Cadastre pelo menos um plano antes de gerar boletos em lote");
                         return;
                       }
-                      const defaultPlan = plans.find(p => p.ativo) || plans[0];
                       const now = new Date();
-                      const vencimento = new Date(now.getFullYear(), now.getMonth() + 1, 10).toISOString().slice(0, 10);
                       const mesNome = now.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
 
                       setBulkGenerating(true);
                       let success = 0;
                       let failed = 0;
                       for (const c of activeCustomersWithoutBoleto) {
+                        const customerPlan = plans.find(p => p.id === c.plan_id && p.ativo);
+                        const planToUse = customerPlan || plans.find(p => p.ativo) || plans[0];
+                        const diaVenc = c.dia_vencimento || 10;
+                        // Use current month+1 with the customer's day
+                        let vencMonth = now.getMonth();
+                        let vencYear = now.getFullYear();
+                        // If today is past the customer's due day, schedule for next month
+                        if (now.getDate() > diaVenc) {
+                          vencMonth += 1;
+                          if (vencMonth > 11) { vencMonth = 0; vencYear++; }
+                        }
+                        const vencimento = new Date(vencYear, vencMonth, diaVenc).toISOString().slice(0, 10);
+
+                        const valorFinal = customerPlan 
+                          ? Math.max(0, customerPlan.valor_centavos - (c.desconto_especial_centavos || 0))
+                          : planToUse.valor_centavos;
+
                         const ok = await createBoleto({
                           customer_id: c.id,
                           descricao: `Mensalidade Internet - ${mesNome}`,
-                          valor_centavos: defaultPlan.valor_centavos,
+                          valor_centavos: valorFinal,
                           vencimento,
-                          plan_id: defaultPlan.id,
+                          plan_id: planToUse.id,
                         });
                         if (ok) success++;
                         else failed++;
@@ -415,6 +430,7 @@ export default function Dashboard() {
                 invoices={invoices}
                 onCheckPayment={checkPayment}
                 onCancel={cancelInvoice}
+                onMarkAsPaid={markAsPaid}
               />
             )}
           </TabsContent>
