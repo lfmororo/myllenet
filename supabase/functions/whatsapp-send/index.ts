@@ -27,12 +27,18 @@ async function verifyAdmin(authHeader: string | null) {
   if (!authHeader?.startsWith("Bearer ")) {
     throw new Error("Unauthorized");
   }
-  const supabase = getSupabaseClient(authHeader);
   const token = authHeader.replace("Bearer ", "");
-  const { data, error } = await supabase.auth.getClaims(token);
-  if (error || !data?.claims) throw new Error("Unauthorized");
 
-  const userId = data.claims.sub as string;
+  // Allow service role key for server-to-server calls
+  if (token === Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")) {
+    return "service_role";
+  }
+
+  const supabase = getSupabaseClient(authHeader);
+  const { data: { user }, error } = await supabase.auth.getUser();
+  if (error || !user) throw new Error("Unauthorized");
+
+  const userId = user.id;
   const admin = getSupabaseAdmin();
   const { data: roleData } = await admin
     .from("user_roles")
