@@ -75,7 +75,7 @@ export default function Dashboard() {
     const now = new Date();
     const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0); // last day of current month
     return customers.filter(c => {
-      if (!c.ativo) return false;
+      if (!c.ativo || c.cortesia) return false;
       if (customerIdsWithInvoiceThisMonth.has(c.id)) return false;
       // If customer has pago_ate and it covers the current month, exclude
       if (c.pago_ate) {

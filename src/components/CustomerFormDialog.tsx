@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import type { Customer, CustomerInput } from "@/hooks/useCustomers";
 import type { Plan } from "@/hooks/usePlans";
 
@@ -42,10 +43,10 @@ const formatCurrency = (cents: number) =>
   (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 export default function CustomerFormDialog({ open, onOpenChange, customer, onSave, onUpdate, plans = [] }: Props) {
-  const [form, setForm] = useState<CustomerInput>({
+  const [form, setForm] = useState<CustomerInput & { cortesia: boolean }>({
     nome: "", cpf: "", email: "", telefone: "", usuario_pppoe: "", senha_pppoe: "",
     rua: null, numero: null, complemento: null, bairro: null, cidade: null, estado: null, cep: null,
-    dia_vencimento: 10, plan_id: null, desconto_especial_centavos: 0,
+    dia_vencimento: 10, plan_id: null, desconto_especial_centavos: 0, cortesia: false,
   });
   const [saving, setSaving] = useState(false);
 
@@ -57,12 +58,13 @@ export default function CustomerFormDialog({ open, onOpenChange, customer, onSav
         rua: customer.rua || null, numero: customer.numero || null, complemento: customer.complemento || null,
         bairro: customer.bairro || null, cidade: customer.cidade || null, estado: customer.estado || null, cep: customer.cep || null,
         dia_vencimento: customer.dia_vencimento, plan_id: customer.plan_id, desconto_especial_centavos: customer.desconto_especial_centavos,
+        cortesia: customer.cortesia ?? false,
       });
     } else {
       setForm({
         nome: "", cpf: "", email: "", telefone: "", usuario_pppoe: "", senha_pppoe: "",
         rua: null, numero: null, complemento: null, bairro: null, cidade: null, estado: null, cep: null,
-        dia_vencimento: 10, plan_id: null, desconto_especial_centavos: 0,
+        dia_vencimento: 10, plan_id: null, desconto_especial_centavos: 0, cortesia: false,
       });
     }
   }, [customer, open]);
@@ -173,6 +175,17 @@ export default function CustomerFormDialog({ open, onOpenChange, customer, onSav
                   />
                 </div>
                 <p className="text-xs text-muted-foreground">Desconto adicional ao do plano para este cliente</p>
+              </div>
+              <div className="flex items-center justify-between sm:col-span-2 rounded-lg border p-3 bg-muted/30">
+                <div>
+                  <Label htmlFor="cortesia" className="text-sm font-medium">Cortesia</Label>
+                  <p className="text-xs text-muted-foreground">Cliente cortesia não gera boleto</p>
+                </div>
+                <Switch
+                  id="cortesia"
+                  checked={form.cortesia}
+                  onCheckedChange={(checked) => setForm({ ...form, cortesia: checked })}
+                />
               </div>
             </div>
           </div>

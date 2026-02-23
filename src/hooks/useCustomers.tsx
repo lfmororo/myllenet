@@ -18,6 +18,7 @@ export interface Customer {
   estado: string | null;
   cep: string | null;
   ativo: boolean;
+  cortesia: boolean;
   dia_vencimento: number;
   plan_id: string | null;
   desconto_especial_centavos: number;
@@ -26,7 +27,7 @@ export interface Customer {
   updated_at: string;
 }
 
-export type CustomerInput = Omit<Customer, "id" | "created_at" | "updated_at" | "ativo" | "pago_ate">;
+export type CustomerInput = Omit<Customer, "id" | "created_at" | "updated_at" | "ativo" | "pago_ate" | "cortesia"> & { cortesia?: boolean };
 
 export function useCustomers() {
   const [customers, setCustomers] = useState<Customer[]>([]);
