@@ -97,6 +97,14 @@ function formatPhone(phone: string): string {
   if (!digits.startsWith("55")) {
     digits = "55" + digits;
   }
+  // Fix Brazilian mobile numbers missing the 9th digit
+  // Format should be 55 + DDD(2) + 9 + number(8) = 13 digits
+  // If 12 digits (55 + DDD + 8-digit number), insert 9 after DDD
+  if (digits.length === 12 && digits.startsWith("55")) {
+    const ddd = digits.substring(2, 4);
+    const number = digits.substring(4);
+    digits = `55${ddd}9${number}`;
+  }
   return digits;
 }
 
