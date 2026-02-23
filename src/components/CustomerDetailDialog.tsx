@@ -296,7 +296,20 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
                                 title="Marcar como pago"
                                 onClick={async () => {
                                   const { error } = await supabase.from("invoices").update({ status: "paid", paid_at: new Date().toISOString() }).eq("id", inv.id);
-                                  if (error) { toast.error("Erro ao marcar como pago"); } else { toast.success("Fatura marcada como paga"); fetchInvoices(); onCustomerUpdated?.(); }
+                                  if (error) { toast.error("Erro ao marcar como pago"); return; }
+                                  toast.success("Fatura marcada como paga"); fetchInvoices(); onCustomerUpdated?.();
+                                  try {
+                                    const { data: sd } = await supabase.auth.getSession();
+                                    const tk = sd?.session?.access_token;
+                                    if (tk) {
+                                      const pid = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+                                      const r = await fetch(`https://${pid}.supabase.co/functions/v1/whatsapp-send/notify-invoice`, {
+                                        method: "POST", headers: { Authorization: `Bearer ${tk}`, "Content-Type": "application/json", apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
+                                        body: JSON.stringify({ invoice_id: inv.id, type: "pagamento_confirmado" }),
+                                      });
+                                      if (r.ok) toast.success("Confirmação enviada ao cliente!");
+                                    }
+                                  } catch (e) { console.warn("Notify failed:", e); }
                                 }}
                               >
                                 <CheckCircle2 className="h-3.5 w-3.5" />
