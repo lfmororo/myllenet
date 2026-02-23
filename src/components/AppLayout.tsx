@@ -1,12 +1,11 @@
 import { useAuth } from "@/hooks/useAuth";
-import { Navigate, Outlet } from "react-router-dom";
+import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
   Sidebar,
   SidebarContent,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -36,33 +35,44 @@ const navItems = [
   { title: "Configurações", url: "/settings", icon: Settings },
 ];
 
+const pageTitles: Record<string, string> = {
+  "/dashboard": "Dashboard",
+  "/clientes": "Clientes",
+  "/cobrancas": "Cobranças",
+  "/notificacoes": "Notificações",
+  "/logs-efi": "Logs EFI",
+  "/settings": "Configurações",
+};
+
 function AppSidebar() {
   const { signOut, user } = useAuth();
 
   return (
-    <Sidebar className="border-r bg-card">
-      <div className="flex items-center gap-3 px-4 py-4 border-b">
-        <img src={logoImg} alt="MylleNet" className="h-9 w-9 rounded-lg object-contain" />
+    <Sidebar className="border-r border-sidebar-border">
+      {/* Logo area */}
+      <div className="flex items-center gap-3 px-5 py-5 border-b border-sidebar-border">
+        <img src={logoImg} alt="MylleNet" className="h-10 w-10 rounded-xl object-contain drop-shadow-lg" />
         <div className="overflow-hidden">
-          <h1 className="text-lg font-bold leading-tight truncate">Myllenet</h1>
-          <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+          <h1 className="text-base font-bold leading-tight truncate tracking-wide text-sidebar-primary">Myllenet</h1>
+          <p className="text-[11px] text-sidebar-foreground/60 truncate">{user?.email}</p>
         </div>
       </div>
-      <SidebarContent className="px-2 py-3">
+
+      <SidebarContent className="px-3 py-4">
         <SidebarGroup>
-          <SidebarGroupLabel className="text-xs font-semibold uppercase text-muted-foreground px-3 mb-1">Menu</SidebarGroupLabel>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-sidebar-foreground/40 px-3 mb-2">Navegação</p>
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu className="space-y-0.5">
               {navItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
                     <NavLink
                       to={item.url}
                       end={item.url === "/dashboard"}
-                      className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
-                      activeClassName="bg-primary/10 text-primary font-semibold"
+                      className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium transition-all duration-200 text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                      activeClassName="bg-sidebar-primary/15 text-sidebar-primary font-semibold shadow-sm"
                     >
-                      <item.icon className="h-4 w-4 shrink-0" />
+                      <item.icon className="h-[18px] w-[18px] shrink-0" />
                       <span>{item.title}</span>
                     </NavLink>
                   </SidebarMenuButton>
@@ -72,8 +82,13 @@ function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <div className="mt-auto border-t p-3">
-        <Button variant="ghost" className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground" onClick={signOut}>
+
+      <div className="mt-auto border-t border-sidebar-border p-3">
+        <Button
+          variant="ghost"
+          className="w-full justify-start gap-3 text-sidebar-foreground/50 hover:text-sidebar-foreground hover:bg-sidebar-accent text-[13px] rounded-lg"
+          onClick={signOut}
+        >
           <LogOut className="h-4 w-4" />
           Sair
         </Button>
@@ -83,12 +98,17 @@ function AppSidebar() {
 }
 
 export default function AppLayout() {
-  const { user, isAdmin, loading: authLoading } = useAuth();
+  const { user, isAdmin, loading: authLoading, signOut } = useAuth();
+  const location = useLocation();
+  const currentTitle = pageTitles[location.pathname] || "";
 
   if (authLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-3">
+          <img src={logoImg} alt="MylleNet" className="h-14 w-14 rounded-xl object-contain animate-pulse" />
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        </div>
       </div>
     );
   }
@@ -101,10 +121,8 @@ export default function AppLayout() {
         <div className="text-center space-y-4 max-w-md">
           <ShieldAlert className="mx-auto h-16 w-16 text-destructive" />
           <h1 className="text-2xl font-bold">Acesso Restrito</h1>
-          <p className="text-muted-foreground">
-            Sua conta não possui permissão de administrador.
-          </p>
-          <Button variant="outline" onClick={() => {}}>Sair</Button>
+          <p className="text-muted-foreground">Sua conta não possui permissão de administrador.</p>
+          <Button variant="outline" onClick={signOut}>Sair</Button>
         </div>
       </div>
     );
@@ -114,11 +132,12 @@ export default function AppLayout() {
     <SidebarProvider>
       <div className="flex min-h-screen w-full">
         <AppSidebar />
-        <div className="flex-1 flex flex-col">
-          <header className="border-b bg-card sticky top-0 z-10 h-14 flex items-center px-4 gap-3">
+        <div className="flex-1 flex flex-col min-w-0">
+          <header className="border-b bg-card/80 backdrop-blur-sm sticky top-0 z-10 h-14 flex items-center px-6 gap-4">
             <SidebarTrigger />
+            <h2 className="text-sm font-semibold text-foreground/80">{currentTitle}</h2>
           </header>
-          <main className="flex-1 container mx-auto px-4 py-6">
+          <main className="flex-1 px-6 py-6 overflow-auto">
             <Outlet />
           </main>
         </div>
