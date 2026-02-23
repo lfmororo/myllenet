@@ -86,92 +86,56 @@ async function getRouterInfo(baseUrl: string): Promise<{ sn: string; csrfprotect
 
 async function loginR3005G(
   baseUrl: string,
-  username: string,
-  password: string
+  encodedUser: string,
+  encodedPass: string
 ): Promise<string> {
-  const { sn, csrfprotect, captchaActive } = await getRouterInfo(baseUrl);
+  const { csrfprotect, captchaActive } = await getRouterInfo(baseUrl);
 
   if (captchaActive) {
-    throw new Error("Router captcha is active due to too many failed attempts. Please wait a few minutes or manually log in via browser to reset.");
+    throw new Error("Router captcha is active. Please wait a few minutes or manually log in via browser to reset.");
   }
 
-  const { keyStr, ivStr } = deriveKeyIV(sn);
+  // Send credentials exactly as the browser does - pre-encoded values
+  const payload = {
+    csrfprotect,
+    user: encodedUser,
+    password: encodedPass,
+    base64: 1,
+    tm: Date.now() / 1000,
+  };
 
-  // Try different credential encoding strategies (only ONE attempt to avoid triggering captcha)
-  // Strategy: simple base64 encoding (common for Intelbras routers)
-  const b64User = toBase64(username);
-  const b64Pass = toBase64(password);
-  // Strategy: AES-CBC encryption
-  const aesUser = aesEncrypt(username, keyStr, ivStr);
-  const aesPass = aesEncrypt(password, keyStr, ivStr);
-
-  const attempts = [
-    // 1. Simple base64 with base64 flag
-    { user: b64User, password: b64Pass, base64: 1 },
-    // 2. AES encrypted with base64 flag
-    { user: aesUser, password: aesPass, base64: 1 },
-    // 3. Plaintext with base64 flag (enCode/deCode cancel out)
-    { user: username, password: password, base64: 1 },
-  ];
+  console.log("R3005G login payload:", JSON.stringify({ ...payload, password: "***" }));
 
   const loginUrl = `${baseUrl}/log_in.cgi`;
+  const res = await fetch(loginUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json;charset=UTF-8",
+      Accept: "application/json, text/plain, */*",
+      Origin: baseUrl,
+      Referer: `${baseUrl}/login.html`,
+    },
+    body: JSON.stringify(payload),
+  });
 
-  for (let i = 0; i < attempts.length; i++) {
-    // Get fresh CSRF for each attempt (except first)
-    let csrf = csrfprotect;
-    if (i > 0) {
-      const info = await getRouterInfo(baseUrl);
-      if (info.captchaActive) {
-        throw new Error("Router captcha activated after failed attempts. Wait a few minutes and try again.");
-      }
-      csrf = info.csrfprotect;
-    }
+  const body = await res.text();
+  console.log("R3005G login response:", res.status, body);
 
-    const payload = {
-      csrfprotect: csrf,
-      ...attempts[i],
-      tm: Date.now() / 1000,
-    };
-
-    console.log(`R3005G login attempt ${i + 1}:`, JSON.stringify(payload).substring(0, 150));
-
-    const res = await fetch(loginUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json;charset=UTF-8",
-        Accept: "application/json, text/plain, */*",
-        Origin: baseUrl,
-        Referer: `${baseUrl}/login.html`,
-      },
-      body: JSON.stringify(payload),
-    });
-
-    const body = await res.text();
-    console.log(`R3005G login attempt ${i + 1} response:`, res.status, body);
-
-    let json: { code: number; error?: string };
-    try {
-      json = JSON.parse(body);
-    } catch {
-      continue;
-    }
-
-    if (json.code === 0) {
-      const setCookie = res.headers.get("set-cookie");
-      const cookie = setCookie ? setCookie.split(";")[0] : "";
-      console.log(`R3005G login SUCCESS on attempt ${i + 1} (strategy: ${["base64", "AES", "plaintext"][i]}), cookie:`, cookie ? "present" : "none");
-      return cookie;
-    }
-
-    console.log(`R3005G attempt ${i + 1} failed:`, json.error);
-
-    // If captcha activated or rate limited, stop
-    if (json.error?.includes("código de verificação") || json.error?.includes("restantes 1") || json.error?.includes("restantes 0")) {
-      throw new Error(`Login blocked: ${json.error}. Wait a few minutes and try again.`);
-    }
+  let json: { code: number; error?: string };
+  try {
+    json = JSON.parse(body);
+  } catch {
+    throw new Error(`Login returned non-JSON: ${body.substring(0, 200)}`);
   }
 
-  throw new Error("Login failed: all encoding strategies exhausted. Check username/password.");
+  if (json.code === 0) {
+    const setCookie = res.headers.get("set-cookie");
+    const cookie = setCookie ? setCookie.split(";")[0] : "";
+    console.log("R3005G login SUCCESS, cookie:", cookie ? "present" : "none");
+    return cookie;
+  }
+
+  throw new Error(`Login failed: ${json.error || JSON.stringify(json)}`);
 }
 
 async function fetchPPPoEUsers(
