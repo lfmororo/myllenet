@@ -104,7 +104,7 @@ export function useInvoices() {
               "Content-Type": "application/json",
               apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
             },
-            body: JSON.stringify({ invoice_id: result.invoice_id || result.id, type: "boleto_gerado" }),
+            body: JSON.stringify({ invoice_id: result.invoice?.id || result.invoice_id || result.id, type: "boleto_gerado" }),
           }
         );
         if (notifyResponse.ok) {
