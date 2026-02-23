@@ -48,7 +48,7 @@ function aesEncrypt(plaintext: string, keyStr: string, ivStr: string): string {
   return encrypted.toString();
 }
 
-async function getRouterInfo(baseUrl: string): Promise<{ sn: string; csrfprotect: string }> {
+async function getRouterInfo(baseUrl: string): Promise<{ sn: string; csrfprotect: string; captchaActive: boolean }> {
   // Fetch serial number from base_mini.data
   let sn = "";
   try {
@@ -57,25 +57,31 @@ async function getRouterInfo(baseUrl: string): Promise<{ sn: string; csrfprotect
     if (baseJson?.data) {
       const decoded = JSON.parse(fromBase64(baseJson.data));
       sn = decoded.gwsn || decoded.sn || "";
-      console.log("R3005G: SN found:", sn ? sn.substring(0, 4) + "..." : "empty");
+      console.log("R3005G: SN found:", sn);
     }
   } catch (e) {
     console.error("R3005G: Failed to fetch base_mini.data:", e);
   }
 
-  // Fetch CSRF token
+  // Fetch CSRF token and check captcha status
   let csrfprotect = Math.floor(Date.now() / 1000).toString();
+  let captchaActive = false;
   try {
     const csrfRes = await fetch(`${baseUrl}/csrfprotect.data`);
     const csrfJson = await csrfRes.json();
+    console.log("R3005G: csrfprotect.data response:", JSON.stringify(csrfJson));
     if (csrfJson?.data?.csrfprotect) {
       csrfprotect = csrfJson.data.csrfprotect;
+    }
+    // Check if captcha is active - when code.key is not empty, a captcha image is required
+    if (csrfJson?.data?.code?.key && csrfJson.data.code.key !== "") {
+      captchaActive = true;
     }
   } catch (e) {
     console.error("R3005G: Failed to fetch csrfprotect.data:", e);
   }
 
-  return { sn, csrfprotect };
+  return { sn, csrfprotect, captchaActive };
 }
 
 async function loginR3005G(
@@ -83,32 +89,41 @@ async function loginR3005G(
   username: string,
   password: string
 ): Promise<string> {
-  const { sn, csrfprotect } = await getRouterInfo(baseUrl);
+  const { sn, csrfprotect, captchaActive } = await getRouterInfo(baseUrl);
+
+  if (captchaActive) {
+    throw new Error("Router captcha is active due to too many failed attempts. Please wait a few minutes or manually log in via browser to reset.");
+  }
+
   const { keyStr, ivStr } = deriveKeyIV(sn);
 
-  // The router's Vue frontend uses enCode(AES encrypt) then deCode(AES decrypt) which cancel out,
-  // so the router actually receives plaintext. But base64:1 flag must be present.
-  // We also include `code: ""` as the router checks for verification code field.
-  
-  // Try AES-encrypted first (what the browser JS sends before the Vue deCode reverses it)
-  const encUser = aesEncrypt(username, keyStr, ivStr);
-  const encPass = aesEncrypt(password, keyStr, ivStr);
+  // Try different credential encoding strategies (only ONE attempt to avoid triggering captcha)
+  // Strategy: simple base64 encoding (common for Intelbras routers)
+  const b64User = toBase64(username);
+  const b64Pass = toBase64(password);
+  // Strategy: AES-CBC encryption
+  const aesUser = aesEncrypt(username, keyStr, ivStr);
+  const aesPass = aesEncrypt(password, keyStr, ivStr);
 
-  // Attempt 1: plaintext + code field (most likely what works)
-  // Attempt 2: AES encrypted  
   const attempts = [
-    { user: username, password: password, base64: 1, code: "" },
-    { user: username, password: password, code: "" },
-    { user: encUser, password: encPass, base64: 1, code: "" },
+    // 1. Simple base64 with base64 flag
+    { user: b64User, password: b64Pass, base64: 1 },
+    // 2. AES encrypted with base64 flag
+    { user: aesUser, password: aesPass, base64: 1 },
+    // 3. Plaintext with base64 flag (enCode/deCode cancel out)
+    { user: username, password: password, base64: 1 },
   ];
 
   const loginUrl = `${baseUrl}/log_in.cgi`;
 
   for (let i = 0; i < attempts.length; i++) {
-    // Get fresh CSRF for each attempt
+    // Get fresh CSRF for each attempt (except first)
     let csrf = csrfprotect;
     if (i > 0) {
       const info = await getRouterInfo(baseUrl);
+      if (info.captchaActive) {
+        throw new Error("Router captcha activated after failed attempts. Wait a few minutes and try again.");
+      }
       csrf = info.csrfprotect;
     }
 
@@ -118,7 +133,7 @@ async function loginR3005G(
       tm: Date.now() / 1000,
     };
 
-    console.log(`R3005G login attempt ${i + 1}:`, JSON.stringify(payload).substring(0, 120));
+    console.log(`R3005G login attempt ${i + 1}:`, JSON.stringify(payload).substring(0, 150));
 
     const res = await fetch(loginUrl, {
       method: "POST",
@@ -144,35 +159,19 @@ async function loginR3005G(
     if (json.code === 0) {
       const setCookie = res.headers.get("set-cookie");
       const cookie = setCookie ? setCookie.split(";")[0] : "";
-      console.log(`R3005G login success on attempt ${i + 1}, cookie:`, cookie ? "present" : "none");
+      console.log(`R3005G login SUCCESS on attempt ${i + 1} (strategy: ${["base64", "AES", "plaintext"][i]}), cookie:`, cookie ? "present" : "none");
       return cookie;
     }
 
     console.log(`R3005G attempt ${i + 1} failed:`, json.error);
-    
-    // If rate limited, stop trying
-    if (json.error?.includes("restantes 1") || json.error?.includes("restantes 0")) {
-      throw new Error(`Login rate limited: ${json.error}`);
+
+    // If captcha activated or rate limited, stop
+    if (json.error?.includes("código de verificação") || json.error?.includes("restantes 1") || json.error?.includes("restantes 0")) {
+      throw new Error(`Login blocked: ${json.error}. Wait a few minutes and try again.`);
     }
   }
 
-  throw new Error("Login failed: all attempts exhausted");
-
-  let json: { code: number; error?: string };
-  try {
-    json = JSON.parse(body);
-  } catch {
-    throw new Error(`Login parse error. Status: ${res.status}, Body: ${body}`);
-  }
-
-  if (json.code !== 0) {
-    throw new Error(`Login failed: ${json.error || body}`);
-  }
-
-  const setCookie = res.headers.get("set-cookie");
-  const cookie = setCookie ? setCookie.split(";")[0] : "";
-  console.log("R3005G login success, cookie:", cookie ? "present" : "none");
-  return cookie;
+  throw new Error("Login failed: all encoding strategies exhausted. Check username/password.");
 }
 
 async function fetchPPPoEUsers(
@@ -280,9 +279,15 @@ Deno.serve(async (req) => {
 
     if (action === "debug") {
       // Debug endpoint - return router info WITHOUT logging in
-      const { sn, csrfprotect } = await getRouterInfo(baseUrl);
+      const { sn, csrfprotect, captchaActive } = await getRouterInfo(baseUrl);
       const { keyStr, ivStr } = deriveKeyIV(sn);
       
+      // Show what base64 and AES encodings produce for comparison
+      const b64User = toBase64(routerUser!);
+      const b64Pass = toBase64(routerPass!);
+      const aesUser = aesEncrypt(routerUser!, keyStr, ivStr);
+      const aesPass = aesEncrypt(routerPass!, keyStr, ivStr);
+
       // Also fetch raw csrfprotect.data to see what's returned
       let rawCsrf = "fetch_failed";
       try {
@@ -291,26 +296,23 @@ Deno.serve(async (req) => {
       } catch (e) {
         rawCsrf = `error: ${e.message}`;
       }
-      
-      // Also fetch raw base_mini.data
-      let rawBase = "fetch_failed";
-      try {
-        const baseRes = await fetch(`${baseUrl}/base_mini.data`);
-        rawBase = await baseRes.text();
-      } catch (e) {
-        rawBase = `error: ${e.message}`;
-      }
 
       return new Response(
         JSON.stringify({ 
-          sn_prefix: sn.substring(0, 8), 
+          sn,
           sn_length: sn.length,
           csrfprotect, 
-          key_prefix: keyStr.substring(0, 6), 
-          iv_prefix: ivStr.substring(0, 6),
-          raw_csrf: rawCsrf.substring(0, 200),
-          raw_base: rawBase.substring(0, 200),
-          user_prefix: routerUser!.substring(0, 3),
+          captcha_active: captchaActive,
+          key: keyStr,
+          iv: ivStr,
+          encodings: {
+            b64_user: b64User,
+            b64_pass_prefix: b64Pass.substring(0, 10),
+            aes_user: aesUser,
+            aes_pass_prefix: aesPass.substring(0, 10),
+          },
+          raw_csrf: rawCsrf.substring(0, 300),
+          user: routerUser,
           pass_length: routerPass!.length,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -436,8 +438,8 @@ Deno.serve(async (req) => {
         );
       }
 
-      const { csrfprotect } = await getRouterInfo(baseUrl);
-      const result = await togglePPPoEUser(baseUrl, cookie, csrfprotect, usuario_pppoe, !!enable);
+      const { csrfprotect: toggleCsrf } = await getRouterInfo(baseUrl);
+      const result = await togglePPPoEUser(baseUrl, cookie, toggleCsrf, usuario_pppoe, !!enable);
 
       return new Response(JSON.stringify(result), {
         status: result.success ? 200 : 500,
