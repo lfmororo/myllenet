@@ -184,6 +184,33 @@ export function useInvoices() {
     }
     toast.success("Fatura marcada como paga");
     fetchInvoices();
+
+    // Send payment confirmation via WhatsApp
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      if (token) {
+        const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+        const response = await fetch(
+          `https://${projectId}.supabase.co/functions/v1/whatsapp-send/notify-invoice`,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            },
+            body: JSON.stringify({ invoice_id: invoiceId, type: "pagamento_confirmado" }),
+          }
+        );
+        if (response.ok) {
+          toast.success("Confirmação de pagamento enviada ao cliente!");
+        }
+      }
+    } catch (notifyErr) {
+      console.warn("WhatsApp payment confirm failed:", notifyErr);
+    }
+
     return true;
   };
 
