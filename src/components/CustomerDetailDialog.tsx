@@ -6,7 +6,7 @@ import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, ExternalLink, Copy, CheckCircle2, Clock, Import, CalendarCheck, X } from "lucide-react";
+import { Loader2, ExternalLink, Copy, CheckCircle2, Clock, Import, CalendarCheck, X, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import type { Customer } from "@/hooks/useCustomers";
 import type { Invoice } from "@/hooks/useInvoices";
@@ -286,6 +286,34 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
                             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => copyToClipboard(inv.efi_pix_copiacola!)} title="Copiar PIX">
                               <Copy className="h-3.5 w-3.5" />
                             </Button>
+                          )}
+                          {inv.status !== "paid" && inv.status !== "cancelled" && (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-green-600 hover:text-green-700"
+                                title="Marcar como pago"
+                                onClick={async () => {
+                                  const { error } = await supabase.from("invoices").update({ status: "paid", paid_at: new Date().toISOString() }).eq("id", inv.id);
+                                  if (error) { toast.error("Erro ao marcar como pago"); } else { toast.success("Fatura marcada como paga"); fetchInvoices(); onCustomerUpdated?.(); }
+                                }}
+                              >
+                                <CheckCircle2 className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-destructive hover:text-destructive"
+                                title="Cancelar fatura"
+                                onClick={async () => {
+                                  const { error } = await supabase.from("invoices").update({ status: "cancelled" }).eq("id", inv.id);
+                                  if (error) { toast.error("Erro ao cancelar"); } else { toast.success("Fatura cancelada"); fetchInvoices(); onCustomerUpdated?.(); }
+                                }}
+                              >
+                                <XCircle className="h-3.5 w-3.5" />
+                              </Button>
+                            </>
                           )}
                         </div>
                       </TableCell>
