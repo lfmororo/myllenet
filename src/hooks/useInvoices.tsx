@@ -84,9 +84,14 @@ export function useInvoices() {
       if (!response.ok) {
         if (response.status === 409) {
           toast.info(result.error || "Cobrança já existe para este vencimento");
-          return true; // Not a failure, just already exists
+          return true;
         }
-        toast.error(result.error || "Erro ao gerar boleto");
+        const errorMsg = result.error || "Erro ao gerar boleto";
+        if (errorMsg.includes("mesma pessoa")) {
+          toast.error("O CPF deste cliente é o mesmo do titular da conta EFI. A EFI não permite emitir boleto para si mesmo.");
+        } else {
+          toast.error(errorMsg);
+        }
         return false;
       }
 
