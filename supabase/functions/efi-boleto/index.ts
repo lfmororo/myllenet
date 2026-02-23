@@ -245,6 +245,7 @@ async function createBoleto(req: Request) {
   };
 
   try {
+    console.log("EFI boleto - CPF cliente enviado:", cpfClean, "| Nome:", customer.nome, "| Email:", customer.email);
     const efiResponse = await efiRequest("/v1/charge/one-step", "POST", chargeBody, "criar_boleto");
 
     const chargeData = efiResponse.data || efiResponse;
