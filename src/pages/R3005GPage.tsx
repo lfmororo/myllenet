@@ -209,7 +209,7 @@ export default function R3005GPage() {
                       <TableHead>Nome</TableHead>
                       <TableHead>Usuário PPPoE</TableHead>
                       <TableHead>Status Sistema</TableHead>
-                      <TableHead>Status Conexão</TableHead>
+                      <TableHead>Status Online</TableHead>
                       <TableHead>No Roteador</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -226,11 +226,11 @@ export default function R3005GPage() {
                         <TableCell>
                           {c.online ? (
                             <Badge className="bg-success/15 text-success border-success/30">
-                              <Wifi className="h-3 w-3 mr-1" /> Online
+                              <Wifi className="h-3 w-3 mr-1" /> Conectado
                             </Badge>
                           ) : (
                             <Badge variant="outline" className="text-muted-foreground">
-                              <WifiOff className="h-3 w-3 mr-1" /> Offline
+                              <WifiOff className="h-3 w-3 mr-1" /> Não logado
                             </Badge>
                           )}
                         </TableCell>
@@ -274,11 +274,11 @@ export default function R3005GPage() {
                           <TableCell>
                             {u.online ? (
                               <Badge className="bg-success/15 text-success border-success/30">
-                                <Wifi className="h-3 w-3 mr-1" /> Online
+                                <Wifi className="h-3 w-3 mr-1" /> Conectado
                               </Badge>
                             ) : (
                               <Badge variant="outline" className="text-muted-foreground">
-                                <WifiOff className="h-3 w-3 mr-1" /> Offline
+                                <WifiOff className="h-3 w-3 mr-1" /> Não logado
                               </Badge>
                             )}
                           </TableCell>
