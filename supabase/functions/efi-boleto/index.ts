@@ -270,6 +270,11 @@ async function checkPayment(req: Request) {
         .from("invoices")
         .update({ status: newStatus, paid_at: paidAt })
         .eq("id", invoiceId);
+
+      // Send notification if newly paid
+      if (newStatus === "paid") {
+        await sendPaymentNotification(supabase, invoiceId);
+      }
     }
 
     return new Response(
@@ -618,6 +623,77 @@ async function checkCustomerCharges(req: Request) {
   }
 }
 
+async function sendPaymentNotification(supabase: any, invoiceId: string) {
+  try {
+    const { data: invoice } = await supabase
+      .from("invoices")
+      .select("*, customers(nome, telefone, cpf)")
+      .eq("id", invoiceId)
+      .single();
+
+    if (!invoice) return;
+    const customer = (invoice as any).customers;
+    if (!customer?.telefone) {
+      // Log even if no phone
+      await supabase.from("notification_logs").insert({
+        customer_id: invoice.customer_id,
+        customer_name: customer?.nome || "Desconhecido",
+        phone: null,
+        type: "pagamento_confirmado",
+        message: `Pagamento confirmado: ${invoice.descricao}`,
+        status: "failed",
+        error_message: "Cliente sem telefone cadastrado",
+      });
+      return;
+    }
+
+    const valor = (invoice.valor_centavos / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+    const message = `Olá ${customer.nome}! 🌐\n\n✅ Pagamento confirmado!\n\n📋 ${invoice.descricao}\n💰 Valor: ${valor}\n\nObrigado por manter sua internet em dia! 🚀`;
+
+    const UAZAPI_BASE_URL = "https://ipazua.uazapi.com";
+    let token = "";
+    const { data: tokenData } = await supabase.from("settings").select("value").eq("key", "uazapi_token").maybeSingle();
+    token = tokenData?.value || Deno.env.get("UAZAPI_TOKEN") || "";
+
+    if (!token) {
+      await supabase.from("notification_logs").insert({
+        customer_id: invoice.customer_id,
+        customer_name: customer.nome,
+        phone: customer.telefone,
+        type: "pagamento_confirmado",
+        message,
+        status: "failed",
+        error_message: "Token WhatsApp não configurado",
+      });
+      return;
+    }
+
+    let digits = customer.telefone.replace(/\D/g, "");
+    if (!digits.startsWith("55")) digits = "55" + digits;
+
+    const response = await fetch(`${UAZAPI_BASE_URL}/send/text`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", token },
+      body: JSON.stringify({ number: digits, text: message }),
+    });
+
+    const responseText = await response.text();
+    console.log("Payment notification sent:", response.status, responseText.slice(0, 200));
+
+    await supabase.from("notification_logs").insert({
+      customer_id: invoice.customer_id,
+      customer_name: customer.nome,
+      phone: customer.telefone,
+      type: "pagamento_confirmado",
+      message,
+      status: response.ok ? "sent" : "failed",
+      error_message: response.ok ? null : responseText.slice(0, 500),
+    });
+  } catch (err) {
+    console.error("Payment notification error:", err);
+  }
+}
+
 async function bulkCheckPayments(req: Request) {
   const authHeader = req.headers.get("Authorization");
   await verifyAdmin(authHeader);
@@ -646,6 +722,7 @@ async function bulkCheckPayments(req: Request) {
 
   let updated = 0;
   let errors = 0;
+  const paidInvoiceIds: string[] = [];
 
   for (const inv of pendingInvoices) {
     try {
@@ -671,6 +748,11 @@ async function bulkCheckPayments(req: Request) {
           .update({ status: newStatus, paid_at: paidAt })
           .eq("id", inv.id);
         updated++;
+
+        // Track paid invoices for notification
+        if (newStatus === "paid") {
+          paidInvoiceIds.push(inv.id);
+        }
       }
     } catch (e) {
       console.error(`Error checking charge ${inv.efi_charge_id}:`, e);
@@ -678,8 +760,13 @@ async function bulkCheckPayments(req: Request) {
     }
   }
 
+  // Send WhatsApp notifications for newly paid invoices
+  for (const invoiceId of paidInvoiceIds) {
+    await sendPaymentNotification(supabase, invoiceId);
+  }
+
   return new Response(
-    JSON.stringify({ checked: pendingInvoices.length, updated, errors }),
+    JSON.stringify({ checked: pendingInvoices.length, updated, errors, notified: paidInvoiceIds.length }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } }
   );
 }
