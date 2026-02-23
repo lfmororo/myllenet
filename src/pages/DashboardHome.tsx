@@ -66,9 +66,9 @@ export default function DashboardHome() {
   // Status distribution for pie chart
   const statusData = useMemo(() => {
     return [
-      { name: "Pagos", value: stats.paidCount, color: "hsl(142, 71%, 45%)" },
-      { name: "Pendentes", value: stats.pendingCount, color: "hsl(48, 96%, 53%)" },
-      { name: "Vencidos", value: stats.overdueCount, color: "hsl(0, 84%, 60%)" },
+      { name: "Pagos", value: stats.paidCount, color: "hsl(var(--success))" },
+      { name: "Pendentes", value: stats.pendingCount, color: "hsl(var(--warning))" },
+      { name: "Vencidos", value: stats.overdueCount, color: "hsl(var(--destructive))" },
     ].filter(d => d.value > 0);
   }, [stats]);
 
@@ -81,7 +81,7 @@ export default function DashboardHome() {
       const name = plan?.nome || "Sem plano";
       planMap.set(name, (planMap.get(name) || 0) + 1);
     }
-    const colors = ["hsl(220, 70%, 55%)", "hsl(160, 60%, 45%)", "hsl(280, 60%, 55%)", "hsl(30, 80%, 55%)", "hsl(340, 70%, 55%)"];
+    const colors = ["hsl(var(--primary))", "hsl(var(--accent))", "hsl(var(--success))", "hsl(var(--warning))", "hsl(var(--destructive))"];
     return Array.from(planMap.entries()).map(([name, value], i) => ({
       name,
       value,
@@ -101,40 +101,40 @@ export default function DashboardHome() {
 
       {/* KPI Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
+        <Card className="border-l-4 border-l-primary">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Clientes Ativos</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+            <div className="rounded-lg bg-primary/10 p-2"><Users className="h-4 w-4 text-primary" /></div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.activeCustomers}</div>
             <p className="text-xs text-muted-foreground">{stats.inactiveCustomers} inativos</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="border-l-4 border-l-success">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Recebido</CardTitle>
-            <DollarSign className="h-4 w-4 text-green-500" />
+            <div className="rounded-lg bg-success/10 p-2"><DollarSign className="h-4 w-4 text-success" /></div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{formatCurrency(stats.totalReceived)}</div>
+            <div className="text-2xl font-bold text-success">{formatCurrency(stats.totalReceived)}</div>
             <p className="text-xs text-muted-foreground">{stats.paidCount} faturas pagas</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="border-l-4 border-l-warning">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Pendente</CardTitle>
-            <TrendingUp className="h-4 w-4 text-yellow-500" />
+            <div className="rounded-lg bg-warning/10 p-2"><TrendingUp className="h-4 w-4 text-warning" /></div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-yellow-600">{formatCurrency(stats.totalPending)}</div>
+            <div className="text-2xl font-bold text-warning">{formatCurrency(stats.totalPending)}</div>
             <p className="text-xs text-muted-foreground">{stats.pendingCount} faturas pendentes</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="border-l-4 border-l-destructive">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Vencido</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-destructive" />
+            <div className="rounded-lg bg-destructive/10 p-2"><AlertTriangle className="h-4 w-4 text-destructive" /></div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-destructive">{formatCurrency(stats.totalOverdue)}</div>
@@ -160,8 +160,8 @@ export default function DashboardHome() {
                   formatter={(value: number) => [`R$ ${value.toFixed(2).replace(".", ",")}`, ""]}
                   contentStyle={{ borderRadius: "8px", border: "1px solid hsl(var(--border))", background: "hsl(var(--card))" }}
                 />
-                <Bar dataKey="recebido" name="Recebido" fill="hsl(142, 71%, 45%)" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="pendente" name="Pendente" fill="hsl(48, 96%, 53%)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="recebido" name="Recebido" fill="hsl(var(--success))" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="pendente" name="Pendente" fill="hsl(var(--warning))" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
