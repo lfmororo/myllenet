@@ -190,6 +190,28 @@ export default function CustomersPage() {
           <Button variant="outline" onClick={exportCSV} className="flex-1 sm:flex-none">
             <Download className="mr-2 h-4 w-4" /> Exportar CSV
           </Button>
+          <Button variant="outline" onClick={() => {
+            const activeCustomers = customers.filter(c => c.ativo);
+            if (activeCustomers.length === 0) { toast.error("Nenhum cliente ativo"); return; }
+            const planMap = Object.fromEntries(plans.map(p => [p.id, p]));
+            const header = "name,password,type,state,IPaddr_start,IPaddr_end,MACaddr,date,mem,num,up_speed,down_speed,mode_speed,modify_passwd,UserID,admin,mobile,lock,vlan,group,timeout";
+            const rows = activeCustomers.map(c => {
+              const plan = c.plan_id ? planMap[c.plan_id] : null;
+              const group = plan?.nome_servidor || "Default";
+              return [c.usuario_pppoe, c.senha_pppoe, "pppoe", "", "0.0.0.0", "0.0.0.0", "", "0", ">>>>>>", "1", "0", "0", "dl", "1", "0", "0", "0", "0", "0/0", group, "-"].join(",");
+            });
+            const csv = [header, ...rows].join("\n");
+            const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = `r3005g_users_${new Date().toISOString().slice(0, 10)}.csv`;
+            link.click();
+            URL.revokeObjectURL(url);
+            toast.success("Arquivo R3005G exportado!");
+          }} className="flex-1 sm:flex-none">
+            <Download className="mr-2 h-4 w-4" /> Exportar R3005G
+          </Button>
           <Button variant="outline" onClick={() => setCsvImportOpen(true)} className="flex-1 sm:flex-none">
             <Upload className="mr-2 h-4 w-4" /> Importar CSV
           </Button>
