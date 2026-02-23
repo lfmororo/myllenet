@@ -51,7 +51,7 @@ function AppSidebar() {
   const { signOut, user } = useAuth();
 
   return (
-    <Sidebar className="border-r border-sidebar-border">
+    <Sidebar collapsible="offcanvas" className="border-r border-sidebar-border">
       {/* Logo area */}
       <div className="flex items-center gap-3 px-5 py-5 border-b border-sidebar-border">
         <img src={logoImg} alt="MylleNet" className="h-10 w-10 rounded-xl object-contain drop-shadow-lg" />
