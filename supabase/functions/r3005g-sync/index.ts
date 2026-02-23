@@ -54,6 +54,19 @@ function tryDecrypt(encryptedDoubleB64: string, key: CryptoJS.lib.WordArray, iv:
   return null;
 }
 
+// Encrypt a plaintext string to match router's format (for encrypt-and-compare)
+function tryEncrypt(plaintext: string, key: CryptoJS.lib.WordArray, iv: CryptoJS.lib.WordArray): string {
+  const encrypted = CryptoJS.AES.encrypt(plaintext, key, {
+    iv, mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.ZeroPadding,
+  });
+  const innerB64 = encrypted.toString(); // base64 of ciphertext
+  // Double base64 encode to match router format
+  const bytes = new TextEncoder().encode(innerB64);
+  let binary = "";
+  for (const b of bytes) binary += String.fromCharCode(b);
+  return btoa(binary);
+}
+
 function getAllKeyApproaches(serialNumber: string): Array<{ name: string; key: CryptoJS.lib.WordArray; iv: CryptoJS.lib.WordArray }> {
   const combined = serialNumber + AES_CONSTANT;
   const reversed = AES_CONSTANT + serialNumber;
@@ -88,7 +101,7 @@ async function getRouterInfo(baseUrl: string): Promise<{ csrfprotect: string; ca
   return { csrfprotect, captchaActive };
 }
 
-async function loginR3005G(baseUrl: string, plainUser: string, plainPass: string): Promise<string> {
+async function loginR3005G(baseUrl: string, plainUser: string, plainPass: string): Promise<{ cookie: string; loginData: Record<string, unknown> }> {
   const { csrfprotect, captchaActive } = await getRouterInfo(baseUrl);
   if (captchaActive) throw new Error("Router captcha ativo.");
   const payload = { csrfprotect, user: encodeCredential(plainUser), password: encodeCredential(plainPass), base64: 1, tm: Date.now() / 1000 };
@@ -98,11 +111,13 @@ async function loginR3005G(baseUrl: string, plainUser: string, plainPass: string
     body: JSON.stringify(payload),
   });
   const body = await res.text();
-  let json: { code: number; error?: string };
+  let json: Record<string, unknown>;
   try { json = JSON.parse(body); } catch { throw new Error(`Login non-JSON: ${body.substring(0, 200)}`); }
+  console.log("R3005G LOGIN response:", JSON.stringify(json).substring(0, 500));
   if (json.code === 0) {
     const setCookie = res.headers.get("set-cookie");
-    return setCookie ? setCookie.split(";")[0] : "";
+    const cookie = setCookie ? setCookie.split(";")[0] : "";
+    return { cookie, loginData: json };
   }
   throw new Error(`Login falhou: ${json.error || JSON.stringify(json)}`);
 }
@@ -286,7 +301,25 @@ Deno.serve(async (req) => {
 
     const urlObj = new URL(req.url);
     const action = urlObj.pathname.split("/").pop();
-    const cookie = await loginR3005G(baseUrl, routerUser, routerPass);
+    const { cookie, loginData } = await loginR3005G(baseUrl, routerUser, routerPass);
+
+    // Extract SN from login response
+    let loginSN: string | null = null;
+    const searchLoginData = (obj: Record<string, unknown>) => {
+      for (const [k, v] of Object.entries(obj)) {
+        const kl = k.toLowerCase();
+        if ((kl === "sn" || kl === "serial" || kl === "serial_number" || kl === "serialnumber" || kl === "devicesn") && typeof v === "string" && v.length > 4) {
+          return v;
+        }
+        if (typeof v === "object" && v && !Array.isArray(v)) {
+          const found = searchLoginData(v as Record<string, unknown>);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+    loginSN = searchLoginData(loginData);
+    if (loginSN) console.log("R3005G: SN from login:", loginSN);
 
     // ACTION: discover
     if (action === "discover") {
@@ -296,12 +329,11 @@ Deno.serve(async (req) => {
         fetchRawUsers(baseUrl, cookie),
       ]);
 
-      const effectiveSN = serialNumber || jsKey;
+      const effectiveSN = loginSN || serialNumber || jsKey;
       const firstUser = routerUsers[0] as Record<string, unknown> | undefined;
       const testEncrypted = firstUser?.user as string || "";
 
-      console.log("R3005G DISCOVER: SN from endpoints:", serialNumber);
-      console.log("R3005G DISCOVER: Key from JS:", jsKey);
+      console.log("R3005G DISCOVER: SN login:", loginSN, "endpoints:", serialNumber, "JS:", jsKey);
       console.log("R3005G DISCOVER: First user:", JSON.stringify(firstUser));
 
       const decryptionResults: Record<string, string | null> = {};
@@ -314,7 +346,7 @@ Deno.serve(async (req) => {
       }
 
       return new Response(JSON.stringify({
-        serial_number: serialNumber, js_key: jsKey,
+        serial_number: serialNumber, login_sn: loginSN, js_key: jsKey,
         total_users: routerUsers.length, first_user_encrypted: testEncrypted,
         decryption_results: decryptionResults,
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -328,22 +360,24 @@ Deno.serve(async (req) => {
         fetchRawUsers(baseUrl, cookie),
       ]);
 
-      const effectiveSN = serialNumber || jsKey;
-      console.log(`R3005G STATUS: SN=${effectiveSN || "NOT FOUND"}, jsKey=${jsKey || "NOT FOUND"}, users=${routerUsers.length}`);
+      const snCandidates = [loginSN, serialNumber, jsKey].filter(Boolean) as string[];
+      console.log(`R3005G STATUS: SN candidates=[${snCandidates.join(", ") || "NONE"}], users=${routerUsers.length}`);
 
-      // Find working decryption
+      // Try each SN candidate with each key approach
       let workingApproach: { key: CryptoJS.lib.WordArray; iv: CryptoJS.lib.WordArray } | null = null;
-      if (effectiveSN) {
-        const testEnc = (routerUsers[0] as Record<string, unknown>)?.user as string;
-        if (testEnc) {
-          for (const a of getAllKeyApproaches(effectiveSN)) {
+      const testEnc = (routerUsers[0] as Record<string, unknown>)?.user as string;
+      
+      if (testEnc) {
+        for (const sn of snCandidates) {
+          for (const a of getAllKeyApproaches(sn)) {
             const result = tryDecrypt(testEnc, a.key, a.iv);
             if (result && /^[a-zA-Z0-9._@\-]+$/.test(result)) {
-              console.log(`R3005G STATUS: Using "${a.name}", test="${result}"`);
+              console.log(`R3005G STATUS: ✅ SN="${sn}", approach="${a.name}", test="${result}"`);
               workingApproach = { key: a.key, iv: a.iv };
               break;
             }
           }
+          if (workingApproach) break;
         }
       }
 
@@ -359,41 +393,81 @@ Deno.serve(async (req) => {
 
       console.log(`R3005G STATUS: Decrypted ${routerUserMap.size}/${routerUsers.length}`);
 
-      // FALLBACK: Check if user field might already be plaintext or try direct field matching
-      if (routerUserMap.size === 0) {
-        console.log("R3005G STATUS: Trying plaintext/direct field matching fallback...");
+      // ENCRYPT-AND-COMPARE FALLBACK: encrypt known usernames and match against router data
+      if (routerUserMap.size === 0 && testEnc) {
+        console.log("R3005G STATUS: Trying encrypt-and-compare fallback...");
         
-        // Check ALL possible username fields in router data
-        const possibleFields = ["user", "name", "username", "userid", "UserID", "pppoe_user", "account", "login", "mem", "mac"];
-        const firstUser = routerUsers[0] as Record<string, unknown>;
+        // Get a few known usernames to test
+        const { data: testCustomers } = await serviceClient.from("customers").select("usuario_pppoe").limit(10);
+        const knownUsernames = (testCustomers || []).map(c => c.usuario_pppoe).filter(Boolean);
         
-        for (const field of possibleFields) {
-          const val = firstUser?.[field];
-          if (val && typeof val === "string") {
-            console.log(`R3005G FALLBACK: field "${field}" = "${String(val).substring(0, 80)}"`);
-          }
-        }
+        // Build encrypted set from router
+        const routerEncryptedUsers = new Set(routerUsers.map((ru: Record<string, unknown>) => ru.user as string));
         
-        // Try treating 'user' or 'name' as plaintext username
-        for (const field of ["name", "user", "username", "userid", "UserID", "account"]) {
-          let matched = 0;
-          const testMap = new Map<string, Record<string, unknown>>();
-          for (const ru of routerUsers) {
-            const ruObj = ru as Record<string, unknown>;
-            const val = ruObj[field] as string;
-            if (val && typeof val === "string") {
-              testMap.set(val.toLowerCase(), ruObj);
+        // Try the `mem` field as potential SN (same for all users: "UHNMSTFrMjVHZDMzN3ZmeGtBeWIxQT09")
+        const memVal = (routerUsers[0] as Record<string, unknown>)?.mem as string;
+        let memDecoded = memVal;
+        try { memDecoded = atob(memVal); } catch { /* keep */ }
+        try { memDecoded = atob(memDecoded); } catch { /* keep */ }
+        
+        const additionalSNs = [memVal, memDecoded];
+        if (memVal) console.log(`R3005G ENCRYPT-COMPARE: mem raw="${memVal}", decoded="${memDecoded}"`);
+        
+        // Try all SN candidates including mem-derived ones
+        const allSNs = [...snCandidates, ...additionalSNs].filter(Boolean) as string[];
+        
+        for (const sn of allSNs) {
+          for (const approach of getAllKeyApproaches(sn)) {
+            let matches = 0;
+            for (const username of knownUsernames) {
+              const encrypted = tryEncrypt(username, approach.key, approach.iv);
+              if (routerEncryptedUsers.has(encrypted)) {
+                matches++;
+              }
+            }
+            if (matches > 0) {
+              console.log(`R3005G ENCRYPT-COMPARE: ✅ SN="${sn.substring(0, 20)}", approach="${approach.name}" matched ${matches}/${knownUsernames.length}`);
+              workingApproach = { key: approach.key, iv: approach.iv };
+              // Now decrypt all router users with this approach
+              for (const ru of routerUsers) {
+                const ruObj = ru as Record<string, unknown>;
+                const dec = tryDecrypt(ruObj.user as string, approach.key, approach.iv);
+                if (dec) routerUserMap.set(dec.toLowerCase(), ruObj);
+              }
+              break;
             }
           }
-          // Check if any known customer PPPoE matches
-          const { data: customers } = await serviceClient.from("customers").select("usuario_pppoe");
-          for (const c of customers || []) {
-            if (testMap.has(c.usuario_pppoe?.toLowerCase())) matched++;
+          if (routerUserMap.size > 0) break;
+        }
+        
+        // If still nothing, try direct plaintext field matching
+        if (routerUserMap.size === 0) {
+          console.log("R3005G STATUS: Trying plaintext field matching...");
+          const possibleFields = ["user", "name", "username", "userid", "UserID", "account"];
+          const firstUser = routerUsers[0] as Record<string, unknown>;
+          for (const field of possibleFields) {
+            const val = firstUser?.[field];
+            if (val && typeof val === "string") {
+              console.log(`R3005G FALLBACK: field "${field}" = "${String(val).substring(0, 80)}"`);
+            }
           }
-          if (matched > 0) {
-            console.log(`R3005G FALLBACK: ✅ field "${field}" matched ${matched} customers! Using this field.`);
-            for (const [k, v] of testMap) routerUserMap.set(k, v);
-            break;
+          
+          for (const field of ["name", "user", "username", "account"]) {
+            const testMap = new Map<string, Record<string, unknown>>();
+            for (const ru of routerUsers) {
+              const ruObj = ru as Record<string, unknown>;
+              const val = ruObj[field] as string;
+              if (val && typeof val === "string") testMap.set(val.toLowerCase(), ruObj);
+            }
+            let matched = 0;
+            for (const username of knownUsernames) {
+              if (testMap.has(username.toLowerCase())) matched++;
+            }
+            if (matched > 0) {
+              console.log(`R3005G FALLBACK: ✅ field "${field}" matched ${matched}!`);
+              for (const [k, v] of testMap) routerUserMap.set(k, v);
+              break;
+            }
           }
         }
         
