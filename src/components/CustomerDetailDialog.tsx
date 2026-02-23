@@ -303,6 +303,17 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
                                     const tk = sd?.session?.access_token;
                                     if (tk) {
                                       const pid = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+                                      // Cancel on EFI if has charge_id
+                                      if (inv.efi_charge_id) {
+                                        try {
+                                          const cr = await fetch(`https://${pid}.supabase.co/functions/v1/efi-boleto/cancel`, {
+                                            method: "POST", headers: { Authorization: `Bearer ${tk}`, "Content-Type": "application/json", apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
+                                            body: JSON.stringify({ charge_id: inv.efi_charge_id }),
+                                          });
+                                          if (cr.ok) toast.success("Cobrança cancelada na EFI");
+                                        } catch (e) { console.warn("EFI cancel failed:", e); }
+                                      }
+                                      // WhatsApp notification
                                       const r = await fetch(`https://${pid}.supabase.co/functions/v1/whatsapp-send/notify-invoice`, {
                                         method: "POST", headers: { Authorization: `Bearer ${tk}`, "Content-Type": "application/json", apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
                                         body: JSON.stringify({ invoice_id: inv.id, type: "pagamento_confirmado" }),
