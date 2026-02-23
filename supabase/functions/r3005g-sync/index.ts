@@ -208,14 +208,42 @@ async function fetchKeyFromJS(baseUrl: string, cookie: string): Promise<string |
 }
 
 async function fetchRawUsers(baseUrl: string, cookie: string): Promise<Record<string, unknown>[]> {
-  const res = await fetch(`${baseUrl}/user.data`, { headers: { Cookie: cookie } });
-  if (!res.ok) throw new Error(`user.data failed: ${res.status}`);
-  const json = await res.json();
-  let userData = json.data;
-  if (typeof json.data === "string") {
-    try { userData = JSON.parse(fromBase64(json.data)); } catch { /* keep */ }
+  // Try multiple endpoints for PPPoE user data
+  const endpoints = ["user.data", "pppoeUser.data", "pppoe_user.data", "pppoe.data", "pppoeUserIndex.data"];
+  
+  for (const ep of endpoints) {
+    try {
+      const res = await fetch(`${baseUrl}/${ep}`, { headers: { Cookie: cookie } });
+      if (!res.ok) { console.log(`R3005G fetchUsers: ${ep} => ${res.status}`); continue; }
+      const text = await res.text();
+      let json;
+      try { json = JSON.parse(text); } catch { console.log(`R3005G fetchUsers: ${ep} not JSON`); continue; }
+      
+      console.log(`R3005G fetchUsers: ${ep} code=${json.code}, dataType=${typeof json.data}`);
+      
+      let userData = json.data;
+      if (typeof json.data === "string") {
+        try { 
+          const decoded = fromBase64(json.data);
+          userData = JSON.parse(decoded);
+          console.log(`R3005G fetchUsers: ${ep} decoded from base64`);
+        } catch { /* keep */ }
+      }
+      
+      const users = userData?.all || userData?.list || (Array.isArray(userData) ? userData : []);
+      if (users.length > 0) {
+        // Log first 3 users with ALL their fields
+        console.log(`R3005G fetchUsers: ${ep} found ${users.length} users`);
+        for (let i = 0; i < Math.min(3, users.length); i++) {
+          console.log(`R3005G USER[${i}] keys:`, Object.keys(users[i]).join(", "));
+          console.log(`R3005G USER[${i}] data:`, JSON.stringify(users[i]).substring(0, 500));
+        }
+        return users;
+      }
+    } catch (e) { console.log(`R3005G fetchUsers: ${ep} error:`, e.message); }
   }
-  return userData?.all || userData?.list || (Array.isArray(userData) ? userData : []);
+  
+  throw new Error("No PPPoE user data found from any endpoint");
 }
 
 Deno.serve(async (req) => {
@@ -330,6 +358,48 @@ Deno.serve(async (req) => {
       }
 
       console.log(`R3005G STATUS: Decrypted ${routerUserMap.size}/${routerUsers.length}`);
+
+      // FALLBACK: Check if user field might already be plaintext or try direct field matching
+      if (routerUserMap.size === 0) {
+        console.log("R3005G STATUS: Trying plaintext/direct field matching fallback...");
+        
+        // Check ALL possible username fields in router data
+        const possibleFields = ["user", "name", "username", "userid", "UserID", "pppoe_user", "account", "login", "mem", "mac"];
+        const firstUser = routerUsers[0] as Record<string, unknown>;
+        
+        for (const field of possibleFields) {
+          const val = firstUser?.[field];
+          if (val && typeof val === "string") {
+            console.log(`R3005G FALLBACK: field "${field}" = "${String(val).substring(0, 80)}"`);
+          }
+        }
+        
+        // Try treating 'user' or 'name' as plaintext username
+        for (const field of ["name", "user", "username", "userid", "UserID", "account"]) {
+          let matched = 0;
+          const testMap = new Map<string, Record<string, unknown>>();
+          for (const ru of routerUsers) {
+            const ruObj = ru as Record<string, unknown>;
+            const val = ruObj[field] as string;
+            if (val && typeof val === "string") {
+              testMap.set(val.toLowerCase(), ruObj);
+            }
+          }
+          // Check if any known customer PPPoE matches
+          const { data: customers } = await serviceClient.from("customers").select("usuario_pppoe");
+          for (const c of customers || []) {
+            if (testMap.has(c.usuario_pppoe?.toLowerCase())) matched++;
+          }
+          if (matched > 0) {
+            console.log(`R3005G FALLBACK: ✅ field "${field}" matched ${matched} customers! Using this field.`);
+            for (const [k, v] of testMap) routerUserMap.set(k, v);
+            break;
+          }
+        }
+        
+        console.log(`R3005G STATUS: After fallback: ${routerUserMap.size} mapped`);
+      }
+
       if (routerUserMap.size > 0) {
         console.log("R3005G STATUS: Samples:", [...routerUserMap.keys()].slice(0, 5).join(", "));
       }
@@ -342,7 +412,7 @@ Deno.serve(async (req) => {
         const routerMatch = routerUserMap.get(pppoeUser);
         return {
           id: c.id, nome: c.nome, usuario_pppoe: c.usuario_pppoe, ativo: c.ativo,
-          online: routerMatch ? routerMatch.cstate === 97 : false,
+          online: routerMatch ? (routerMatch.cstate === 97 || routerMatch.state === "on" || routerMatch.online === true || routerMatch.online === 1) : false,
           found_in_router: !!routerMatch,
         };
       });
@@ -350,14 +420,19 @@ Deno.serve(async (req) => {
       const notInSystem: Array<{ usuario_pppoe: string; online: boolean }> = [];
       for (const [username, ruObj] of routerUserMap) {
         if (!customerPPPoEs.has(username)) {
-          notInSystem.push({ usuario_pppoe: username, online: ruObj.cstate === 97 });
+          notInSystem.push({ 
+            usuario_pppoe: username, 
+            online: ruObj.cstate === 97 || ruObj.state === "on" || ruObj.online === true || ruObj.online === 1,
+          });
         }
       }
 
       return new Response(JSON.stringify({
         customers: result, not_in_system: notInSystem,
         total_router_users: routerUsers.length,
-        total_connected: routerUsers.filter((u: Record<string, unknown>) => u.cstate === 97).length,
+        total_connected: routerUsers.filter((u: Record<string, unknown>) => 
+          u.cstate === 97 || u.state === "on" || u.online === true || u.online === 1
+        ).length,
         decryption_success: routerUserMap.size > 0, decrypted_count: routerUserMap.size,
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
