@@ -75,6 +75,7 @@ export function useCustomers() {
 
     // Send welcome notification via WhatsApp
     const phone = customer.telefone;
+    console.log("Welcome WhatsApp check - telefone:", JSON.stringify(phone), "inserted:", inserted?.id);
     if (phone && phone.trim()) {
       try {
         const { data: sessionData } = await supabase.auth.getSession();
