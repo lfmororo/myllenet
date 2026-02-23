@@ -14,8 +14,21 @@ function decodeBase64(encoded: string): string {
   }
 }
 
-function toBase64(str: string): string {
-  return btoa(str);
+async function getCsrfToken(baseUrl: string): Promise<string> {
+  try {
+    const res = await fetch(`${baseUrl}/login.html`, { redirect: "follow" });
+    const html = await res.text();
+    // Try to find csrfprotect in the HTML/JS
+    const match = html.match(/csrfprotect["']?\s*[:=]\s*["']?([0-9a-zA-Z]+)["']?/);
+    if (match) {
+      console.log("CSRF token found:", match[1]);
+      return match[1];
+    }
+  } catch (e) {
+    console.log("Could not fetch CSRF token:", e);
+  }
+  // Fallback: use timestamp like the browser does
+  return Math.floor(Date.now() / 1000).toString();
 }
 
 async function loginR3005G(
@@ -23,24 +36,26 @@ async function loginR3005G(
   username: string,
   password: string
 ): Promise<string> {
-  const now = Date.now() / 1000;
-  const csrfprotect = Math.floor(now).toString();
-  
+  const csrfprotect = await getCsrfToken(baseUrl);
+  const tm = Date.now() / 1000;
+
   const payload = {
     csrfprotect,
-    user: toBase64(username),
-    password: toBase64(password),
-    tm: now,
+    user: btoa(username),
+    password: btoa(password),
+    tm,
     base64: 1,
   };
 
-  console.log("R3005G login payload (without creds):", { csrfprotect, tm: now, base64: 1 });
+  console.log("R3005G login to:", `${baseUrl}/log_in.cgi`, "csrf:", csrfprotect);
 
   const res = await fetch(`${baseUrl}/log_in.cgi`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json;charset=UTF-8",
       "Accept": "application/json, text/plain, */*",
+      "Origin": baseUrl,
+      "Referer": `${baseUrl}/login.html`,
     },
     body: JSON.stringify(payload),
   });
@@ -59,9 +74,10 @@ async function loginR3005G(
     throw new Error(`Login failed: ${json.error || body}`);
   }
 
-  // Try to get cookie if present, otherwise proceed without
+  // Get cookie if present
   const setCookie = res.headers.get("set-cookie");
   const cookie = setCookie ? setCookie.split(";")[0] : "";
+  console.log("R3005G login success, cookie:", cookie ? "present" : "none");
   return cookie;
 }
 
