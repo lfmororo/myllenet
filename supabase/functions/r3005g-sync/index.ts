@@ -227,13 +227,29 @@ Deno.serve(async (req) => {
       });
     }
 
-    const baseUrl = Deno.env.get("R3005G_URL");
-    const routerUser = Deno.env.get("R3005G_USERNAME");
-    const routerPass = Deno.env.get("R3005G_PASSWORD");
+    // Read R3005G credentials from settings table
+    const serviceClient = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+
+    const { data: settingsData } = await serviceClient
+      .from("settings")
+      .select("key, value")
+      .in("key", ["r3005g_url", "r3005g_username", "r3005g_password"]);
+
+    const settings: Record<string, string> = {};
+    for (const row of settingsData || []) {
+      if (row.key && row.value) settings[row.key] = row.value;
+    }
+
+    const baseUrl = settings["r3005g_url"] || Deno.env.get("R3005G_URL");
+    const routerUser = settings["r3005g_username"] || Deno.env.get("R3005G_USERNAME");
+    const routerPass = settings["r3005g_password"] || Deno.env.get("R3005G_PASSWORD");
 
     if (!baseUrl || !routerUser || !routerPass) {
       return new Response(
-        JSON.stringify({ error: "R3005G credentials not configured" }),
+        JSON.stringify({ error: "R3005G não configurado. Vá em Configurações > R3005G para definir URL e credenciais." }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -303,10 +319,6 @@ Deno.serve(async (req) => {
     }));
 
     if (action === "status") {
-      const serviceClient = createClient(
-        Deno.env.get("SUPABASE_URL")!,
-        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-      );
 
       const { data: customers } = await serviceClient
         .from("customers")
@@ -351,10 +363,6 @@ Deno.serve(async (req) => {
     }
 
     if (action === "import") {
-      const serviceClient = createClient(
-        Deno.env.get("SUPABASE_URL")!,
-        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-      );
 
       const { data: customers } = await serviceClient
         .from("customers")

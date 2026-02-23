@@ -14,7 +14,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Loader2, Save, Upload, CheckCircle, XCircle, ShieldAlert, Zap, Plus, Pencil, Trash2, Package, MessageCircle, Users } from "lucide-react";
+import { ArrowLeft, Loader2, Save, Upload, CheckCircle, XCircle, ShieldAlert, Zap, Plus, Pencil, Trash2, Package, MessageCircle, Users, Router } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -34,6 +34,12 @@ export default function Settings() {
   // WhatsApp settings
   const [uazapiToken, setUazapiToken] = useState("");
   const [savingWhatsapp, setSavingWhatsapp] = useState(false);
+
+  // R3005G settings
+  const [r3005gUrl, setR3005gUrl] = useState("");
+  const [r3005gUser, setR3005gUser] = useState("");
+  const [r3005gPass, setR3005gPass] = useState("");
+  const [savingR3005g, setSavingR3005g] = useState(false);
 
   // User management state
   interface SystemUser {
@@ -151,7 +157,7 @@ export default function Settings() {
     const { data } = await supabase
       .from("settings")
       .select("key, value")
-      .in("key", ["efi_client_id", "efi_client_secret", "efi_certificate_path", "uazapi_token"]);
+      .in("key", ["efi_client_id", "efi_client_secret", "efi_certificate_path", "uazapi_token", "r3005g_url", "r3005g_username", "r3005g_password"]);
 
     if (data) {
       for (const row of data) {
@@ -159,6 +165,9 @@ export default function Settings() {
         if (row.key === "efi_client_secret") setClientSecret(row.value || "");
         if (row.key === "efi_certificate_path") setCertUploaded(!!row.value);
         if (row.key === "uazapi_token") setUazapiToken(row.value || "");
+        if (row.key === "r3005g_url") setR3005gUrl(row.value || "");
+        if (row.key === "r3005g_username") setR3005gUser(row.value || "");
+        if (row.key === "r3005g_password") setR3005gPass(row.value || "");
       }
     }
     setLoadingSettings(false);
@@ -275,6 +284,9 @@ export default function Settings() {
             </TabsTrigger>
             <TabsTrigger value="users">
               <Users className="mr-1.5 h-4 w-4" /> Usuários
+            </TabsTrigger>
+            <TabsTrigger value="r3005g">
+              <Router className="mr-1.5 h-4 w-4" /> R3005G
             </TabsTrigger>
           </TabsList>
 
@@ -555,6 +567,89 @@ export default function Settings() {
                 </Table>
               </div>
             )}
+          </TabsContent>
+
+          {/* R3005G Tab */}
+          <TabsContent value="r3005g" className="mt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Roteador Intelbras R3005G</CardTitle>
+                <CardDescription>
+                  Configure o endereço IP e as credenciais de acesso ao roteador para sincronização PPPoE.
+                  Use os valores codificados (base64) capturados do navegador.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {loadingSettings ? (
+                  <div className="flex justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                  </div>
+                ) : (
+                  <div className="space-y-5">
+                    <div className="space-y-2">
+                      <Label htmlFor="r3005g_url">URL do Roteador</Label>
+                      <Input
+                        id="r3005g_url"
+                        value={r3005gUrl}
+                        onChange={(e) => setR3005gUrl(e.target.value)}
+                        placeholder="http://IP_DO_ROTEADOR"
+                      />
+                      <p className="text-xs text-muted-foreground">Ex: http://189.xxx.xxx.xxx</p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="r3005g_user">Usuário (codificado)</Label>
+                      <Input
+                        id="r3005g_user"
+                        value={r3005gUser}
+                        onChange={(e) => setR3005gUser(e.target.value)}
+                        placeholder="Valor codificado do campo 'user' do login"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Copie o valor do campo "user" capturado no DevTools (F12) do navegador ao fazer login no roteador.
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="r3005g_pass">Senha (codificada)</Label>
+                      <Input
+                        id="r3005g_pass"
+                        type="password"
+                        value={r3005gPass}
+                        onChange={(e) => setR3005gPass(e.target.value)}
+                        placeholder="Valor codificado do campo 'password' do login"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Copie o valor do campo "password" capturado no DevTools (F12) do navegador ao fazer login no roteador.
+                      </p>
+                    </div>
+
+                    <Button
+                      onClick={async () => {
+                        setSavingR3005g(true);
+                        try {
+                          await upsertSetting("r3005g_url", r3005gUrl);
+                          await upsertSetting("r3005g_username", r3005gUser);
+                          await upsertSetting("r3005g_password", r3005gPass);
+                          toast.success("Configurações R3005G salvas!");
+                        } catch (err: any) {
+                          toast.error("Erro ao salvar: " + (err.message || "Erro desconhecido"));
+                        }
+                        setSavingR3005g(false);
+                      }}
+                      disabled={savingR3005g}
+                    >
+                      {savingR3005g ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Save className="mr-2 h-4 w-4" />
+                      )}
+                      Salvar Configurações
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
 
