@@ -29,6 +29,7 @@ export interface InvoiceRow {
   vencimento: string;
   status: string;
   paid_at?: string | null;
+  efi_link?: string | null;
   _cpf?: string;
   _nome?: string;
   _email?: string;
@@ -37,7 +38,7 @@ export interface InvoiceRow {
 
 type Step = "upload" | "mapping" | "preview";
 
-const EXPECTED_FIELDS = ["cpf", "nome", "email", "complemento", "descricao", "valor", "vencimento", "status"] as const;
+const EXPECTED_FIELDS = ["cpf", "nome", "email", "complemento", "descricao", "valor", "vencimento", "status", "link_boleto"] as const;
 type FieldKey = typeof EXPECTED_FIELDS[number];
 
 const FIELD_LABELS: Record<FieldKey, string> = {
@@ -49,6 +50,7 @@ const FIELD_LABELS: Record<FieldKey, string> = {
   valor: "Valor (R$)",
   vencimento: "Vencimento",
   status: "Status",
+  link_boleto: "Link do Boleto",
 };
 
 const REQUIRED_FIELDS: FieldKey[] = ["cpf", "valor", "vencimento"];
@@ -106,10 +108,11 @@ const HEADER_ALIASES: Record<string, FieldKey> = {
   valor: "valor", value: "valor", amount: "valor", valor_centavos: "valor", total: "valor",
   vencimento: "vencimento", due_date: "vencimento", data_vencimento: "vencimento", expiration: "vencimento",
   status: "status", situacao: "status",
+  link_boleto: "link_boleto", link: "link_boleto", boleto_link: "link_boleto", link_do_boleto: "link_boleto", url_boleto: "link_boleto", boleto_url: "link_boleto", boleto: "link_boleto",
 };
 
 function autoMapColumns(headers: string[]): Record<FieldKey, number | null> {
-  const mapping: Record<FieldKey, number | null> = { cpf: null, nome: null, email: null, complemento: null, descricao: null, valor: null, vencimento: null, status: null };
+  const mapping: Record<FieldKey, number | null> = { cpf: null, nome: null, email: null, complemento: null, descricao: null, valor: null, vencimento: null, status: null, link_boleto: null };
   headers.forEach((h, idx) => {
     const normalized = normalizeHeader(h);
     const field = HEADER_ALIASES[normalized];
@@ -167,7 +170,7 @@ export default function InvoiceCSVImportDialog({ open, onOpenChange, customers, 
   const [step, setStep] = useState<Step>("upload");
   const [headers, setHeaders] = useState<string[]>([]);
   const [rows, setRows] = useState<string[][]>([]);
-  const [mapping, setMapping] = useState<Record<FieldKey, number | null>>({ cpf: null, nome: null, email: null, complemento: null, descricao: null, valor: null, vencimento: null, status: null });
+  const [mapping, setMapping] = useState<Record<FieldKey, number | null>>({ cpf: null, nome: null, email: null, complemento: null, descricao: null, valor: null, vencimento: null, status: null, link_boleto: null });
   const [issues, setIssues] = useState<ValidationIssue[]>([]);
   const [validRows, setValidRows] = useState<InvoiceRow[]>([]);
   const [importing, setImporting] = useState(false);
@@ -176,7 +179,7 @@ export default function InvoiceCSVImportDialog({ open, onOpenChange, customers, 
 
   const reset = () => {
     setStep("upload"); setHeaders([]); setRows([]);
-    setMapping({ cpf: null, nome: null, email: null, complemento: null, descricao: null, valor: null, vencimento: null, status: null });
+    setMapping({ cpf: null, nome: null, email: null, complemento: null, descricao: null, valor: null, vencimento: null, status: null, link_boleto: null });
     setIssues([]); setValidRows([]); setImporting(false); setFileName("");
   };
 
@@ -261,10 +264,13 @@ export default function InvoiceCSVImportDialog({ open, onOpenChange, customers, 
       const status = statusRaw ? mapStatus(statusRaw) : "pending";
       const paid_at = status === "paid" ? vencimento + "T12:00:00Z" : null;
 
+      const linkBoleto = getValue("link_boleto") || null;
+
       if (rowValid && valorCentavos && vencimento) {
         valid.push({
           customer_id: customer?.id || "__pending__",
           descricao, valor_centavos: valorCentavos, vencimento, status, paid_at,
+          efi_link: linkBoleto,
           _cpf: cpf,
           _nome: getValue("nome"),
           _email: getValue("email"),
