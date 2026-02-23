@@ -19,7 +19,8 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Wifi, Plus, Search, Download, LogOut, Loader2, ShieldAlert, FileText, Import, Settings as SettingsIcon, Upload, AlertTriangle, Zap, Filter, RefreshCw, MessageCircle, Bell, Clock } from "lucide-react";
+import { Plus, Search, Download, LogOut, Loader2, ShieldAlert, FileText, Import, Settings as SettingsIcon, Upload, AlertTriangle, Zap, Filter, RefreshCw, MessageCircle, Bell, Clock } from "lucide-react";
+import logoImg from "@/assets/logo.png";
 import { Navigate, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -164,9 +165,7 @@ export default function Dashboard() {
       <header className="border-b bg-card sticky top-0 z-10">
         <div className="container mx-auto flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <Wifi className="h-5 w-5" />
-            </div>
+            <img src={logoImg} alt="MylleNet" className="h-9 w-9 rounded-lg object-contain" />
             <div>
               <h1 className="text-lg font-bold leading-tight">Myllenet</h1>
               <p className="text-xs text-muted-foreground">Gerenciamento de Clientes</p>
