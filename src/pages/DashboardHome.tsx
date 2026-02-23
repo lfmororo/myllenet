@@ -1,15 +1,44 @@
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useCustomers } from "@/hooks/useCustomers";
 import { useInvoices } from "@/hooks/useInvoices";
 import { usePlans } from "@/hooks/usePlans";
+import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, AlertTriangle, DollarSign, TrendingUp } from "lucide-react";
+import { Users, AlertTriangle, DollarSign, TrendingUp, Router, Wifi, WifiOff, Loader2 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
 
 export default function DashboardHome() {
   const { customers } = useCustomers();
   const { allInvoices } = useInvoices();
   const { plans } = usePlans();
+
+  const [routerStatus, setRouterStatus] = useState<"loading" | "online" | "offline">("loading");
+
+  useEffect(() => {
+    const checkRouter = async () => {
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const token = sessionData?.session?.access_token;
+        if (!token) { setRouterStatus("offline"); return; }
+
+        const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+        const res = await fetch(
+          `https://${projectId}.supabase.co/functions/v1/r3005g-sync/status`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            },
+            signal: AbortSignal.timeout(15000),
+          }
+        );
+        setRouterStatus(res.ok ? "online" : "offline");
+      } catch {
+        setRouterStatus("offline");
+      }
+    };
+    checkRouter();
+  }, []);
 
   const stats = useMemo(() => {
     const activeCustomers = customers.filter(c => c.ativo).length;
@@ -107,7 +136,28 @@ export default function DashboardHome() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+        {/* Router Status */}
+        <Card className={`border-l-4 ${routerStatus === "online" ? "border-l-success" : routerStatus === "offline" ? "border-l-destructive" : "border-l-muted"}`}>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">R3005G</CardTitle>
+            <div className={`rounded-lg p-2 ${routerStatus === "online" ? "bg-success/10" : routerStatus === "offline" ? "bg-destructive/10" : "bg-muted/10"}`}>
+              {routerStatus === "loading" ? (
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              ) : routerStatus === "online" ? (
+                <Wifi className="h-4 w-4 text-success" />
+              ) : (
+                <WifiOff className="h-4 w-4 text-destructive" />
+              )}
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className={`text-2xl font-bold ${routerStatus === "online" ? "text-success" : routerStatus === "offline" ? "text-destructive" : "text-muted-foreground"}`}>
+              {routerStatus === "loading" ? "Verificando..." : routerStatus === "online" ? "Online" : "Offline"}
+            </div>
+            <p className="text-xs text-muted-foreground">Roteador Intelbras</p>
+          </CardContent>
+        </Card>
         <Card className="border-l-4 border-l-primary">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Clientes Ativos</CardTitle>
