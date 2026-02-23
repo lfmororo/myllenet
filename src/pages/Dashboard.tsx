@@ -532,6 +532,7 @@ export default function Dashboard() {
         open={boletoOpen}
         onOpenChange={setBoletoOpen}
         customers={customers}
+        plans={plans}
         onSave={createBoleto}
       />
 

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,33 +8,85 @@ import { Loader2 } from "lucide-react";
 import type { Customer } from "@/hooks/useCustomers";
 import type { CreateInvoiceInput } from "@/hooks/useInvoices";
 
+interface Plan {
+  id: string;
+  nome: string;
+  valor_centavos: number;
+  desconto_centavos: number;
+  dias_desconto: number;
+}
+
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   customers: Customer[];
+  plans: Plan[];
   onSave: (data: CreateInvoiceInput) => Promise<boolean>;
 }
 
-export default function CreateBoletoDialog({ open, onOpenChange, customers, onSave }: Props) {
+export default function CreateBoletoDialog({ open, onOpenChange, customers, plans, onSave }: Props) {
   const [customerId, setCustomerId] = useState("");
   const [descricao, setDescricao] = useState("");
   const [valor, setValor] = useState("");
   const [vencimento, setVencimento] = useState("");
   const [saving, setSaving] = useState(false);
 
+  // Auto-fill when customer is selected
+  useEffect(() => {
+    if (!customerId) return;
+    const customer = customers.find(c => c.id === customerId);
+    if (!customer) return;
+
+    // Set vencimento based on dia_vencimento
+    const now = new Date();
+    let year = now.getFullYear();
+    let month = now.getMonth(); // 0-indexed
+    const dia = customer.dia_vencimento;
+
+    // If day already passed this month, use next month
+    if (now.getDate() > dia) {
+      month += 1;
+      if (month > 11) {
+        month = 0;
+        year += 1;
+      }
+    }
+
+    // Clamp to last day of month
+    const lastDay = new Date(year, month + 1, 0).getDate();
+    const finalDia = Math.min(dia, lastDay);
+    const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(finalDia).padStart(2, "0")}`;
+    setVencimento(dateStr);
+
+    // Set valor and descricao based on plan
+    if (customer.plan_id) {
+      const plan = plans.find(p => p.id === customer.plan_id);
+      if (plan) {
+        const valorCentavos = plan.valor_centavos - (customer.desconto_especial_centavos || 0);
+        setValor((Math.max(valorCentavos, 0) / 100).toFixed(2).replace(".", ","));
+
+        // Auto description
+        const monthNames = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+        setDescricao(`Mensalidade Internet - ${monthNames[month]} de ${year}`);
+      }
+    }
+  }, [customerId, customers, plans]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
 
-    // Parse value: user types "89.90", we need 8990 centavos
     const valorNum = parseFloat(valor.replace(",", "."));
     const centavos = Math.round(valorNum * 100);
+
+    const customer = customers.find(c => c.id === customerId);
 
     const success = await onSave({
       customer_id: customerId,
       descricao,
       valor_centavos: centavos,
       vencimento,
+      plan_id: customer?.plan_id || undefined,
     });
 
     setSaving(false);
@@ -47,7 +99,6 @@ export default function CreateBoletoDialog({ open, onOpenChange, customers, onSa
     }
   };
 
-  // Default to 7 days from now
   const defaultDate = () => {
     const d = new Date();
     d.setDate(d.getDate() + 7);
