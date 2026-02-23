@@ -835,7 +835,7 @@ async function bulkCheckPayments(req: Request) {
   // Get all pending/waiting invoices that have an efi_charge_id
   const { data: pendingInvoices, error } = await supabase
     .from("invoices")
-    .select("id, efi_charge_id, status, paid_at")
+    .select("id, efi_charge_id, status, paid_at, efi_barcode, efi_link, efi_pix_qrcode, efi_pix_copiacola")
     .in("status", ["pending", "waiting", "overdue"])
     .not("efi_charge_id", "is", null);
 
@@ -874,10 +874,21 @@ async function bulkCheckPayments(req: Request) {
         newStatus = "overdue";
       }
 
-      if (newStatus !== inv.status) {
+      // Extract billet data (link, barcode, pix)
+      const billet = chargeData.payment?.banking_billet || {};
+      const updatePayload: Record<string, any> = { status: newStatus, paid_at: paidAt };
+      
+      if (billet.barcode && !inv.efi_barcode) updatePayload.efi_barcode = billet.barcode;
+      if (billet.pix?.qrcode && !inv.efi_pix_qrcode) updatePayload.efi_pix_qrcode = billet.pix.qrcode;
+      if (billet.pix?.qrcode && !inv.efi_pix_copiacola) updatePayload.efi_pix_copiacola = billet.pix.qrcode;
+      if ((billet.link || billet.pdf?.charge) && !inv.efi_link) updatePayload.efi_link = billet.link || billet.pdf?.charge;
+
+      const hasBilletUpdates = Object.keys(updatePayload).length > 2;
+
+      if (newStatus !== inv.status || hasBilletUpdates) {
         await supabase
           .from("invoices")
-          .update({ status: newStatus, paid_at: paidAt })
+          .update(updatePayload)
           .eq("id", inv.id);
         updated++;
 
