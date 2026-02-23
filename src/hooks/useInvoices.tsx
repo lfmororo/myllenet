@@ -173,6 +173,13 @@ export function useInvoices() {
   };
 
   const markAsPaid = async (invoiceId: string) => {
+    // Get invoice to check for efi_charge_id
+    const { data: invoice } = await supabase
+      .from("invoices")
+      .select("efi_charge_id")
+      .eq("id", invoiceId)
+      .single();
+
     const { error } = await supabase
       .from("invoices")
       .update({ status: "paid", paid_at: new Date().toISOString() })
@@ -185,12 +192,39 @@ export function useInvoices() {
     toast.success("Fatura marcada como paga");
     fetchInvoices();
 
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token;
+    const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+
+    // Cancel charge on EFI if it has an efi_charge_id
+    if (invoice?.efi_charge_id && token) {
+      try {
+        const cancelRes = await fetch(
+          `https://${projectId}.supabase.co/functions/v1/efi-boleto/cancel`,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            },
+            body: JSON.stringify({ charge_id: invoice.efi_charge_id }),
+          }
+        );
+        if (cancelRes.ok) {
+          toast.success("Cobrança cancelada na EFI");
+        } else {
+          const err = await cancelRes.json();
+          console.warn("EFI cancel warning:", err.error);
+        }
+      } catch (e) {
+        console.warn("EFI cancel failed:", e);
+      }
+    }
+
     // Send payment confirmation via WhatsApp
-    try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData?.session?.access_token;
-      if (token) {
-        const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+    if (token) {
+      try {
         const response = await fetch(
           `https://${projectId}.supabase.co/functions/v1/whatsapp-send/notify-invoice`,
           {
@@ -206,9 +240,9 @@ export function useInvoices() {
         if (response.ok) {
           toast.success("Confirmação de pagamento enviada ao cliente!");
         }
+      } catch (notifyErr) {
+        console.warn("WhatsApp payment confirm failed:", notifyErr);
       }
-    } catch (notifyErr) {
-      console.warn("WhatsApp payment confirm failed:", notifyErr);
     }
 
     return true;
