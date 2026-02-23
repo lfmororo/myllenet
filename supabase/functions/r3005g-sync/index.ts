@@ -59,8 +59,25 @@ function aesDecrypt(cipherBase64: string, keyStr: string, ivStr: string): string
     );
     const result = decrypted.toString(CryptoJS.enc.Utf8);
     // Remove null bytes from ZeroPadding
-    return result.replace(/\0+$/g, "");
-  } catch {
+    const cleaned = result.replace(/\0+$/g, "");
+    if (!cleaned || cleaned.length === 0) {
+      console.error("R3005G aesDecrypt: empty result for input:", cipherBase64.substring(0, 20));
+      // Try with Pkcs7 padding
+      const decrypted2 = CryptoJS.AES.decrypt(
+        cipherBase64,
+        key,
+        { iv, mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.Pkcs7 }
+      );
+      const result2 = decrypted2.toString(CryptoJS.enc.Utf8);
+      if (result2 && result2.length > 0) {
+        console.log("R3005G aesDecrypt: Pkcs7 worked!");
+        return result2;
+      }
+      return cipherBase64;
+    }
+    return cleaned;
+  } catch (e) {
+    console.error("R3005G aesDecrypt error:", (e as Error).message, "input:", cipherBase64.substring(0, 20));
     return cipherBase64;
   }
 }
@@ -204,11 +221,39 @@ async function fetchPPPoEUsers(
   }
 
   const json = await res.json();
-  if (json.code !== 0 || !json.data?.all) {
-    throw new Error(`Unexpected response: ${JSON.stringify(json)}`);
+  console.log("R3005G user.data response keys:", JSON.stringify(Object.keys(json)));
+  console.log("R3005G user.data data type:", typeof json.data);
+
+  // Handle base64-encoded data (same format as base_mini.data)
+  let userData = json.data;
+  if (typeof json.data === "string") {
+    try {
+      userData = JSON.parse(fromBase64(json.data));
+      console.log("R3005G: decoded base64 data, keys:", JSON.stringify(Object.keys(userData)));
+    } catch (e) {
+      console.error("R3005G: failed to decode base64 data:", e);
+    }
   }
 
-  return json.data.all;
+  if (json.code !== 0) {
+    throw new Error(`Unexpected response code: ${json.code}`);
+  }
+
+  const users = userData?.all || userData?.list || userData;
+  if (!Array.isArray(users)) {
+    // Log sample to understand structure
+    console.log("R3005G: userData sample:", JSON.stringify(userData).substring(0, 500));
+    throw new Error(`Could not find users array in response`);
+  }
+
+  // Log first user's raw fields for debugging
+  if (users.length > 0) {
+    const sample = users[0];
+    console.log("R3005G: raw user sample fields:", JSON.stringify(Object.keys(sample)));
+    console.log("R3005G: raw user sample:", JSON.stringify({ user: sample.user?.substring(0, 30), cstate: sample.cstate, enable: sample.enable }));
+  }
+
+  return users;
 }
 
 async function togglePPPoEUser(
@@ -356,19 +401,39 @@ Deno.serve(async (req) => {
     const cookie = await loginR3005G(baseUrl, routerUser, routerPass);
     const { keyStr, ivStr } = deriveKeyIV(sn);
 
+    console.log("R3005G: SN for key derivation:", sn);
+    console.log("R3005G: keyStr:", keyStr, "ivStr:", ivStr);
+
     // Fetch PPPoE users
     const routerUsers = await fetchPPPoEUsers(baseUrl, cookie);
 
-    const decodedUsers = routerUsers.map((u) => ({
-      usuario_pppoe: aesDecrypt(u.user, keyStr, ivStr),
-      senha_pppoe: aesDecrypt(u.pwd, keyStr, ivStr),
-      cstate: u.cstate,
-      gid: u.gid,
-      connected: u.cstate === 97,
-      enable: u.enable,
-    }));
+    const decodedUsers = routerUsers.map((u) => {
+      // Try direct AES decryption
+      let username = aesDecrypt(u.user, keyStr, ivStr);
+      let password = aesDecrypt(u.pwd, keyStr, ivStr);
 
-    console.log("R3005G: decoded first 3 users:", decodedUsers.slice(0, 3).map(u => u.usuario_pppoe));
+      // If result still looks like base64, try decoding the outer base64 first then decrypt
+      if (/^[A-Za-z0-9+/]+=*$/.test(username) && username.length > 10) {
+        const innerUser = fromBase64(u.user);
+        const innerPwd = fromBase64(u.pwd);
+        const attempt = aesDecrypt(innerUser, keyStr, ivStr);
+        if (attempt !== innerUser) {
+          username = attempt;
+          password = aesDecrypt(innerPwd, keyStr, ivStr);
+        }
+      }
+
+      return {
+        usuario_pppoe: username,
+        senha_pppoe: password,
+        cstate: u.cstate,
+        gid: u.gid,
+        connected: u.cstate === 97,
+        enable: u.enable,
+      };
+    });
+
+    console.log("R3005G: decoded first 3 users:", decodedUsers.slice(0, 3).map(u => ({ user: u.usuario_pppoe, cstate: u.cstate, enable: u.enable, connected: u.connected })));
 
     if (action === "status") {
 
