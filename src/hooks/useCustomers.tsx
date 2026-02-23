@@ -90,8 +90,46 @@ export function useCustomers() {
   };
 
   const toggleCustomerActive = async (id: string, ativo: boolean) => {
-    // If deactivating, cancel all pending invoices (locally + EFI)
+    // If deactivating, cancel all pending invoices and toggle PPPoE on router
     if (!ativo) {
+      // Get customer info for PPPoE toggle
+      const { data: customerData } = await supabase
+        .from("customers")
+        .select("usuario_pppoe")
+        .eq("id", id)
+        .single();
+
+      // Toggle PPPoE user on router (best effort, don't block deactivation)
+      if (customerData?.usuario_pppoe) {
+        try {
+          const { data: sessionData } = await supabase.auth.getSession();
+          const token = sessionData?.session?.access_token;
+          if (token) {
+            const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+            const res = await fetch(
+              `https://${projectId}.supabase.co/functions/v1/r3005g-sync/toggle`,
+              {
+                method: "POST",
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                  "Content-Type": "application/json",
+                  apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+                },
+                body: JSON.stringify({ usuario_pppoe: customerData.usuario_pppoe, enable: false }),
+              }
+            );
+            const result = await res.json();
+            if (result.success) {
+              toast.info("PPPoE desativado no roteador");
+            } else {
+              console.warn("PPPoE toggle failed:", result.message);
+            }
+          }
+        } catch (e) {
+          console.error("Erro ao desativar PPPoE no roteador:", e);
+        }
+      }
+
       const { data: openInvoices } = await supabase
         .from("invoices")
         .select("id, efi_charge_id")
