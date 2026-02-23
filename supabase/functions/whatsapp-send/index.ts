@@ -329,6 +329,49 @@ async function sendInvoiceNotification(req: Request) {
   }
 }
 
+async function resendPaidNotifications(req: Request) {
+  const authHeader = req.headers.get("Authorization");
+  await verifyAdmin(authHeader);
+
+  const { invoice_ids } = await req.json();
+  if (!Array.isArray(invoice_ids) || invoice_ids.length === 0) {
+    return new Response(JSON.stringify({ error: "invoice_ids array obrigatório" }), {
+      status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  let sent = 0;
+  let failed = 0;
+  for (const id of invoice_ids) {
+    try {
+      const supabase = getSupabaseAdmin();
+      const { data: invoice } = await supabase.from("invoices").select("*, customers(nome, telefone, cpf)").eq("id", id).single();
+      if (!invoice) { failed++; continue; }
+      const customer = (invoice as any).customers;
+      if (!customer?.telefone) { 
+        await logNotification({ customer_id: invoice.customer_id, customer_name: customer?.nome || "?", type: "pagamento_confirmado", message: `Pagamento: ${invoice.descricao}`, status: "failed", error_message: "Sem telefone" });
+        failed++; continue; 
+      }
+
+      const valor = (invoice.valor_centavos / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+      const message = `Olá ${customer.nome}! 🌐\n\n✅ Pagamento confirmado!\n\n📋 ${invoice.descricao}\n💰 Valor: ${valor}\n\nObrigado por manter sua internet em dia! 🚀`;
+      const formattedPhone = formatPhone(customer.telefone);
+
+      await uazapiRequest("/send/text", { number: formattedPhone, text: message });
+      await logNotification({ customer_id: invoice.customer_id, customer_name: customer.nome, phone: customer.telefone, type: "pagamento_confirmado", message, status: "sent" });
+      sent++;
+      await new Promise(r => setTimeout(r, 1000));
+    } catch (err) {
+      failed++;
+      console.error("Resend error:", err);
+    }
+  }
+
+  return new Response(JSON.stringify({ sent, failed }), {
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -345,6 +388,8 @@ Deno.serve(async (req) => {
         return await sendBulk(req);
       case "notify-invoice":
         return await sendInvoiceNotification(req);
+      case "resend-paid":
+        return await resendPaidNotifications(req);
       default:
         return new Response(JSON.stringify({ error: "Endpoint não encontrado" }), {
           status: 404,
