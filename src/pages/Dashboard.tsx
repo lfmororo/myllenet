@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Wifi, Plus, Search, Download, LogOut, Loader2, ShieldAlert, FileText, Import, Settings as SettingsIcon, Upload, AlertTriangle, Zap, Filter, RefreshCw, MessageCircle, Bell, Clock } from "lucide-react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -44,6 +45,7 @@ export default function Dashboard() {
   const [notifyOverdueOpen, setNotifyOverdueOpen] = useState(false);
   const [bulkCheckingEfi, setBulkCheckingEfi] = useState(false);
   const [bulkCheckProgress, setBulkCheckProgress] = useState({ done: 0, total: 0, imported: 0 });
+  const [invoiceStatusFilter, setInvoiceStatusFilter] = useState<string>("overdue");
   // Compute which customers have invoices this month
   const customerIdsWithInvoiceThisMonth = useMemo(() => {
     const now = new Date();
@@ -326,8 +328,21 @@ export default function Dashboard() {
                     className="pl-9"
                   />
                 </div>
+                <Select value={invoiceStatusFilter} onValueChange={setInvoiceStatusFilter}>
+                  <SelectTrigger className="w-40">
+                    <Filter className="mr-2 h-4 w-4" />
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="overdue">Vencidos</SelectItem>
+                    <SelectItem value="pending">Pendentes</SelectItem>
+                    <SelectItem value="paid">Pagos</SelectItem>
+                    <SelectItem value="cancelled">Cancelados</SelectItem>
+                  </SelectContent>
+                </Select>
                 <span className="text-sm text-muted-foreground whitespace-nowrap">
-                  {invoices.length} fatura{invoices.length !== 1 ? "s" : ""}
+                  {invoices.filter(i => invoiceStatusFilter === "all" || i.status === invoiceStatusFilter).length} fatura{invoices.filter(i => invoiceStatusFilter === "all" || i.status === invoiceStatusFilter).length !== 1 ? "s" : ""}
                 </span>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -427,7 +442,7 @@ export default function Dashboard() {
               </div>
             ) : (
               <InvoiceTable
-                invoices={invoices}
+                invoices={invoiceStatusFilter === "all" ? invoices : invoices.filter(i => i.status === invoiceStatusFilter)}
                 onCheckPayment={checkPayment}
                 onCancel={cancelInvoice}
                 onMarkAsPaid={markAsPaid}
