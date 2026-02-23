@@ -46,6 +46,7 @@ export default function Dashboard() {
   const [bulkCheckingEfi, setBulkCheckingEfi] = useState(false);
   const [bulkCheckProgress, setBulkCheckProgress] = useState({ done: 0, total: 0, imported: 0 });
   const [invoiceStatusFilter, setInvoiceStatusFilter] = useState<string>("overdue");
+  const [customerActiveFilter, setCustomerActiveFilter] = useState<string>("active");
   // Compute which customers have invoices this month
   const customerIdsWithInvoiceThisMonth = useMemo(() => {
     const now = new Date();
@@ -81,10 +82,21 @@ export default function Dashboard() {
     return customers.filter(c => c.ativo && !c.plan_id);
   }, [customers]);
 
-  const displayedCustomers = filterNoBoleto
-    ? customers.filter(c => {
-        if (customerIdsWithInvoiceThisMonth.has(c.id)) return false;
+  const displayedCustomers = useMemo(() => {
+    let filtered = customers;
+
+    // Filter by active status
+    if (customerActiveFilter === "active") {
+      filtered = filtered.filter(c => c.ativo);
+    } else if (customerActiveFilter === "inactive") {
+      filtered = filtered.filter(c => !c.ativo);
+    }
+
+    // Filter by no boleto
+    if (filterNoBoleto) {
+      filtered = filtered.filter(c => {
         if (!c.ativo) return false;
+        if (customerIdsWithInvoiceThisMonth.has(c.id)) return false;
         if (c.pago_ate) {
           const now = new Date();
           const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
@@ -92,8 +104,11 @@ export default function Dashboard() {
           if (pagoAte >= currentMonthEnd) return false;
         }
         return true;
-      })
-    : customers;
+      });
+    }
+
+    return filtered;
+  }, [customers, customerActiveFilter, filterNoBoleto, customerIdsWithInvoiceThisMonth]);
 
   if (authLoading) {
     return (
@@ -269,14 +284,26 @@ export default function Dashboard() {
             )}
 
             <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-              <div className="relative w-full sm:max-w-sm">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar por nome, CPF ou usuário PPPoE..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-9"
-                />
+              <div className="flex items-center gap-3 w-full sm:w-auto">
+                <div className="relative w-full sm:max-w-sm">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar por nome, CPF ou usuário PPPoE..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+                <Select value={customerActiveFilter} onValueChange={setCustomerActiveFilter}>
+                  <SelectTrigger className="w-36">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="active">Ativos</SelectItem>
+                    <SelectItem value="inactive">Inativos</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div className="flex gap-2 w-full sm:w-auto">
                 <Button variant="outline" onClick={exportCSV} className="flex-1 sm:flex-none">
