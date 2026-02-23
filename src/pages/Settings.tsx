@@ -257,20 +257,13 @@ export default function Settings() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b bg-card sticky top-0 z-10">
-        <div className="container mx-auto flex items-center gap-3 px-4 py-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div>
-            <h1 className="text-lg font-bold leading-tight">Configurações</h1>
-            <p className="text-xs text-muted-foreground">Gerencie as integrações do sistema</p>
-          </div>
-        </div>
-      </header>
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-bold tracking-tight">Configurações</h2>
+        <p className="text-muted-foreground">Gerencie as integrações do sistema</p>
+      </div>
 
-      <main className="container mx-auto px-4 py-6 max-w-2xl">
+      <div className="max-w-2xl">
         <Tabs defaultValue="plans">
           <TabsList>
             <TabsTrigger value="plans">
@@ -661,7 +654,7 @@ export default function Settings() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-      </main>
+      </div>
     </div>
   );
 }
