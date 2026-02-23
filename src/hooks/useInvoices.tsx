@@ -88,6 +88,31 @@ export function useInvoices() {
 
       toast.success("Boleto gerado com sucesso!");
       fetchInvoices();
+
+      // Auto-send WhatsApp notification
+      try {
+        const notifyResponse = await fetch(
+          `https://${projectId}.supabase.co/functions/v1/whatsapp-send/notify-invoice`,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            },
+            body: JSON.stringify({ invoice_id: result.invoice_id || result.id, type: "boleto_gerado" }),
+          }
+        );
+        if (notifyResponse.ok) {
+          toast.success("Notificação WhatsApp enviada ao cliente!");
+        } else {
+          const notifyErr = await notifyResponse.json();
+          console.warn("WhatsApp notify warning:", notifyErr.error);
+        }
+      } catch (notifyErr) {
+        console.warn("WhatsApp auto-notify failed:", notifyErr);
+      }
+
       return true;
     } catch (err) {
       console.error(err);
