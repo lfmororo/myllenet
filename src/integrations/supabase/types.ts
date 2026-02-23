@@ -94,6 +94,45 @@ export type Database = {
           },
         ]
       }
+      efi_api_logs: {
+        Row: {
+          context: string | null
+          created_at: string
+          duration_ms: number | null
+          endpoint: string
+          error_message: string | null
+          id: string
+          method: string
+          request_body: string | null
+          response_body: string | null
+          status_code: number | null
+        }
+        Insert: {
+          context?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          endpoint: string
+          error_message?: string | null
+          id?: string
+          method: string
+          request_body?: string | null
+          response_body?: string | null
+          status_code?: number | null
+        }
+        Update: {
+          context?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          endpoint?: string
+          error_message?: string | null
+          id?: string
+          method?: string
+          request_body?: string | null
+          response_body?: string | null
+          status_code?: number | null
+        }
+        Relationships: []
+      }
       invoices: {
         Row: {
           created_at: string
