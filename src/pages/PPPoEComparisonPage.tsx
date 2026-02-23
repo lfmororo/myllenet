@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Upload, AlertTriangle, UserPlus, UserMinus, CheckCircle2, Loader2, FileUp } from "lucide-react";
 
 interface CsvUser {
@@ -248,6 +249,23 @@ export default function PPPoEComparisonPage() {
           </Card>
         </div>
       )}
+
+      {/* Alert for active users without registration */}
+      {result && (() => {
+        const activeNotRegistered = result.inFileNotInSystem.filter(u => u.state !== "off");
+        return activeNotRegistered.length > 0 ? (
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Atenção: {activeNotRegistered.length} usuário(s) ativo(s) sem cadastro!</AlertTitle>
+            <AlertDescription>
+              Os seguintes usuários estão <strong>conectados/ativos</strong> no roteador mas não possuem cadastro no sistema:{" "}
+              <span className="font-mono text-xs">
+                {activeNotRegistered.map(u => u.name).join(", ")}
+              </span>
+            </AlertDescription>
+          </Alert>
+        ) : null;
+      })()}
 
       {/* Tabs with tables */}
       {result && (
