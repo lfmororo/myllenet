@@ -1,11 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertCircle } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import { toast } from "sonner";
 import type { Customer, CustomerInput } from "@/hooks/useCustomers";
 import type { Plan } from "@/hooks/usePlans";
 
@@ -42,6 +43,21 @@ const formatCEP = (value: string) => {
 const formatCurrency = (cents: number) =>
   (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
+function isValidCPF(cpf: string): boolean {
+  const clean = cpf.replace(/\D/g, "");
+  if (clean.length !== 11 || /^(\d)\1{10}$/.test(clean)) return false;
+  let sum = 0;
+  for (let i = 0; i < 9; i++) sum += parseInt(clean[i]) * (10 - i);
+  let rest = (sum * 10) % 11;
+  if (rest === 10) rest = 0;
+  if (rest !== parseInt(clean[9])) return false;
+  sum = 0;
+  for (let i = 0; i < 10; i++) sum += parseInt(clean[i]) * (11 - i);
+  rest = (sum * 10) % 11;
+  if (rest === 10) rest = 0;
+  return rest === parseInt(clean[10]);
+}
+
 export default function CustomerFormDialog({ open, onOpenChange, customer, onSave, onUpdate, plans = [] }: Props) {
   const [form, setForm] = useState<CustomerInput & { cortesia: boolean }>({
     nome: "", cpf: "", email: "", telefone: "", usuario_pppoe: "", senha_pppoe: "",
@@ -69,11 +85,17 @@ export default function CustomerFormDialog({ open, onOpenChange, customer, onSav
     }
   }, [customer, open]);
 
+  const cpfClean = form.cpf.replace(/\D/g, "");
+  const cpfInvalid = useMemo(() => cpfClean.length === 11 && !isValidCPF(cpfClean), [cpfClean]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (cpfClean.length !== 11 || !isValidCPF(cpfClean)) {
+      toast.error("CPF inválido. Verifique os dígitos.");
+      return;
+    }
     setSaving(true);
-    const cleanCPF = form.cpf.replace(/\D/g, "");
-    const data = { ...form, cpf: cleanCPF, telefone: form.telefone || null };
+    const data = { ...form, cpf: cpfClean, telefone: form.telefone || null };
 
     let success = false;
     if (customer && onUpdate) {
@@ -101,7 +123,12 @@ export default function CustomerFormDialog({ open, onOpenChange, customer, onSav
             </div>
             <div className="space-y-2">
               <Label htmlFor="cpf">CPF *</Label>
-              <Input id="cpf" value={form.cpf} onChange={(e) => setForm({ ...form, cpf: formatCPF(e.target.value) })} placeholder="000.000.000-00" required maxLength={14} />
+              <Input id="cpf" value={form.cpf} onChange={(e) => setForm({ ...form, cpf: formatCPF(e.target.value) })} placeholder="000.000.000-00" required maxLength={14} className={cpfInvalid ? "border-destructive" : ""} />
+              {cpfInvalid && (
+                <p className="text-xs text-destructive flex items-center gap-1">
+                  <AlertCircle className="h-3 w-3" /> CPF inválido
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="email">E-mail *</Label>
