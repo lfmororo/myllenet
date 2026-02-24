@@ -755,6 +755,46 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ACTION: fetch-router-js - fetch JS files from router to analyze user add patterns
+    if (action === "fetch-router-js") {
+      const results: Record<string, string> = {};
+      try {
+        const htmlRes = await fetch(`${baseUrl}/index.html`, { headers: { Cookie: cookie } });
+        if (htmlRes.ok) {
+          const html = await htmlRes.text();
+          const scriptPaths = [...html.matchAll(/(?:src|href)=["']?([^"'\s>]+\.js[^"'\s>]*)["']?/g)].map(m => m[1].replace(/^\.\//, "").replace(/^\//, ""));
+          for (const jsPath of scriptPaths) {
+            try {
+              const jsRes = await fetch(`${baseUrl}/${jsPath}`, { headers: { Cookie: cookie } });
+              if (!jsRes.ok) continue;
+              const jsText = await jsRes.text();
+              // Search for postData, $post, user.data POST, save/add user patterns
+              const patterns = [
+                /\$postData[^;]{0,500}/gi,
+                /postData[^;]{0,500}/gi,
+                /\.post\([^)]*user[^)]*\)[^;]{0,300}/gi,
+                /ajax[^}]{0,500}user\.data[^}]{0,300}/gi,
+                /function\s+(?:save|add|edit|del)User[^}]{0,1000}/gi,
+                /userOperate[^}]{0,800}/gi,
+                /opt\s*[:=]\s*["'](?:add|edit|del)[^}]{0,500}/gi,
+              ];
+              for (const pat of patterns) {
+                const matches = [...jsText.matchAll(pat)];
+                for (const m of matches.slice(0, 5)) {
+                  const key = `${jsPath}:${pat.source}:${m.index}`;
+                  results[key] = m[0].substring(0, 800);
+                }
+              }
+            } catch { /* skip */ }
+          }
+        }
+      } catch { /* skip */ }
+      
+      return new Response(JSON.stringify({ patterns: results }, null, 2), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // ACTION: add-user - create a PPPoE user on the router via userfile.cgi
     if (action === "add-user") {
       const body = await req.json();
@@ -821,13 +861,66 @@ Deno.serve(async (req) => {
 
       console.log(`R3005G ADD-USER: Adding "${usuario_pppoe}" to group "${group || "Default"}"`);
 
-      // Intelbras pattern: $postData uses same endpoint for read (GET) and write (POST)
-      // user.data is the primary endpoint for PPPoE user management
-      const endpointsToTry = ["user.data", "pppoe_base.data", "user.asp", "pppoe_user.asp"];
+      // First, get current user count for verification
+      let userCountBefore = 0;
+      try {
+        const beforeRes = await fetch(`${baseUrl}/user.data`, { headers: { Cookie: cookie } });
+        if (beforeRes.ok) {
+          const beforeJson = JSON.parse(await beforeRes.text());
+          if (beforeJson.code === 0 && beforeJson.data?.all) {
+            userCountBefore = beforeJson.data.all.length;
+          }
+        }
+      } catch { /* skip */ }
+      console.log(`R3005G ADD-USER: Users before: ${userCountBefore}`);
+
+      // Intelbras routers use form-urlencoded POST to user.data with specific format
+      // The key insight: the router JS $postData sends data as form-urlencoded
+      const endpointsToTry = ["user.data", "pppoe_base.data"];
 
       for (const ep of endpointsToTry) {
         try {
-          // Try JSON POST first
+          // Try form-urlencoded first (Intelbras standard for writes)
+          const formBody = Object.entries(userPayload).map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`).join("&");
+          console.log(`R3005G ADD-USER: Trying ${ep} (form), payload: ${formBody.substring(0, 300)}`);
+          
+          const formRes = await fetch(`${baseUrl}/${ep}`, {
+            method: "POST",
+            headers: { 
+              "Content-Type": "application/x-www-form-urlencoded", 
+              Cookie: cookie, 
+              Origin: baseUrl, 
+              Referer: `${baseUrl}/` 
+            },
+            body: formBody,
+          });
+
+          const formText = await formRes.text();
+          console.log(`R3005G ADD-USER: ${ep} (form) => status=${formRes.status}, body=${formText.substring(0, 500)}`);
+
+          if (formText.includes("Not Found") || formRes.status === 404) continue;
+
+          let formJson: Record<string, unknown>;
+          try { formJson = JSON.parse(formText); } catch { formJson = { raw: formText.substring(0, 500) }; }
+
+          // Check if user count increased
+          const allUsers = (formJson as any)?.data?.all;
+          const userCountAfter = Array.isArray(allUsers) ? allUsers.length : 0;
+          console.log(`R3005G ADD-USER: Users after: ${userCountAfter} (before: ${userCountBefore})`);
+
+          if (formJson.code === 0 && userCountAfter > userCountBefore) {
+            return new Response(JSON.stringify({ 
+              success: true, 
+              message: `Usuário ${usuario_pppoe} cadastrado no roteador (grupo: ${group || "Default"})`, 
+              endpoint: ep, 
+              usersBefore: userCountBefore,
+              usersAfter: userCountAfter,
+            }), {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+
+          // If form-urlencoded didn't work, try JSON POST
           const addRes = await fetch(`${baseUrl}/${ep}`, {
             method: "POST",
             headers: { "Content-Type": "application/json;charset=UTF-8", Cookie: cookie, Origin: baseUrl, Referer: `${baseUrl}/` },
@@ -842,54 +935,40 @@ Deno.serve(async (req) => {
           let addJson: Record<string, unknown>;
           try { addJson = JSON.parse(addText); } catch { addJson = { raw: addText.substring(0, 500) }; }
 
-          if (addJson.code === 0) {
-            return new Response(JSON.stringify({ success: true, message: `Usuário ${usuario_pppoe} cadastrado no roteador (grupo: ${group || "Default"})`, endpoint: ep, data: addJson }), {
+          const allUsersJson = (addJson as any)?.data?.all;
+          const userCountAfterJson = Array.isArray(allUsersJson) ? allUsersJson.length : 0;
+          
+          if (addJson.code === 0 && userCountAfterJson > userCountBefore) {
+            return new Response(JSON.stringify({ 
+              success: true, 
+              message: `Usuário ${usuario_pppoe} cadastrado no roteador (grupo: ${group || "Default"})`, 
+              endpoint: ep,
+              usersBefore: userCountBefore,
+              usersAfter: userCountAfterJson,
+            }), {
               headers: { ...corsHeaders, "Content-Type": "application/json" },
             });
           }
-
-          // If JSON didn't work, try form-urlencoded (some Intelbras CGIs expect this)
-          const formBody = Object.entries(userPayload).map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`).join("&");
-          const formRes = await fetch(`${baseUrl}/${ep}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/x-www-form-urlencoded", Cookie: cookie, Origin: baseUrl, Referer: `${baseUrl}/` },
-            body: formBody,
-          });
-
-          const formText = await formRes.text();
-          console.log(`R3005G ADD-USER: ${ep} (form) => status=${formRes.status}, body=${formText.substring(0, 500)}`);
-
-          if (formText.includes("Not Found") || formRes.status === 404) continue;
-
-          let formJson: Record<string, unknown>;
-          try { formJson = JSON.parse(formText); } catch { formJson = { raw: formText.substring(0, 500) }; }
-
-          if (formJson.code === 0) {
-            return new Response(JSON.stringify({ success: true, message: `Usuário ${usuario_pppoe} cadastrado no roteador (grupo: ${group || "Default"})`, endpoint: ep, format: "form", data: formJson }), {
-              headers: { ...corsHeaders, "Content-Type": "application/json" },
-            });
-          }
-
-          // If we got a valid response but error, return it
-          return new Response(JSON.stringify({ success: false, message: `Roteador respondeu com erro`, endpoint: ep, json_response: addJson, form_response: formJson }), {
-            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
         } catch (e) {
-          console.log(`R3005G ADD-USER: ${ep} error:`, e.message);
+          console.error(`R3005G ADD-USER: Error with ${ep}:`, e);
         }
       }
 
-      return new Response(JSON.stringify({ success: false, message: "Nenhum endpoint de cadastro funcionou", tried: endpointsToTry }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      return new Response(JSON.stringify({ 
+        success: false, 
+        message: `Não foi possível cadastrar o usuário ${usuario_pppoe} no roteador. O roteador respondeu mas o número de usuários não aumentou (${userCountBefore}).`,
+        usersBefore: userCountBefore,
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    return new Response(JSON.stringify({ error: "Use /status, /discover, /add-user ou /extract-js" }), {
+    return new Response(JSON.stringify({ error: `Ação desconhecida: ${action}` }), {
       status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
     console.error("R3005G error:", err);
-    return new Response(JSON.stringify({ error: err.message || "Internal error" }), {
+    return new Response(JSON.stringify({ error: err.message || "Erro interno" }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
