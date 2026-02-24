@@ -717,7 +717,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ACTION: list-cgis - discover all CGI endpoints from router JS
+    // ACTION: list-cgis - discover all CGI/ASP/DATA endpoints from router JS
     if (action === "list-cgis") {
       const allCgis: string[] = [];
       const contexts: Record<string, string> = {};
@@ -731,17 +731,19 @@ Deno.serve(async (req) => {
               const jsRes = await fetch(`${baseUrl}/${jsPath}`, { headers: { Cookie: cookie } });
               if (!jsRes.ok) continue;
               const jsText = await jsRes.text();
-              const cgiMatches = [...jsText.matchAll(/["']([a-zA-Z0-9_]+\.cgi)["']/g)];
-              for (const m of cgiMatches) {
+              // Match .cgi, .data, and .asp endpoints
+              const allMatches = [...jsText.matchAll(/["']([a-zA-Z0-9_]+\.(?:cgi|data|asp))["']/g)];
+              for (const m of allMatches) {
                 if (!allCgis.includes(m[1])) allCgis.push(m[1]);
                 const idx = jsText.indexOf(m[1]);
                 if (idx !== -1) {
                   contexts[m[1]] = jsText.substring(Math.max(0, idx - 200), Math.min(jsText.length, idx + 200));
                 }
               }
-              const dataMatches = [...jsText.matchAll(/["']([a-zA-Z0-9_]+\.data)["']/g)];
-              for (const m of dataMatches) {
-                if (!allCgis.includes(m[1])) allCgis.push(m[1]);
+              // Search for user save/add patterns
+              const userSavePatterns = [...jsText.matchAll(/.{0,300}(?:saveUser|addUser|editUser|user.*\.asp|pppoe.*\.asp|setUser|userOperate)[^}]{0,500}/gi)];
+              for (const m of userSavePatterns.slice(0, 8)) {
+                contexts["__user_save_pattern_" + allCgis.length] = m[0].substring(0, 600);
               }
             } catch { /* skip */ }
           }
@@ -791,7 +793,9 @@ Deno.serve(async (req) => {
       }
 
       // Build payload matching the router's user data structure
+      // The router JS shows userOperate with opt field for operation type
       const userPayload = {
+        opt: "add",
         user: encUser,
         pwd: encPwd,
         ips: "-",
@@ -815,10 +819,11 @@ Deno.serve(async (req) => {
         pack_status: 0,
       };
 
-      console.log(`R3005G ADD-USER: Adding "${usuario_pppoe}" to group "${group || "Default"}" via userfile.cgi`);
+      console.log(`R3005G ADD-USER: Adding "${usuario_pppoe}" to group "${group || "Default"}"`);
 
-      // Try userfile.cgi as the primary endpoint (discovered from router JS)
-      const endpointsToTry = ["userfile.cgi", "user_add.cgi", "pppoeUser_add.cgi"];
+      // Intelbras pattern: $postData uses same endpoint for read (GET) and write (POST)
+      // user.data is the primary endpoint for PPPoE user management
+      const endpointsToTry = ["user.data", "pppoe_base.data", "user.asp", "pppoe_user.asp"];
 
       for (const ep of endpointsToTry) {
         try {
