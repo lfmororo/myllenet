@@ -717,7 +717,82 @@ Deno.serve(async (req) => {
       });
     }
 
-    return new Response(JSON.stringify({ error: "Use /status, /discover ou /extract-js" }), {
+    // ACTION: add-user - create a PPPoE user on the router
+    if (action === "add-user") {
+      const body = await req.json();
+      const { usuario_pppoe, senha_pppoe, group } = body as { usuario_pppoe: string; senha_pppoe: string; group?: string };
+
+      if (!usuario_pppoe || !senha_pppoe) {
+        return new Response(JSON.stringify({ error: "usuario_pppoe e senha_pppoe são obrigatórios" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Get SN for encryption
+      const [serialNumber, jsKey] = await Promise.all([
+        fetchSerialNumber(baseUrl, cookie),
+        fetchKeyFromJS(baseUrl, cookie),
+      ]);
+      const effectiveSN = configSN || loginSN || serialNumber || jsKey;
+
+      let encUser = usuario_pppoe;
+      let encPwd = senha_pppoe;
+
+      if (effectiveSN) {
+        const { key, iv } = getRouterKeyIV(effectiveSN);
+        // Encrypt username and password using AES-CBC with ZeroPadding, then double-base64
+        const encryptField = (plain: string): string => {
+          const encrypted = CryptoJS.AES.encrypt(plain, key, {
+            iv, mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.ZeroPadding,
+          });
+          const innerB64 = encrypted.toString();
+          const bytes = new TextEncoder().encode(innerB64);
+          let binary = "";
+          for (const b of bytes) binary += String.fromCharCode(b);
+          return btoa(binary);
+        };
+        encUser = encryptField(usuario_pppoe);
+        encPwd = encryptField(senha_pppoe);
+      }
+
+      // Add user via CGI endpoint
+      const userPayload = {
+        user: encUser,
+        pwd: encPwd,
+        state: 1,
+        speed_up: 0,
+        speed_down: 0,
+        speed_mode: "dl",
+        group: group || "Default",
+        vlan: 0,
+        mod_pwd: "1",
+      };
+
+      console.log(`R3005G ADD-USER: Adding "${usuario_pppoe}" to group "${group || "Default"}"`);
+
+      const addRes = await fetch(`${baseUrl}/user_add.cgi`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json;charset=UTF-8", Cookie: cookie, Origin: baseUrl },
+        body: JSON.stringify(userPayload),
+      });
+
+      const addText = await addRes.text();
+      let addJson: Record<string, unknown>;
+      try { addJson = JSON.parse(addText); } catch { addJson = { raw: addText.substring(0, 500) }; }
+      console.log(`R3005G ADD-USER: Response:`, JSON.stringify(addJson).substring(0, 500));
+
+      if (addJson.code === 0 || addRes.ok) {
+        return new Response(JSON.stringify({ success: true, message: `Usuário ${usuario_pppoe} cadastrado no roteador`, data: addJson }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      return new Response(JSON.stringify({ success: false, message: `Erro ao cadastrar no roteador: ${addJson.error || addText.substring(0, 200)}`, data: addJson }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    return new Response(JSON.stringify({ error: "Use /status, /discover, /add-user ou /extract-js" }), {
       status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {

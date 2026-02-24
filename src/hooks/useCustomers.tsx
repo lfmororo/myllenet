@@ -73,6 +73,48 @@ export function useCustomers() {
     toast.success("Cliente cadastrado com sucesso!");
     fetchCustomers();
 
+    // Register PPPoE user on R3005G router
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      if (token) {
+        // Get plan's nome_servidor to use as group
+        let group = "Default";
+        if (customer.plan_id) {
+          const { data: planData } = await supabase.from("plans").select("nome_servidor").eq("id", customer.plan_id).single();
+          if (planData?.nome_servidor) group = planData.nome_servidor;
+        }
+
+        const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+        const res = await fetch(
+          `https://${projectId}.supabase.co/functions/v1/r3005g-sync/add-user`,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            },
+            body: JSON.stringify({
+              usuario_pppoe: customer.usuario_pppoe,
+              senha_pppoe: customer.senha_pppoe,
+              group,
+            }),
+          }
+        );
+        const result = await res.json();
+        if (result.success) {
+          toast.success(`PPPoE cadastrado no roteador (grupo: ${group})`);
+        } else {
+          console.warn("R3005G add-user error:", result);
+          toast.warning(`Cliente salvo, mas erro ao cadastrar no roteador: ${result.message || "Erro desconhecido"}`);
+        }
+      }
+    } catch (e) {
+      console.warn("Erro ao cadastrar PPPoE no roteador:", e);
+      toast.warning("Cliente salvo, mas não foi possível cadastrar no roteador");
+    }
+
     // Send welcome notification via WhatsApp
     const phone = customer.telefone;
     console.log("Welcome WhatsApp check - telefone:", JSON.stringify(phone), "inserted:", inserted?.id);
