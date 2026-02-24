@@ -35,6 +35,8 @@ export default function R3005GPage() {
   const [importing, setImporting] = useState(false);
   const [data, setData] = useState<SyncResult | null>(null);
   const [search, setSearch] = useState("");
+  const [cgis, setCgis] = useState<{ endpoints: string[]; contexts: Record<string, string> } | null>(null);
+  const [loadingCgis, setLoadingCgis] = useState(false);
 
   const fetchStatus = async () => {
     setLoading(true);
@@ -128,6 +130,24 @@ export default function R3005GPage() {
             {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
             Sincronizar Status
           </Button>
+          <Button variant="secondary" onClick={async () => {
+            setLoadingCgis(true);
+            try {
+              const { data: sessionData } = await supabase.auth.getSession();
+              const token = sessionData?.session?.access_token;
+              if (!token) { toast.error("Sessão expirada"); return; }
+              const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+              const res = await fetch(`https://${projectId}.supabase.co/functions/v1/r3005g-sync/list-cgis`, {
+                headers: { Authorization: `Bearer ${token}`, apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
+              });
+              const result = await res.json();
+              setCgis(result);
+              toast.success(`${result.endpoints?.length || 0} endpoints encontrados`);
+            } catch (e) { console.error(e); toast.error("Erro"); } finally { setLoadingCgis(false); }
+          }} disabled={loadingCgis}>
+            {loadingCgis ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+            Listar CGIs
+          </Button>
           {data && data.not_in_system.length > 0 && (
             <Button variant="outline" onClick={importUsers} disabled={importing}>
               {importing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Download className="h-4 w-4 mr-2" />}
@@ -136,6 +156,26 @@ export default function R3005GPage() {
           )}
         </div>
       </div>
+
+      {cgis && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Endpoints CGI do Roteador</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2 max-h-[400px] overflow-auto">
+              {cgis.endpoints?.map((ep: string) => (
+                <div key={ep} className="border rounded p-2">
+                  <p className="text-sm font-mono font-bold text-primary">{ep}</p>
+                  {cgis.contexts?.[ep] && (
+                    <pre className="text-xs font-mono text-muted-foreground mt-1 whitespace-pre-wrap break-all">{cgis.contexts[ep]}</pre>
+                  )}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* KPIs */}
       {data && (
