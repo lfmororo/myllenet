@@ -101,53 +101,27 @@ function tryEncryptVariants(plaintext: string, key: CryptoJS.lib.WordArray, iv: 
 
 interface KeyApproach { name: string; key: CryptoJS.lib.WordArray; iv: CryptoJS.lib.WordArray; mode?: typeof CryptoJS.mode.CBC }
 
-function getAllKeyApproaches(serialNumber: string): KeyApproach[] {
-  const combined = serialNumber + AES_CONSTANT;
-  const reversed = AES_CONSTANT + serialNumber;
-  const md5Hash = CryptoJS.MD5(combined);
-  const md5Rev = CryptoJS.MD5(reversed);
-  const sha256 = CryptoJS.SHA256(combined);
-  const sha256Hex = sha256.toString();
-  const md5Serial = CryptoJS.MD5(serialNumber);
-  const md5Const = CryptoJS.MD5(AES_CONSTANT);
-  const md5Hex = md5Hash.toString(); // 32 hex chars
-  const md5RevHex = md5Rev.toString();
-  const zeroIV = CryptoJS.enc.Hex.parse("00000000000000000000000000000000");
+// Exact logic from router's chunk-common.js:
+// combined = Base64(SN) + AES_CONSTANT; key = combined[0:16]; iv = combined[16:32]
+function getRouterKeyIV(serialNumber: string): { key: CryptoJS.lib.WordArray; iv: CryptoJS.lib.WordArray } {
+  let sn = serialNumber;
+  if (/^(没有序列号|no-ssid)$/i.test(sn)) sn = "";
+  const b64sn = btoa(sn);
+  const combined = b64sn + AES_CONSTANT;
+  const keyStr = combined.slice(0, 16);
+  const ivStr = combined.slice(16, 32);
+  console.log(`R3005G KEY: Base64(SN)="${b64sn}", key="${keyStr}", iv="${ivStr}"`);
+  return {
+    key: CryptoJS.enc.Utf8.parse(keyStr),
+    iv: CryptoJS.enc.Utf8.parse(ivStr),
+  };
+}
 
+function getAllKeyApproaches(serialNumber: string): KeyApproach[] {
+  const router = getRouterKeyIV(serialNumber);
   return [
-    // CBC approaches - Hex-parsed MD5
-    { name: "MD5(sn+const) key=iv", key: CryptoJS.enc.Hex.parse(md5Hex), iv: CryptoJS.enc.Hex.parse(md5Hex) },
-    { name: "MD5(sn+const), zero IV", key: CryptoJS.enc.Hex.parse(md5Hex), iv: zeroIV },
-    { name: "MD5(const+sn) key=iv", key: CryptoJS.enc.Hex.parse(md5RevHex), iv: CryptoJS.enc.Hex.parse(md5RevHex) },
-    // CBC - UTF8-parsed MD5 hex (very common in Intelbras!)
-    { name: "MD5hex(sn+const)[:16] utf8 key=iv", key: CryptoJS.enc.Utf8.parse(md5Hex.substring(0, 16)), iv: CryptoJS.enc.Utf8.parse(md5Hex.substring(0, 16)) },
-    { name: "MD5hex(sn+const) utf8 key[:16]=iv[16:]", key: CryptoJS.enc.Utf8.parse(md5Hex.substring(0, 16)), iv: CryptoJS.enc.Utf8.parse(md5Hex.substring(16, 32)) },
-    { name: "MD5hex(const+sn)[:16] utf8 key=iv", key: CryptoJS.enc.Utf8.parse(md5RevHex.substring(0, 16)), iv: CryptoJS.enc.Utf8.parse(md5RevHex.substring(0, 16)) },
-    { name: "MD5hex(const+sn) utf8 key[:16]=iv[16:]", key: CryptoJS.enc.Utf8.parse(md5RevHex.substring(0, 16)), iv: CryptoJS.enc.Utf8.parse(md5RevHex.substring(16, 32)) },
-    // CBC - raw string keys
-    { name: "serial key, const IV", key: CryptoJS.enc.Utf8.parse(serialNumber.padEnd(16, "\0").substring(0, 16)), iv: CryptoJS.enc.Utf8.parse(AES_CONSTANT.substring(0, 16)) },
-    { name: "const key, serial IV", key: CryptoJS.enc.Utf8.parse(AES_CONSTANT.substring(0, 16)), iv: CryptoJS.enc.Utf8.parse(serialNumber.padEnd(16, "\0").substring(0, 16)) },
-    { name: "SHA256 split", key: CryptoJS.enc.Hex.parse(sha256Hex.substring(0, 32)), iv: CryptoJS.enc.Hex.parse(sha256Hex.substring(32, 64)) },
-    { name: "MD5(serial) key, MD5(const) IV", key: CryptoJS.enc.Hex.parse(md5Serial.toString()), iv: CryptoJS.enc.Hex.parse(md5Const.toString()) },
-    { name: "combined[:16] key, zero IV", key: CryptoJS.enc.Utf8.parse(combined.substring(0, 16)), iv: zeroIV },
-    // Constant-only approaches
-    { name: "MD5(const) key=iv", key: CryptoJS.enc.Hex.parse(md5Const.toString()), iv: CryptoJS.enc.Hex.parse(md5Const.toString()) },
-    { name: "const[:16] key=iv", key: CryptoJS.enc.Utf8.parse(AES_CONSTANT.substring(0, 16)), iv: CryptoJS.enc.Utf8.parse(AES_CONSTANT.substring(0, 16)) },
-    { name: "const[:16] key, zero IV", key: CryptoJS.enc.Utf8.parse(AES_CONSTANT.substring(0, 16)), iv: zeroIV },
-    { name: "MD5(const) key, zero IV", key: CryptoJS.enc.Hex.parse(md5Const.toString()), iv: zeroIV },
-    // SN as raw key
-    { name: "sn[:16] key=iv", key: CryptoJS.enc.Utf8.parse(serialNumber.padEnd(16, "\0").substring(0, 16)), iv: CryptoJS.enc.Utf8.parse(serialNumber.padEnd(16, "\0").substring(0, 16)) },
-    { name: "sn[:16] key, zero IV", key: CryptoJS.enc.Utf8.parse(serialNumber.padEnd(16, "\0").substring(0, 16)), iv: zeroIV },
-    // MD5 hex UTF8 with zero IV
-    { name: "MD5hex(sn+const)[:16] utf8, zero IV", key: CryptoJS.enc.Utf8.parse(md5Hex.substring(0, 16)), iv: zeroIV },
-    { name: "MD5hex(const+sn)[:16] utf8, zero IV", key: CryptoJS.enc.Utf8.parse(md5RevHex.substring(0, 16)), iv: zeroIV },
-    // ECB mode (no IV needed)
-    { name: "ECB MD5(sn+const)", key: CryptoJS.enc.Hex.parse(md5Hex), iv: zeroIV, mode: CryptoJS.mode.ECB },
-    { name: "ECB MD5hex[:16] utf8", key: CryptoJS.enc.Utf8.parse(md5Hex.substring(0, 16)), iv: zeroIV, mode: CryptoJS.mode.ECB },
-    { name: "ECB sn[:16]", key: CryptoJS.enc.Utf8.parse(serialNumber.padEnd(16, "\0").substring(0, 16)), iv: zeroIV, mode: CryptoJS.mode.ECB },
-    { name: "ECB const[:16]", key: CryptoJS.enc.Utf8.parse(AES_CONSTANT.substring(0, 16)), iv: zeroIV, mode: CryptoJS.mode.ECB },
-    { name: "ECB MD5(const)", key: CryptoJS.enc.Hex.parse(md5Const.toString()), iv: zeroIV, mode: CryptoJS.mode.ECB },
-    { name: "ECB MD5(serial)", key: CryptoJS.enc.Hex.parse(md5Serial.toString()), iv: zeroIV, mode: CryptoJS.mode.ECB },
+    // PRIMARY: exact router logic
+    { name: "ROUTER_EXACT: B64(sn)+const", key: router.key, iv: router.iv },
   ];
 }
 
@@ -653,85 +627,92 @@ Deno.serve(async (req) => {
 
     // ACTION: extract-js - download and analyze router JS files for decryption logic
     if (action === "extract-js") {
-      const jsSnippets: Record<string, string> = {};
+      const result: Record<string, string> = {};
       
-      // 1. Get index.html to find JS paths
+      // 1. Fetch multiple HTML pages and extract ALL content
+      const htmlPages = ["index.html", "login.html", "main.html", "home.html", "pppoe.html", "user.html", "system.html", ""];
       const jsFiles: string[] = [];
-      try {
-        const htmlRes = await fetch(`${baseUrl}/index.html`, { headers: { Cookie: cookie } });
-        if (htmlRes.ok) {
-          const html = await htmlRes.text();
-          jsSnippets["index.html_scripts"] = [...html.matchAll(/src=["']([^"']*\.js[^"']*?)["']/g)].map(m => m[1]).join("\n");
-          const scriptMatches = html.matchAll(/src=["']([^"']*\.js[^"']*?)["']/g);
-          for (const m of scriptMatches) jsFiles.push(m[1].replace(/^\//, ""));
-        }
-      } catch (e) { jsSnippets["html_error"] = String(e); }
-
-      // Also try login.html
-      try {
-        const loginRes = await fetch(`${baseUrl}/login.html`, { headers: { Cookie: cookie } });
-        if (loginRes.ok) {
-          const html = await loginRes.text();
-          const scriptMatches = html.matchAll(/src=["']([^"']*\.js[^"']*?)["']/g);
-          for (const m of scriptMatches) {
-            const path = m[1].replace(/^\//, "");
+      
+      for (const page of htmlPages) {
+        try {
+          const res = await fetch(`${baseUrl}/${page}`, { headers: { Cookie: cookie } });
+          if (!res.ok) continue;
+          const html = await res.text();
+          
+          // Extract script src tags AND link preload tags
+          const srcMatches = [...html.matchAll(/src=["']?([^"'\s>]+\.js[^"'\s>]*)["']?/g)];
+          const linkMatches = [...html.matchAll(/href=["']?([^"'\s>]+\.js[^"'\s>]*)["']?/g)];
+          for (const m of [...srcMatches, ...linkMatches]) {
+            const path = m[1].replace(/^\.\//, "").replace(/^\//, "");
             if (!jsFiles.includes(path)) jsFiles.push(path);
           }
-        }
-      } catch { /* */ }
-
-      // Add common fallback paths
-      for (const f of ["static/js/chunk-common.js", "static/js/app.js", "js/chunk-common.js", "js/app.js", "js/main.js", "static/js/chunk-vendors.js"]) {
-        if (!jsFiles.includes(f)) jsFiles.push(f);
+          
+          // Extract inline scripts
+          const inlineMatches = [...html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)];
+          for (let i = 0; i < inlineMatches.length; i++) {
+            const content = inlineMatches[i][1].trim();
+            if (content.length > 10) {
+              result[`${page || "root"}_inline_${i}`] = content.substring(0, 3000);
+            }
+          }
+          
+          // Save full HTML (truncated) for analysis
+          result[`${page || "root"}_html`] = html.substring(0, 5000);
+        } catch { /* skip */ }
       }
-
-      jsSnippets["js_files_found"] = jsFiles.join(", ");
-
-      // 2. Download each JS file and extract crypto-related code
-      const cryptoKeywords = ["decrypt", "encrypt", "AES", "CryptoJS", "crypto", "aes", "c3W1KF", "sn", "serial", "decipher", "cipher", "md5", "MD5", "key", "iv "];
       
+      // 2. Try many Intelbras-specific JS paths
+      // No extra fallback paths needed - we extract real paths from HTML above
+      result["js_paths_discovered"] = jsFiles.join(", ");
+      
+      // 3. Download each discovered JS file - prioritize chunk-common and index (crypto logic)
+      const foundFiles: string[] = [];
+      const priorityOrder = (f: string) => {
+        if (f.includes("chunk-common")) return 0;
+        if (f.includes("index.") && f.includes(".js")) return 1;
+        if (f.includes("login.")) return 2;
+        if (f.includes("chunk-vendors") || f.includes("chunk-element")) return 10;
+        return 5;
+      };
+      jsFiles.sort((a, b) => priorityOrder(a) - priorityOrder(b));
+
       for (const jsFile of jsFiles) {
+        if (!jsFile.endsWith(".js")) continue;
         try {
           const res = await fetch(`${baseUrl}/${jsFile}`, { headers: { Cookie: cookie } });
-          if (!res.ok) { jsSnippets[`${jsFile}_status`] = String(res.status); continue; }
+          if (!res.ok) continue;
           const text = await res.text();
-          jsSnippets[`${jsFile}_size`] = `${text.length} bytes`;
-
-          // Search for crypto-related snippets
-          for (const kw of cryptoKeywords) {
-            let idx = -1;
+          foundFiles.push(jsFile);
+          result[`${jsFile}_size`] = `${text.length} bytes`;
+          
+          const keywords = ["decrypt", "encrypt", "AES", "CryptoJS", "c3W1KF", "aes_", "MD5", "md5", "cipher", "decipher"];
+          for (const kw of keywords) {
             let searchFrom = 0;
-            let snippetCount = 0;
-            while ((idx = text.indexOf(kw, searchFrom)) !== -1 && snippetCount < 3) {
-              const start = Math.max(0, idx - 200);
-              const end = Math.min(text.length, idx + 300);
-              const snippet = text.substring(start, end);
-              jsSnippets[`${jsFile}__${kw}_${snippetCount}`] = snippet;
+            let count = 0;
+            while (count < 3) {
+              const idx = text.indexOf(kw, searchFrom);
+              if (idx === -1) break;
+              const start = Math.max(0, idx - 400);
+              const end = Math.min(text.length, idx + 600);
+              result[`${jsFile}__${kw}_${count}`] = text.substring(start, end);
               searchFrom = idx + kw.length;
-              snippetCount++;
+              count++;
             }
           }
-
-          // Also look for function definitions around decrypt/encrypt
-          const funcPatterns = [
-            /function\s+\w*[Dd]ecrypt\w*\s*\([^)]*\)\s*\{[^}]{0,2000}\}/g,
-            /function\s+\w*[Ee]ncrypt\w*\s*\([^)]*\)\s*\{[^}]{0,2000}\}/g,
-            /function\s+\w*[Aa]es\w*\s*\([^)]*\)\s*\{[^}]{0,2000}\}/g,
-            /\w+\s*=\s*function\s*\([^)]*\)\s*\{[^}]*(?:decrypt|encrypt|AES|aes)[^}]{0,2000}\}/g,
-            /(?:var|let|const)\s+\w+\s*=\s*(?:CryptoJS|crypto)[^;]{0,500}/g,
-          ];
-          for (const pat of funcPatterns) {
-            const matches = text.matchAll(pat);
-            let i = 0;
-            for (const m of matches) {
-              jsSnippets[`${jsFile}__func_${pat.source.substring(0,20)}_${i}`] = m[0].substring(0, 2000);
-              i++;
+          
+          // For chunk-common, extract large context around AES constant
+          if (jsFile.includes("chunk-common")) {
+            const cryptoIdx = text.indexOf("c3W1KF");
+            if (cryptoIdx !== -1) {
+              result[`${jsFile}__AES_CONTEXT`] = text.substring(Math.max(0, cryptoIdx - 2000), Math.min(text.length, cryptoIdx + 3000));
             }
           }
-        } catch (e) { jsSnippets[`${jsFile}_error`] = String(e); }
+        } catch { /* skip */ }
       }
+      
+      result["found_js_files"] = foundFiles.join(", ") || "NONE";
 
-      return new Response(JSON.stringify(jsSnippets, null, 2), {
+      return new Response(JSON.stringify(result, null, 2), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
