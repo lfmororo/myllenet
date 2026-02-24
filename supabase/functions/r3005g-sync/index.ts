@@ -717,6 +717,42 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ACTION: list-cgis - discover all CGI endpoints from router JS
+    if (action === "list-cgis") {
+      const allCgis: string[] = [];
+      const contexts: Record<string, string> = {};
+      try {
+        const htmlRes = await fetch(`${baseUrl}/index.html`, { headers: { Cookie: cookie } });
+        if (htmlRes.ok) {
+          const html = await htmlRes.text();
+          const scriptPaths = [...html.matchAll(/(?:src|href)=["']?([^"'\s>]+\.js[^"'\s>]*)["']?/g)].map(m => m[1].replace(/^\.\//, "").replace(/^\//, ""));
+          for (const jsPath of scriptPaths) {
+            try {
+              const jsRes = await fetch(`${baseUrl}/${jsPath}`, { headers: { Cookie: cookie } });
+              if (!jsRes.ok) continue;
+              const jsText = await jsRes.text();
+              const cgiMatches = [...jsText.matchAll(/["']([a-zA-Z0-9_]+\.cgi)["']/g)];
+              for (const m of cgiMatches) {
+                if (!allCgis.includes(m[1])) allCgis.push(m[1]);
+                const idx = jsText.indexOf(m[1]);
+                if (idx !== -1) {
+                  contexts[m[1]] = jsText.substring(Math.max(0, idx - 200), Math.min(jsText.length, idx + 200));
+                }
+              }
+              const dataMatches = [...jsText.matchAll(/["']([a-zA-Z0-9_]+\.data)["']/g)];
+              for (const m of dataMatches) {
+                if (!allCgis.includes(m[1])) allCgis.push(m[1]);
+              }
+            } catch { /* skip */ }
+          }
+        }
+      } catch { /* skip */ }
+      
+      return new Response(JSON.stringify({ endpoints: allCgis, contexts }, null, 2), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // ACTION: add-user - create a PPPoE user on the router
     if (action === "add-user") {
       const body = await req.json();
