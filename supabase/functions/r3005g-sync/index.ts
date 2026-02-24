@@ -755,6 +755,55 @@ Deno.serve(async (req) => {
         encPwd = encryptField(senha_pppoe);
       }
 
+      // First, discover the correct add-user endpoint from router JS
+      let addEndpoint: string | null = null;
+      const allCgiEndpoints: string[] = [];
+      try {
+        const htmlRes = await fetch(`${baseUrl}/index.html`, { headers: { Cookie: cookie } });
+        if (htmlRes.ok) {
+          const html = await htmlRes.text();
+          const scriptPaths = [...html.matchAll(/(?:src|href)=["']?([^"'\s>]+\.js[^"'\s>]*)["']?/g)].map(m => m[1].replace(/^\.\//, "").replace(/^\//, ""));
+          const prioritized = scriptPaths.sort((a, b) => (a.includes("chunk-common") ? -1 : b.includes("chunk-common") ? 1 : 0));
+          for (const jsPath of prioritized) {
+            try {
+              const jsRes = await fetch(`${baseUrl}/${jsPath}`, { headers: { Cookie: cookie } });
+              if (!jsRes.ok) continue;
+              const jsText = await jsRes.text();
+              // Extract ALL .cgi endpoints mentioned in JS
+              const cgiMatches = [...jsText.matchAll(/["']([a-zA-Z0-9_]+\.cgi)["']/g)];
+              for (const m of cgiMatches) {
+                if (!allCgiEndpoints.includes(m[1])) allCgiEndpoints.push(m[1]);
+              }
+              // Also look for context around "user" related CGIs
+              const userCgiContext = [...jsText.matchAll(/.{0,100}(?:user|pppoe)[^"']*\.cgi.{0,100}/gi)];
+              for (const m of userCgiContext.slice(0, 5)) {
+                console.log(`R3005G ADD-USER: User CGI context: ${m[0].substring(0, 200)}`);
+              }
+            } catch { /* skip */ }
+          }
+        }
+      } catch { /* skip */ }
+
+      console.log(`R3005G ADD-USER: All CGI endpoints found in JS: ${allCgiEndpoints.join(", ")}`);
+
+      // Filter for user-related add endpoints
+      const userAddCgis = allCgiEndpoints.filter(e => {
+        const el = e.toLowerCase();
+        return (el.includes("user") || el.includes("pppoe")) && (el.includes("add") || el.includes("create") || el.includes("new") || el.includes("set") || el.includes("edit") || el.includes("save"));
+      });
+      if (userAddCgis.length > 0) addEndpoint = userAddCgis[0];
+      console.log(`R3005G ADD-USER: User add CGIs: ${userAddCgis.join(", ") || "none found"}`);
+
+      // Try multiple possible endpoints
+      const endpointsToTry = [
+        addEndpoint,
+        ...userAddCgis,
+        "pppoeUser_add.cgi", "pppoe_user_add.cgi", "user_add.cgi",
+        "addUser.cgi", "pppoe_add.cgi", "userAdd.cgi",
+        "user_edit.cgi", "pppoeUser_edit.cgi",
+        "user_set.cgi", "pppoeUser_set.cgi",
+      ].filter((v, i, a) => v && a.indexOf(v) === i) as string[];
+
       // Add user via CGI endpoint
       const userPayload = {
         user: encUser,
@@ -768,26 +817,40 @@ Deno.serve(async (req) => {
         mod_pwd: "1",
       };
 
-      console.log(`R3005G ADD-USER: Adding "${usuario_pppoe}" to group "${group || "Default"}"`);
+      console.log(`R3005G ADD-USER: Adding "${usuario_pppoe}" to group "${group || "Default"}", trying endpoints: ${endpointsToTry.join(", ")}`);
 
-      const addRes = await fetch(`${baseUrl}/user_add.cgi`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json;charset=UTF-8", Cookie: cookie, Origin: baseUrl },
-        body: JSON.stringify(userPayload),
-      });
+      for (const ep of endpointsToTry) {
+        try {
+          const addRes = await fetch(`${baseUrl}/${ep}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json;charset=UTF-8", Cookie: cookie, Origin: baseUrl },
+            body: JSON.stringify(userPayload),
+          });
 
-      const addText = await addRes.text();
-      let addJson: Record<string, unknown>;
-      try { addJson = JSON.parse(addText); } catch { addJson = { raw: addText.substring(0, 500) }; }
-      console.log(`R3005G ADD-USER: Response:`, JSON.stringify(addJson).substring(0, 500));
+          const addText = await addRes.text();
+          let addJson: Record<string, unknown>;
+          try { addJson = JSON.parse(addText); } catch { addJson = { raw: addText.substring(0, 500) }; }
+          console.log(`R3005G ADD-USER: ${ep} => status=${addRes.status}, response:`, JSON.stringify(addJson).substring(0, 300));
 
-      if (addJson.code === 0 || addRes.ok) {
-        return new Response(JSON.stringify({ success: true, message: `Usuário ${usuario_pppoe} cadastrado no roteador`, data: addJson }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+          // Check if this endpoint is valid (not 404)
+          if (addText.includes("Not Found") || addRes.status === 404) continue;
+
+          if (addJson.code === 0) {
+            return new Response(JSON.stringify({ success: true, message: `Usuário ${usuario_pppoe} cadastrado no roteador (grupo: ${group || "Default"})`, endpoint: ep, data: addJson }), {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+
+          // If we got a valid response (not 404) but with an error, return it
+          return new Response(JSON.stringify({ success: false, message: `Roteador respondeu com erro: ${addJson.error || JSON.stringify(addJson).substring(0, 200)}`, endpoint: ep, data: addJson }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        } catch (e) {
+          console.log(`R3005G ADD-USER: ${ep} error:`, e.message);
+        }
       }
 
-      return new Response(JSON.stringify({ success: false, message: `Erro ao cadastrar no roteador: ${addJson.error || addText.substring(0, 200)}`, data: addJson }), {
+      return new Response(JSON.stringify({ success: false, message: "Nenhum endpoint de cadastro de usuário encontrado no roteador", tried: endpointsToTry }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
