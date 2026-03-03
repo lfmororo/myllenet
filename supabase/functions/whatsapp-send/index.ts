@@ -92,6 +92,22 @@ async function uazapiRequest(endpoint: string, body: unknown) {
   return data;
 }
 
+async function sendSupportButton(phone: string) {
+  try {
+    await uazapiRequest("/send/menu", {
+      number: phone,
+      type: "button",
+      text: "Precisa de Suporte?",
+      choices: [
+        "Falar com Suporte|https://wa.me/5585986801458?text=Preciso%20de%20Suporte"
+      ],
+      footerText: "Escolha uma opção",
+    });
+  } catch (err) {
+    console.error("Failed to send support button:", err);
+  }
+}
+
 function formatPhone(phone: string): string {
   let digits = phone.replace(/\D/g, "");
   if (!digits.startsWith("55")) {
@@ -152,6 +168,8 @@ async function sendText(req: Request) {
       text: message,
     });
 
+    await sendSupportButton(formattedPhone);
+
     await logNotification({
       customer_id,
       customer_name: customer_name || phone,
@@ -206,6 +224,7 @@ async function sendBulk(req: Request) {
         number: formattedPhone,
         text: msg.message,
       });
+      await sendSupportButton(formattedPhone);
       success++;
 
       await logNotification({
@@ -312,6 +331,8 @@ async function sendInvoiceNotification(req: Request) {
       text: message,
     });
 
+    await sendSupportButton(formattedPhone);
+
     await logNotification({
       customer_id: invoice.customer_id,
       customer_name: customer.nome,
@@ -372,6 +393,7 @@ async function resendPaidNotifications(req: Request) {
       const formattedPhone = formatPhone(customer.telefone);
 
       await uazapiRequest("/send/text", { number: formattedPhone, text: message });
+      await sendSupportButton(formattedPhone);
       await logNotification({ customer_id: invoice.customer_id, customer_name: customer.nome, phone: customer.telefone, type: "pagamento_confirmado", message, status: "sent" });
       sent++;
       await new Promise(r => setTimeout(r, 1000));

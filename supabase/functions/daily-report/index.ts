@@ -31,10 +31,20 @@ async function getUazapiToken(): Promise<string> {
   throw new Error("Token WhatsApp não configurado.");
 }
 
-async function sendWhatsApp(phone: string, message: string) {
-  const token = await getUazapiToken();
+function formatPhone(phone: string): string {
   let digits = phone.replace(/\D/g, "");
   if (!digits.startsWith("55")) digits = "55" + digits;
+  if (digits.length === 12 && digits.startsWith("55")) {
+    const ddd = digits.substring(2, 4);
+    const number = digits.substring(4);
+    digits = `55${ddd}9${number}`;
+  }
+  return digits;
+}
+
+async function sendWhatsApp(phone: string, message: string) {
+  const token = await getUazapiToken();
+  const digits = formatPhone(phone);
 
   const response = await fetch(`${UAZAPI_BASE_URL}/send/text`, {
     method: "POST",
@@ -45,6 +55,26 @@ async function sendWhatsApp(phone: string, message: string) {
   const text = await response.text();
   console.log("WhatsApp send result:", response.status, text.slice(0, 200));
   return response.ok;
+}
+
+async function sendSupportButton(phone: string) {
+  try {
+    const token = await getUazapiToken();
+    const digits = formatPhone(phone);
+    await fetch(`${UAZAPI_BASE_URL}/send/menu`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "token": token },
+      body: JSON.stringify({
+        number: digits,
+        type: "button",
+        text: "Precisa de Suporte?",
+        choices: ["Falar com Suporte|https://wa.me/5585986801458?text=Preciso%20de%20Suporte"],
+        footerText: "Escolha uma opção",
+      }),
+    });
+  } catch (err) {
+    console.error("Failed to send support button:", err);
+  }
 }
 
 async function logNotification(supabase: any, params: {
@@ -161,6 +191,7 @@ Deno.serve(async (req) => {
       try {
         const ok = await sendWhatsApp(phone, message);
         if (ok) {
+          await sendSupportButton(phone);
           sent++;
           await logNotification(supabase, {
             customer_name: "Admin",
