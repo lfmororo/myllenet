@@ -7,6 +7,7 @@ const corsHeaders = {
 };
 
 const UAZAPI_BASE_URL = "https://ipazua.uazapi.com";
+const BOT_DISCLAIMER = "\n\n🤖 _Esta é uma mensagem automática. Para falar com um atendente, entre em contato: (85) 98680-1458_";
 
 function getSupabaseAdmin() {
   return createClient(
@@ -189,7 +190,8 @@ Deno.serve(async (req) => {
       }
 
       try {
-        const ok = await sendWhatsApp(phone, message);
+        const fullMessage = message + BOT_DISCLAIMER;
+        const ok = await sendWhatsApp(phone, fullMessage);
         if (ok) {
           await sendSupportButton(phone);
           sent++;

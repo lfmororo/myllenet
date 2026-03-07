@@ -7,6 +7,7 @@ const corsHeaders = {
 };
 
 const UAZAPI_BASE_URL = "https://ipazua.uazapi.com";
+const BOT_DISCLAIMER = "\n\n🤖 _Esta é uma mensagem automática. Para falar com um atendente, entre em contato: (85) 98680-1458_";
 
 function getSupabaseAdmin() {
   return createClient(
@@ -163,9 +164,10 @@ async function sendText(req: Request) {
 
   try {
     const formattedPhone = formatPhone(phone);
+    const fullMessage = message + BOT_DISCLAIMER;
     const result = await uazapiRequest("/send/text", {
       number: formattedPhone,
-      text: message,
+      text: fullMessage,
     });
 
     await sendSupportButton(formattedPhone);
@@ -175,7 +177,7 @@ async function sendText(req: Request) {
       customer_name: customer_name || phone,
       phone,
       type: "manual",
-      message,
+      message: fullMessage,
       status: "sent",
     });
 
@@ -220,9 +222,10 @@ async function sendBulk(req: Request) {
   for (const msg of messages) {
     try {
       const formattedPhone = formatPhone(msg.phone);
+      const fullMsg = msg.message + BOT_DISCLAIMER;
       await uazapiRequest("/send/text", {
         number: formattedPhone,
-        text: msg.message,
+        text: fullMsg,
       });
       await sendSupportButton(formattedPhone);
       success++;
@@ -232,7 +235,7 @@ async function sendBulk(req: Request) {
         customer_name: msg.customer_name || msg.phone,
         phone: msg.phone,
         type: msg.type || "bulk",
-        message: msg.message,
+        message: fullMsg,
         status: "sent",
       });
 
@@ -326,9 +329,10 @@ async function sendInvoiceNotification(req: Request) {
 
   try {
     const formattedPhone = formatPhone(customer.telefone);
+    const fullMessage = message + BOT_DISCLAIMER;
     const result = await uazapiRequest("/send/text", {
       number: formattedPhone,
-      text: message,
+      text: fullMessage,
     });
 
     await sendSupportButton(formattedPhone);
@@ -338,7 +342,7 @@ async function sendInvoiceNotification(req: Request) {
       customer_name: customer.nome,
       phone: customer.telefone,
       type: notifType,
-      message,
+      message: fullMessage,
       status: "sent",
     });
 
@@ -392,9 +396,10 @@ async function resendPaidNotifications(req: Request) {
       const message = `Olá ${customer.nome}! 🌐\n\n✅ Pagamento confirmado!\n\n📋 ${invoice.descricao}\n💰 Valor: ${valor}\n\nObrigado por manter sua internet em dia! 🚀`;
       const formattedPhone = formatPhone(customer.telefone);
 
-      await uazapiRequest("/send/text", { number: formattedPhone, text: message });
+      const fullMessage = message + BOT_DISCLAIMER;
+      await uazapiRequest("/send/text", { number: formattedPhone, text: fullMessage });
       await sendSupportButton(formattedPhone);
-      await logNotification({ customer_id: invoice.customer_id, customer_name: customer.nome, phone: customer.telefone, type: "pagamento_confirmado", message, status: "sent" });
+      await logNotification({ customer_id: invoice.customer_id, customer_name: customer.nome, phone: customer.telefone, type: "pagamento_confirmado", message: fullMessage, status: "sent" });
       sent++;
       await new Promise(r => setTimeout(r, 1000));
     } catch (err) {

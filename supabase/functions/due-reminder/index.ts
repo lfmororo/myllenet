@@ -7,6 +7,7 @@ const corsHeaders = {
 };
 
 const UAZAPI_BASE_URL = "https://ipazua.uazapi.com";
+const BOT_DISCLAIMER = "\n\n🤖 _Esta é uma mensagem automática. Para falar com um atendente, entre em contato: (85) 98680-1458_";
 
 function getSupabaseAdmin() {
   return createClient(
@@ -162,7 +163,8 @@ Evite a suspensão do serviço. Pague em dia! 😊
 _Equipe Myllenet_`;
 
       try {
-        const ok = await sendWhatsApp(customer.telefone, message);
+        const fullMessage = message + BOT_DISCLAIMER;
+        const ok = await sendWhatsApp(customer.telefone, fullMessage);
         if (ok) {
           await sendSupportButton(customer.telefone);
           sent++;
