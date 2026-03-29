@@ -14,3 +14,6 @@ verify_jwt = false
 
 [functions.due-reminder]
 verify_jwt = false
+
+[functions.cutoff-warning]
+verify_jwt = false
