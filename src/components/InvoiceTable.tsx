@@ -52,6 +52,15 @@ export default function InvoiceTable({ invoices, onCheckPayment, onCancel, onMar
     return new Date(dateStr + "T00:00:00").toLocaleDateString("pt-BR");
   };
 
+  const getDaysOverdue = (dateStr: string, status: string) => {
+    if (status !== "overdue") return null;
+    const venc = new Date(dateStr + "T00:00:00");
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const diff = Math.floor((today.getTime() - venc.getTime()) / (1000 * 60 * 60 * 24));
+    return diff > 0 ? diff : null;
+  };
+
   const getAvailableWhatsappOptions = (status: string) => {
     return whatsappOptions.filter(opt => !opt.statusFilter || opt.statusFilter.includes(status));
   };
@@ -91,7 +100,15 @@ export default function InvoiceTable({ invoices, onCheckPayment, onCancel, onMar
                 <TableCell className="font-mono">{formatCurrency(inv.valor_centavos)}</TableCell>
                 <TableCell>{formatDate(inv.vencimento)}</TableCell>
                 <TableCell>
-                  <Badge variant={status.variant}>{status.label}</Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={status.variant}>{status.label}</Badge>
+                    {(() => {
+                      const days = getDaysOverdue(inv.vencimento, inv.status);
+                      return days ? (
+                        <span className="text-xs font-medium text-destructive">{days}d</span>
+                      ) : null;
+                    })()}
+                  </div>
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-1">
