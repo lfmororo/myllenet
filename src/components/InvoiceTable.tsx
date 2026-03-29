@@ -52,6 +52,15 @@ export default function InvoiceTable({ invoices, onCheckPayment, onCancel, onMar
     return new Date(dateStr + "T00:00:00").toLocaleDateString("pt-BR");
   };
 
+  const getDaysOverdue = (dateStr: string, status: string) => {
+    if (status !== "overdue") return null;
+    const venc = new Date(dateStr + "T00:00:00");
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const diff = Math.floor((today.getTime() - venc.getTime()) / (1000 * 60 * 60 * 24));
+    return diff > 0 ? diff : null;
+  };
+
   const getAvailableWhatsappOptions = (status: string) => {
     return whatsappOptions.filter(opt => !opt.statusFilter || opt.statusFilter.includes(status));
   };
