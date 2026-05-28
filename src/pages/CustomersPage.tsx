@@ -198,7 +198,8 @@ export default function CustomersPage() {
             const rows = activeCustomers.map(c => {
               const plan = c.plan_id ? planMap[c.plan_id] : null;
               const group = plan?.nome_servidor || "Default";
-              return [c.usuario_pppoe, c.senha_pppoe, "pppoe", "", "0.0.0.0", "0.0.0.0", "", "0", ">>>>>>", "1", "0", "0", "dl", "1", "0", "0", "0", "0", "0/0", group, "-"].join(",");
+              const userId = String(Math.floor(1000000000 + Math.random() * 9000000000));
+              return [c.usuario_pppoe, c.senha_pppoe, "pppoe", "", "0.0.0.0", "0.0.0.0", "", "0", ">>>>>>", "1", "0", "0", "dl", "1", userId, "0", "0", "0", "0/0", group, "-"].join(",");
             });
             const csv = [header, ...rows].join("\n");
             const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
