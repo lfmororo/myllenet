@@ -855,7 +855,91 @@ async function bulkCheckPayments(_req: Request) {
 
   const supabase = getSupabaseAdmin();
 
-  // Get all pending/waiting invoices that have an efi_charge_id
+  // ===== PASS 1: Reconcile invoices WITHOUT efi_charge_id by querying EFI by CPF =====
+  // Lists open invoices per customer, fetches the customer's recent EFI charges, and
+  // links/updates each one matched by month of vencimento + valor.
+  let reconciled = 0;
+  try {
+    const { data: orphanInvoices } = await supabase
+      .from("invoices")
+      .select("id, customer_id, valor_centavos, vencimento, status, customers(cpf)")
+      .in("status", ["pending", "waiting", "overdue"])
+      .is("efi_charge_id", null);
+
+    // Group by customer CPF
+    const byCpf = new Map<string, { customer_id: string; invoices: any[] }>();
+    for (const inv of orphanInvoices || []) {
+      const cpf = ((inv as any).customers?.cpf || "").replace(/\D/g, "");
+      if (!cpf) continue;
+      if (!byCpf.has(cpf)) byCpf.set(cpf, { customer_id: inv.customer_id, invoices: [] });
+      byCpf.get(cpf)!.invoices.push(inv);
+    }
+
+    const now = new Date();
+    const beginDate = new Date(now); beginDate.setMonth(beginDate.getMonth() - 6);
+    const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    const bd = fmt(beginDate);
+    const ed = fmt(now);
+
+    for (const [cpf, group] of byCpf) {
+      try {
+        let charges: any[] = [];
+        let offset = 0;
+        const limit = 100;
+        let hasMore = true;
+        while (hasMore) {
+          const resp = await efiRequest(
+            `/v1/charges?charge_type=billet&customer_document=${cpf}&begin_date=${bd}&end_date=${ed}&limit=${limit}&offset=${offset}`,
+            "GET", undefined, "bulk_check"
+          );
+          const page = resp.data || resp || [];
+          if (Array.isArray(page)) {
+            charges = charges.concat(page);
+            hasMore = page.length === limit;
+          } else { hasMore = false; }
+          offset += limit;
+        }
+
+        for (const inv of group.invoices) {
+          const invMonth = String(inv.vencimento).slice(0, 7); // YYYY-MM
+          const match = charges.find((c: any) => {
+            const billet = c.payment?.banking_billet || {};
+            const expire = billet.expire_at || c.expire_at || c.created_at?.slice(0, 10) || "";
+            const sameMonth = String(expire).slice(0, 7) === invMonth;
+            const value = c.value || c.total || billet.value || 0;
+            return sameMonth && Number(value) === Number(inv.valor_centavos);
+          });
+          if (!match) continue;
+
+          const chargeId = match.charge_id || match.id;
+          const billet = match.payment?.banking_billet || {};
+          let newStatus = inv.status;
+          let paidAt: string | null = null;
+          if (match.status === "paid" || match.status === "settled") {
+            newStatus = "paid"; paidAt = match.paid_at || new Date().toISOString();
+          } else if (match.status === "canceled" || match.status === "refunded") {
+            newStatus = "cancelled";
+          } else if (match.status === "expired" || match.status === "unpaid") {
+            newStatus = "overdue";
+          }
+          await supabase.from("invoices").update({
+            efi_charge_id: chargeId,
+            efi_barcode: billet.barcode || null,
+            efi_link: billet.link || billet.pdf?.charge || null,
+            status: newStatus,
+            paid_at: paidAt,
+          }).eq("id", inv.id);
+          reconciled++;
+        }
+      } catch (e) {
+        console.error(`reconcile by cpf ${cpf} failed:`, e);
+      }
+    }
+  } catch (e) {
+    console.error("Reconcile pass failed:", e);
+  }
+
+  // ===== PASS 2: Refresh invoices that already have an efi_charge_id =====
   const { data: pendingInvoices, error } = await supabase
     .from("invoices")
     .select("id, efi_charge_id, status, paid_at, efi_barcode, efi_link, efi_pix_qrcode, efi_pix_copiacola")
@@ -870,10 +954,11 @@ async function bulkCheckPayments(_req: Request) {
   }
 
   if (!pendingInvoices || pendingInvoices.length === 0) {
-    return new Response(JSON.stringify({ checked: 0, updated: 0 }), {
+    return new Response(JSON.stringify({ checked: 0, updated: 0, reconciled }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
+
 
   let updated = 0;
   let errors = 0;
@@ -936,7 +1021,7 @@ async function bulkCheckPayments(_req: Request) {
   }
 
   return new Response(
-    JSON.stringify({ checked: pendingInvoices.length, updated, errors, notified: paidInvoiceIds.length }),
+    JSON.stringify({ checked: pendingInvoices.length, updated, errors, notified: paidInvoiceIds.length, reconciled }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } }
   );
 }
