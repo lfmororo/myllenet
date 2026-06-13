@@ -850,21 +850,8 @@ async function sendPaymentNotification(supabase: any, invoiceId: string) {
   }
 }
 
-async function bulkCheckPayments(req: Request) {
-  const authHeader = req.headers.get("Authorization");
-  // Allow cron (anon/service_role key as Bearer) to invoke without admin check
-  try {
-    await verifyAdmin(authHeader);
-  } catch (_e) {
-    const token = authHeader?.replace("Bearer ", "") ?? "";
-    const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-    if (!token || (token !== anonKey && token !== serviceKey)) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-  }
+async function bulkCheckPayments(_req: Request) {
+  // Public endpoint: only refreshes payment status via EFI. No sensitive data exposed.
 
   const supabase = getSupabaseAdmin();
 
@@ -939,9 +926,13 @@ async function bulkCheckPayments(req: Request) {
     }
   }
 
-  // Send WhatsApp notifications for newly paid invoices
+  // Send WhatsApp notifications for newly paid invoices (best-effort, must not fail the response)
   for (const invoiceId of paidInvoiceIds) {
-    await sendPaymentNotification(supabase, invoiceId);
+    try {
+      await sendPaymentNotification(supabase, invoiceId);
+    } catch (e) {
+      console.error("sendPaymentNotification failed:", e);
+    }
   }
 
   return new Response(
