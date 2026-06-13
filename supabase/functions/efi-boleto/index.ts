@@ -926,9 +926,13 @@ async function bulkCheckPayments(_req: Request) {
     }
   }
 
-  // Send WhatsApp notifications for newly paid invoices
+  // Send WhatsApp notifications for newly paid invoices (best-effort, must not fail the response)
   for (const invoiceId of paidInvoiceIds) {
-    await sendPaymentNotification(supabase, invoiceId);
+    try {
+      await sendPaymentNotification(supabase, invoiceId);
+    } catch (e) {
+      console.error("sendPaymentNotification failed:", e);
+    }
   }
 
   return new Response(
