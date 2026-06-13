@@ -1021,7 +1021,7 @@ async function bulkCheckPayments(_req: Request) {
   }
 
   return new Response(
-    JSON.stringify({ checked: pendingInvoices.length, updated, errors, notified: paidInvoiceIds.length }),
+    JSON.stringify({ checked: pendingInvoices.length, updated, errors, notified: paidInvoiceIds.length, reconciled }),
     { headers: { ...corsHeaders, "Content-Type": "application/json" } }
   );
 }
