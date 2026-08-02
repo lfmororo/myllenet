@@ -141,12 +141,18 @@ async function loginR3005G(baseUrl: string, plainUser: string, plainPass: string
   const { csrfprotect, captchaActive } = await getRouterInfo(baseUrl);
   if (captchaActive) throw new Error("Router captcha ativo.");
   const payload = { csrfprotect, user: encodeCredential(plainUser), password: encodeCredential(plainPass), base64: 1, tm: Date.now() / 1000 };
-  const res = await fetch(`${baseUrl}/log_in.cgi`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json;charset=UTF-8", Origin: baseUrl, Referer: `${baseUrl}/login.html` },
-    body: JSON.stringify(payload),
-  });
-  const body = await res.text();
+  
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 8000);
+  
+  try {
+    const res = await fetch(`${baseUrl}/log_in.cgi`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json;charset=UTF-8", Origin: baseUrl, Referer: `${baseUrl}/login.html` },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+    const body = await res.text();
   let json: Record<string, unknown>;
   try { json = JSON.parse(body); } catch { throw new Error(`Login non-JSON: ${body.substring(0, 200)}`); }
   console.log("R3005G LOGIN response:", JSON.stringify(json).substring(0, 500));
@@ -156,6 +162,9 @@ async function loginR3005G(baseUrl: string, plainUser: string, plainPass: string
     return { cookie, loginData: json };
   }
   throw new Error(`Login falhou: ${json.error || JSON.stringify(json)}`);
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 // Fetch serial number - try many endpoints and log everything
@@ -352,7 +361,29 @@ Deno.serve(async (req) => {
 
     const urlObj = new URL(req.url);
     const action = urlObj.pathname.split("/").pop();
-    const { cookie, loginData } = await loginR3005G(baseUrl, routerUser, routerPass);
+    
+    let cookie = "";
+    let loginData = {};
+    
+    try {
+      const login = await loginR3005G(baseUrl, routerUser, routerPass);
+      cookie = login.cookie;
+      loginData = login.loginData;
+    } catch (loginErr) {
+      console.error("Login attempt failed:", loginErr.message);
+      // Return a 200 with offline status if it's just a connection error during status check
+      if (action === "status") {
+        return new Response(JSON.stringify({ 
+          customers: [], 
+          total_router_users: 0, 
+          online: false, 
+          error: "Router unreachable: " + loginErr.message 
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      throw loginErr;
+    }
 
     // Extract SN from login response
     let loginSN: string | null = null;
