@@ -571,8 +571,8 @@ export default function Settings() {
             )}
           </TabsContent>
 
-          {/* R3005G Tab */}
-          <TabsContent value="r3005g" className="mt-4">
+          {/* Mikrotik Tab */}
+          <TabsContent value="mikrotik" className="mt-4">
             <Card>
               <CardHeader>
                 <CardTitle>Roteador Intelbras R3005G</CardTitle>
