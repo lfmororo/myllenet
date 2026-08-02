@@ -140,21 +140,57 @@ export default function MikrotikPage() {
           </CardContent>
         </Card>
       </div>
+      
+      <div className="grid gap-6 md:grid-cols-2">
+        <Card className="flex flex-col items-center justify-center text-center p-8 space-y-4">
+          <div className="bg-muted p-4 rounded-full">
+            <Router className="h-12 w-12 text-muted-foreground" />
+          </div>
+          <div className="max-w-md">
+            <h3 className="text-lg font-semibold">Configuração Mikrotik Pendente</h3>
+            <p className="text-sm text-muted-foreground mt-2">
+              A integração com Mikrotik via API requer a configuração do IP externo e credenciais na aba de Configurações.
+            </p>
+            <Button variant="outline" className="mt-6" asChild>
+              <a href="/settings">Ir para Configurações</a>
+            </Button>
+          </div>
+        </Card>
 
-      <Card className="py-20 flex flex-col items-center justify-center text-center space-y-4">
-        <div className="bg-muted p-4 rounded-full">
-          <Router className="h-12 w-12 text-muted-foreground" />
-        </div>
-        <div className="max-w-md">
-          <h3 className="text-lg font-semibold">Configuração Mikrotik Pendente</h3>
-          <p className="text-sm text-muted-foreground mt-2">
-            A integração com Mikrotik via API/SSH requer a configuração do IP externo e credenciais na aba de Configurações.
-          </p>
-          <Button variant="outline" className="mt-6" asChild>
-            <a href="/settings">Ir para Configurações</a>
-          </Button>
-        </div>
-      </Card>
+        <Card className="p-8 space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="bg-primary/10 p-3 rounded-lg">
+              <FileCode className="h-6 w-6 text-primary" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold">Script de Importação</h3>
+              <p className="text-sm text-muted-foreground">Importe seus dados diretamente no Winbox/Terminal</p>
+            </div>
+          </div>
+          
+          <div className="space-y-4 mt-4">
+            <div className="bg-muted/50 p-4 rounded-md border text-sm space-y-2">
+              <p className="font-medium flex items-center gap-2">
+                <Badge variant="outline" className="text-[10px] uppercase">O que está incluído:</Badge>
+              </p>
+              <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+                <li>Configuração básica do PPPoE Server</li>
+                <li>Perfis de planos com limites de velocidade</li>
+                <li>Usuários (Secrets) e senhas ativos</li>
+              </ul>
+            </div>
+
+            <Button className="w-full gap-2" variant="default" onClick={downloadMikrotikScript} disabled={exporting}>
+              {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+              Baixar Script (.rsc)
+            </Button>
+            
+            <p className="text-[11px] text-center text-muted-foreground italic">
+              * Para importar, abra o Terminal no seu Mikrotik e arraste o arquivo .rsc ou use "/import file-name.rsc"
+            </p>
+          </div>
+        </Card>
+      </div>
     </div>
   );
 }
