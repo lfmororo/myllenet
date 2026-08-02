@@ -35,12 +35,12 @@ export default function Settings() {
   const [uazapiToken, setUazapiToken] = useState("");
   const [savingWhatsapp, setSavingWhatsapp] = useState(false);
 
-  // R3005G settings
-  const [r3005gUrl, setR3005gUrl] = useState("");
-  const [r3005gUser, setR3005gUser] = useState("");
-  const [r3005gPass, setR3005gPass] = useState("");
-  const [r3005gSN, setR3005gSN] = useState("");
-  const [savingR3005g, setSavingR3005g] = useState(false);
+  // Mikrotik settings
+  const [mikrotikHost, setMikrotikHost] = useState("");
+  const [mikrotikUser, setMikrotikUser] = useState("");
+  const [mikrotikPass, setMikrotikPass] = useState("");
+  const [mikrotikApiPort, setMikrotikApiPort] = useState("8728");
+  const [savingMikrotik, setSavingMikrotik] = useState(false);
 
   // User management state
   interface SystemUser {

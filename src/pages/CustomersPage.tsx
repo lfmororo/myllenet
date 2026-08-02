@@ -209,9 +209,9 @@ export default function CustomersPage() {
             link.download = `r3005g_users_${new Date().toISOString().slice(0, 10)}.csv`;
             link.click();
             URL.revokeObjectURL(url);
-            toast.success("Arquivo R3005G exportado!");
+            toast.success("Arquivo Mikrotik exportado!");
           }} className="flex-1 sm:flex-none">
-            <Download className="mr-2 h-4 w-4" /> Exportar R3005G
+            <Download className="mr-2 h-4 w-4" /> Exportar Mikrotik
           </Button>
           <Button variant="outline" onClick={() => setCsvImportOpen(true)} className="flex-1 sm:flex-none">
             <Upload className="mr-2 h-4 w-4" /> Importar CSV
