@@ -58,7 +58,7 @@ export default function MikrotikPage() {
       plans.forEach(plan => {
         // Simple queue based on plan
         const limit = plan.nome.toLowerCase().includes("mb") ? plan.nome.toLowerCase().split("mb")[0] + "M/" + plan.nome.toLowerCase().split("mb")[0] + "M" : "10M/10M";
-        script += `/ppp profile add name="${plan.nome}" local-address=10.0.0.1 rate-limit=${limit} dns-server=8.8.8.8\n`;
+        script += `/ppp profile add name="${plan.nome}" local-address=10.0.0.1 rate-limit="${limit}" dns-server=8.8.8.8\n`;
       });
       script += "\n";
 
