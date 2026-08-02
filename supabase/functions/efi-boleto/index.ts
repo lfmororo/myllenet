@@ -935,6 +935,9 @@ async function bulkCheckPayments(_req: Request) {
       } catch (e) {
         console.error(`reconcile by cpf ${cpf} failed:`, e);
       }
+      // Small delay between customers to avoid rate limits
+      await new Promise(r => setTimeout(r, 200));
+    }
     }
   } catch (e) {
     console.error("Reconcile pass failed:", e);
