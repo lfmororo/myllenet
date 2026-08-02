@@ -945,6 +945,93 @@ async function bulkCheckPayments(_req: Request) {
       await new Promise(r => setTimeout(r, 200));
     }
     }
+
+    // ===== PASS 1.5: Deep Reconciliation for Overdue Orphans =====
+    try {
+      const { data: overdueOrphans } = await supabase
+        .from("invoices")
+        .select("id, customer_id, valor_centavos, vencimento, status, customers(cpf)")
+        .eq("status", "overdue")
+        .is("efi_charge_id", null);
+
+      if (overdueOrphans && overdueOrphans.length > 0) {
+        console.log(`Deep reconciliation for ${overdueOrphans.length} overdue orphans...`);
+        const byCpf = new Map<string, any[]>();
+        for (const inv of overdueOrphans) {
+          const cpf = ((inv as any).customers?.cpf || "").replace(/\D/g, "");
+          if (cpf) {
+            if (!byCpf.has(cpf)) byCpf.set(cpf, []);
+            byCpf.get(cpf)!.push(inv);
+          }
+        }
+
+        const longAgo = new Date();
+        longAgo.setFullYear(longAgo.getFullYear() - 2); 
+        const bdDeep = fmt(longAgo);
+        const edDeep = fmt(now);
+
+        for (const [cpf, group] of byCpf) {
+          try {
+            let charges: any[] = [];
+            let offset = 0;
+            const limit = 100;
+            let hasMore = true;
+            while (hasMore) {
+              const resp = await efiRequest(
+                `/v1/charges?customer_document=${cpf}&begin_date=${bdDeep}&end_date=${edDeep}&limit=${limit}&offset=${offset}`,
+                "GET", undefined, "bulk_check_deep"
+              );
+              const page = resp.data || resp || [];
+              if (Array.isArray(page)) {
+                charges = charges.concat(page);
+                hasMore = page.length === limit;
+              } else { hasMore = false; }
+              offset += limit;
+            }
+
+            for (const inv of group) {
+              const invMonth = String(inv.vencimento).slice(0, 7);
+              const match = charges.find((c: any) => {
+                const billet = c.payment?.banking_billet || {};
+                const expire = billet.expire_at || c.expire_at || c.created_at?.slice(0, 10) || "";
+                const sameMonth = String(expire).slice(0, 7) === invMonth;
+                const value = c.value || c.total || billet.value || 0;
+                const diffPercent = Math.abs(Number(value) - Number(inv.valor_centavos)) / Number(inv.valor_centavos);
+                return sameMonth && diffPercent < 0.08;
+              });
+
+              if (match) {
+                const chargeId = match.charge_id || match.id;
+                const billet = match.payment?.banking_billet || {};
+                let newStatus = inv.status;
+                let paidAt: string | null = inv.paid_at;
+                
+                if (match.status === "paid" || match.status === "settled" || match.status === "link" || match.status === "active") {
+                  newStatus = "paid"; 
+                  paidAt = match.paid_at || (["link", "active"].includes(match.status) ? null : new Date().toISOString());
+                } else if (match.status === "canceled" || match.status === "refunded") {
+                  newStatus = "cancelled";
+                }
+
+                await supabase.from("invoices").update({
+                  efi_charge_id: chargeId,
+                  efi_barcode: billet.barcode || null,
+                  efi_link: billet.link || billet.pdf?.charge || null,
+                  status: newStatus,
+                  paid_at: paidAt,
+                }).eq("id", inv.id);
+                reconciled++;
+                if (newStatus === "paid") {
+                   try { await sendPaymentNotification(supabase, inv.id); } catch (e) { /* silent */ }
+                }
+              }
+            }
+          } catch (e) { console.error(`Deep search for CPF ${cpf} failed:`, e); }
+          await new Promise(r => setTimeout(r, 200));
+        }
+      }
+    } catch (e) { console.error("Deep reconciliation pass failed:", e); }
+
   } catch (e) {
     console.error("Reconcile pass failed:", e);
   }
