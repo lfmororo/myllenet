@@ -122,8 +122,24 @@ Deno.serve(async (req) => {
       .lt("vencimento", todayStr)
       .in("status", ["pending", "overdue"]);
 
+    // Fetch reconciliations and automated updates from logs for the last 24 hours
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const { data: efiLogs } = await supabase
+      .from("efi_api_logs")
+      .select("*")
+      .gte("created_at", yesterday.toISOString())
+      .eq("context", "bulk_check");
+
+    const { data: recentPaid } = await supabase
+      .from("invoices")
+      .select("id, valor_centavos, efi_charge_id")
+      .eq("status", "paid")
+      .gte("paid_at", yesterday.toISOString());
+
     const dueTodayList = dueToday || [];
     const overdueList = overdue || [];
+    const reconciledList = recentPaid || [];
 
     if (dueTodayList.length === 0 && overdueList.length === 0) {
       console.log("No overdue or due-today invoices found.");
@@ -162,6 +178,16 @@ Deno.serve(async (req) => {
       if (sorted.length > 30) {
         message += `... e mais ${sorted.length - 30} cobranças\n`;
       }
+      if (sorted.length > 30) {
+        message += `... e mais ${sorted.length - 30} cobranças\n`;
+      }
+      message += "\n";
+    }
+
+    if (reconciledList.length > 0) {
+      const totalReconciled = reconciledList.reduce((s: number, i: any) => s + i.valor_centavos, 0);
+      message += `✅ *Baixas Automáticas (24h): ${reconciledList.length}*\n`;
+      message += `💰 *Total Recuperado: ${formatCurrency(totalReconciled)}*\n\n`;
     }
 
     message += "\n_Relatório automático do sistema Myllenet_";
