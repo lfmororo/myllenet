@@ -56,8 +56,10 @@ export default function MikrotikPage() {
       // 2. Plans (Queues/Profiles)
       script += "# --- Internet Plans ---\n";
       plans.forEach(plan => {
-        // Simple queue based on plan
-        const limit = plan.nome.toLowerCase().includes("mb") ? plan.nome.toLowerCase().split("mb")[0] + "M/" + plan.nome.toLowerCase().split("mb")[0] + "M" : "10M/10M";
+        // Extrai números do nome do plano (ex: "50 Mega" ou "100MB" -> 50 ou 100)
+        const matches = plan.nome.match(/\d+/);
+        const speed = matches ? matches[0] : "10";
+        const limit = `${speed}M/${speed}M`;
         script += `/ppp profile add name="${plan.nome}" local-address=10.0.0.1 rate-limit="${limit}" dns-server=8.8.8.8\n`;
       });
       script += "\n";
