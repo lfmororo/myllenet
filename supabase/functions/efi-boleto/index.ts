@@ -907,7 +907,8 @@ async function bulkCheckPayments(_req: Request) {
             const expire = billet.expire_at || c.expire_at || c.created_at?.slice(0, 10) || "";
             const sameMonth = String(expire).slice(0, 7) === invMonth;
             const value = c.value || c.total || billet.value || 0;
-            return sameMonth && Number(value) === Number(inv.valor_centavos);
+            const diffPercent = Math.abs(Number(value) - Number(inv.valor_centavos)) / Number(inv.valor_centavos);
+            return sameMonth && diffPercent < 0.05; // 5% margin for fines/interest
           });
           if (!match) continue;
 
