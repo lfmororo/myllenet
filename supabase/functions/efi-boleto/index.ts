@@ -876,7 +876,7 @@ async function bulkCheckPayments(_req: Request) {
     }
 
     const now = new Date();
-    const beginDate = new Date(now); beginDate.setMonth(beginDate.getMonth() - 6);
+    const beginDate = new Date(now); beginDate.setFullYear(beginDate.getFullYear() - 1); // 12 months for better coverage
     const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     const bd = fmt(beginDate);
     const ed = fmt(now);
@@ -907,16 +907,18 @@ async function bulkCheckPayments(_req: Request) {
             const expire = billet.expire_at || c.expire_at || c.created_at?.slice(0, 10) || "";
             const sameMonth = String(expire).slice(0, 7) === invMonth;
             const value = c.value || c.total || billet.value || 0;
-            return sameMonth && Number(value) === Number(inv.valor_centavos);
+            const diffPercent = Math.abs(Number(value) - Number(inv.valor_centavos)) / Number(inv.valor_centavos);
+            return sameMonth && diffPercent < 0.05; // 5% margin for fines/interest
           });
           if (!match) continue;
 
           const chargeId = match.charge_id || match.id;
           const billet = match.payment?.banking_billet || {};
           let newStatus = inv.status;
-          let paidAt: string | null = null;
-          if (match.status === "paid" || match.status === "settled") {
-            newStatus = "paid"; paidAt = match.paid_at || new Date().toISOString();
+          let paidAt: string | null = inv.paid_at;
+          if (match.status === "paid" || match.status === "settled" || match.status === "link") {
+            newStatus = "paid"; 
+            paidAt = match.paid_at || (match.status === "link" ? null : new Date().toISOString());
           } else if (match.status === "canceled" || match.status === "refunded") {
             newStatus = "cancelled";
           } else if (match.status === "expired" || match.status === "unpaid") {
@@ -930,10 +932,18 @@ async function bulkCheckPayments(_req: Request) {
             paid_at: paidAt,
           }).eq("id", inv.id);
           reconciled++;
+          
+          // Send notification if newly paid during reconciliation
+          if (newStatus === "paid" && inv.status !== "paid") {
+             try { await sendPaymentNotification(supabase, inv.id); } catch (e) { console.error("Notification error:", e); }
+          }
         }
       } catch (e) {
         console.error(`reconcile by cpf ${cpf} failed:`, e);
       }
+      // Small delay between customers to avoid rate limits
+      await new Promise(r => setTimeout(r, 200));
+    }
     }
   } catch (e) {
     console.error("Reconcile pass failed:", e);
@@ -973,9 +983,9 @@ async function bulkCheckPayments(_req: Request) {
       let newStatus = inv.status;
       let paidAt = inv.paid_at;
 
-      if (efiStatus === "paid" || efiStatus === "settled") {
+      if (efiStatus === "paid" || efiStatus === "settled" || efiStatus === "link") {
         newStatus = "paid";
-        paidAt = paidAt || new Date().toISOString();
+        paidAt = paidAt || (efiStatus === "link" ? null : new Date().toISOString());
       } else if (efiStatus === "canceled" || efiStatus === "refunded") {
         newStatus = "cancelled";
       } else if (efiStatus === "expired" || efiStatus === "unpaid") {
