@@ -148,7 +148,12 @@ async function loginR3005G(baseUrl: string, plainUser: string, plainPass: string
   try {
     const res = await fetch(`${baseUrl}/log_in.cgi`, {
       method: "POST",
-      headers: { "Content-Type": "application/json;charset=UTF-8", Origin: baseUrl, Referer: `${baseUrl}/login.html` },
+      headers: { 
+        "Content-Type": "application/json;charset=UTF-8", 
+        "Connection": "close",
+        Origin: baseUrl, 
+        Referer: `${baseUrl}/login.html` 
+      },
       body: JSON.stringify(payload),
       signal: controller.signal,
     });
@@ -932,9 +937,11 @@ Deno.serve(async (req) => {
             method: "POST",
             headers: { 
               "Content-Type": "application/json;charset=UTF-8", 
+              "Connection": "close",
               Cookie: cookie, 
               Origin: baseUrl, 
               Referer: `${baseUrl}/` 
+
             },
             body: JSON.stringify(userPayload),
           });
@@ -978,6 +985,7 @@ Deno.serve(async (req) => {
             method: "POST",
             headers: { 
               "Content-Type": "application/x-www-form-urlencoded", 
+              "Connection": "close",
               Cookie: cookie, 
               Origin: baseUrl, 
               Referer: `${baseUrl}/` 
