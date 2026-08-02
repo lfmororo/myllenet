@@ -932,6 +932,11 @@ async function bulkCheckPayments(_req: Request) {
             paid_at: paidAt,
           }).eq("id", inv.id);
           reconciled++;
+          
+          // Send notification if newly paid during reconciliation
+          if (newStatus === "paid" && inv.status !== "paid") {
+             try { await sendPaymentNotification(supabase, inv.id); } catch (e) { console.error("Notification error:", e); }
+          }
         }
       } catch (e) {
         console.error(`reconcile by cpf ${cpf} failed:`, e);
