@@ -571,13 +571,13 @@ export default function Settings() {
             )}
           </TabsContent>
 
-          {/* R3005G Tab */}
-          <TabsContent value="r3005g" className="mt-4">
+          {/* Mikrotik Tab */}
+          <TabsContent value="mikrotik" className="mt-4">
             <Card>
               <CardHeader>
-                <CardTitle>Roteador Intelbras R3005G</CardTitle>
+                <CardTitle>Mikrotik</CardTitle>
                 <CardDescription>
-                  Configure o endereço IP externo e as credenciais para o gerenciamento via API/SSH.
+                  Configure o endereço IP externo e as credenciais para o gerenciamento via API.
                 </CardDescription>
               </CardHeader>
               <CardContent>
