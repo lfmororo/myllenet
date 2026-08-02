@@ -48,7 +48,7 @@ export default function MikrotikPage() {
 
       // 1. PPPoE Server Configuration
       script += "/ppp profile\n";
-      script += "add name=myllenet-default local-address=10.0.0.1 remote-address=pppoe-pool dns-server=8.8.8.8,8.8.4.4\n\n";
+      script += "add name=myllenet-default local-address=10.0.0.1 dns-server=8.8.8.8,8.8.4.4\n\n";
 
       script += "/interface pppoe-server server\n";
       script += "add authentication=pap,chap,mschap1,mschap2 disabled=no interface=ether2 service-name=pppoe-myllenet\n\n";
