@@ -46,13 +46,22 @@ export default function MikrotikPage() {
       let script = "# Mikrotik Import Script - Myllenet\n";
       script += "# Generated on: " + new Date().toLocaleString() + "\n\n";
 
+      // 0. IP Pool + DNS
+      script += "# --- IP Pool para clientes PPPoE ---\n";
+      script += "/ip pool\n";
+      script += ':if ([:len [/ip pool find name=pppoe-pool]] = 0) do={ add name=pppoe-pool ranges=10.0.0.10-10.0.3.254 }\n\n';
+
+      script += "# --- DNS (cache local) ---\n";
+      script += "/ip dns\n";
+      script += "set servers=8.8.8.8,8.8.4.4 allow-remote-requests=yes\n\n";
+
       // 1. PPPoE Server Configuration
       script += "# --- PPPoE Server Configuration ---\n";
       script += "/ppp profile\n";
-      script += ":if ([:len [/ppp profile find name=myllenet-default]] = 0) do={ add name=myllenet-default local-address=10.0.0.1 dns-server=8.8.8.8,8.8.4.4 }\n\n";
+      script += ":if ([:len [/ppp profile find name=myllenet-default]] = 0) do={ add name=myllenet-default local-address=10.0.0.1 remote-address=pppoe-pool dns-server=8.8.8.8,8.8.4.4 } else={ set [find name=myllenet-default] local-address=10.0.0.1 remote-address=pppoe-pool dns-server=8.8.8.8,8.8.4.4 }\n\n";
 
       script += "/interface pppoe-server server\n";
-      script += ":if ([:len [/interface pppoe-server server find service-name=pppoe-myllenet]] = 0) do={ add authentication=pap,chap,mschap1,mschap2 disabled=no interface=ether2 service-name=pppoe-myllenet }\n\n";
+      script += ":if ([:len [/interface pppoe-server server find service-name=pppoe-myllenet]] = 0) do={ add authentication=pap,chap,mschap1,mschap2 disabled=no interface=ether2 service-name=pppoe-myllenet one-session-per-host=yes }\n\n";
 
       // 2. Plans (Queues/Profiles)
       script += "# --- Internet Plans ---\n";
@@ -62,9 +71,25 @@ export default function MikrotikPage() {
         const matches = plan.nome.match(/\d+/);
         const speed = matches ? matches[0] : "10";
         const limit = `${speed}M/${speed}M`;
-        script += `:if ([:len [/ppp profile find name="${plan.nome}"]] = 0) do={ add name="${plan.nome}" local-address=10.0.0.1 rate-limit="${limit}" dns-server=8.8.8.8 }\n`;
+        script += `:if ([:len [/ppp profile find name="${plan.nome}"]] = 0) do={ add name="${plan.nome}" local-address=10.0.0.1 remote-address=pppoe-pool rate-limit="${limit}" dns-server=8.8.8.8,8.8.4.4 } else={ set [find name="${plan.nome}"] local-address=10.0.0.1 remote-address=pppoe-pool rate-limit="${limit}" dns-server=8.8.8.8,8.8.4.4 }\n`;
       });
       script += "\n";
+
+      // 2.5 NAT + Firewall (navegação dos clientes)
+      script += "# --- NAT (Masquerade) - permite navegacao dos clientes ---\n";
+      script += "/ip firewall nat\n";
+      script += ':if ([:len [/ip firewall nat find comment="myllenet-masquerade"]] = 0) do={ add chain=srcnat action=masquerade src-address=10.0.0.0/22 out-interface=ether1 comment="myllenet-masquerade" }\n\n';
+
+      script += "# --- Firewall Filter ---\n";
+      script += "/ip firewall filter\n";
+      script += ':if ([:len [/ip firewall filter find comment="myllenet-established"]] = 0) do={ add chain=forward action=accept connection-state=established,related comment="myllenet-established" }\n';
+      script += ':if ([:len [/ip firewall filter find comment="myllenet-clients-out"]] = 0) do={ add chain=forward action=accept src-address=10.0.0.0/22 comment="myllenet-clients-out" }\n';
+      script += ':if ([:len [/ip firewall filter find comment="myllenet-clients-dns"]] = 0) do={ add chain=input action=accept protocol=udp dst-port=53 src-address=10.0.0.0/22 comment="myllenet-clients-dns" }\n';
+      script += ':if ([:len [/ip firewall filter find comment="myllenet-clients-dns-tcp"]] = 0) do={ add chain=input action=accept protocol=tcp dst-port=53 src-address=10.0.0.0/22 comment="myllenet-clients-dns-tcp" }\n\n';
+
+      script += "# --- MTU / MSS (evita paginas que nao carregam no PPPoE) ---\n";
+      script += "/ip firewall mangle\n";
+      script += ':if ([:len [/ip firewall mangle find comment="myllenet-mss"]] = 0) do={ add chain=forward action=change-mss new-mss=clamp-to-pmtu passthrough=yes protocol=tcp tcp-flags=syn comment="myllenet-mss" }\n\n';
 
       // 3. Customers (Secrets)
       script += "# --- PPPoE Users ---\n";
@@ -179,7 +204,9 @@ export default function MikrotikPage() {
                 <Badge variant="outline" className="text-[10px] uppercase">O que está incluído:</Badge>
               </p>
               <ul className="list-disc list-inside space-y-1 text-muted-foreground">
-                <li>Configuração básica do PPPoE Server</li>
+                <li>Configuração básica do PPPoE Server + IP Pool</li>
+                <li>NAT (masquerade) e regras de firewall para navegação</li>
+                <li>Ajuste de MSS/MTU para evitar sites travando</li>
                 <li>Perfis de planos com limites de velocidade</li>
                 <li>Usuários (Secrets) e senhas ativos</li>
               </ul>
