@@ -178,6 +178,12 @@ Deno.serve(async (req) => {
       if (sorted.length > 30) {
         message += `... e mais ${sorted.length - 30} cobranças\n`;
       }
+      if (sorted.length > 30) {
+        message += `... e mais ${sorted.length - 30} cobranças\n`;
+      }
+      message += "\n";
+    }
+
     if (reconciledList.length > 0) {
       const totalReconciled = reconciledList.reduce((s: number, i: any) => s + i.valor_centavos, 0);
       message += `✅ *Baixas Automáticas (24h): ${reconciledList.length}*\n`;
