@@ -47,29 +47,32 @@ export default function MikrotikPage() {
       script += "# Generated on: " + new Date().toLocaleString() + "\n\n";
 
       // 1. PPPoE Server Configuration
+      script += "# --- PPPoE Server Configuration ---\n";
       script += "/ppp profile\n";
-      script += "add name=myllenet-default local-address=10.0.0.1 dns-server=8.8.8.8,8.8.4.4 comment=\"Myllenet Default Profile\"\n\n";
+      script += ":if ([:len [/ppp profile find name=myllenet-default]] = 0) do={ add name=myllenet-default local-address=10.0.0.1 dns-server=8.8.8.8,8.8.4.4 }\n\n";
 
       script += "/interface pppoe-server server\n";
-      script += "add authentication=pap,chap,mschap1,mschap2 disabled=no interface=ether2 service-name=pppoe-myllenet\n\n";
+      script += ":if ([:len [/interface pppoe-server server find service-name=pppoe-myllenet]] = 0) do={ add authentication=pap,chap,mschap1,mschap2 disabled=no interface=ether2 service-name=pppoe-myllenet }\n\n";
 
       // 2. Plans (Queues/Profiles)
       script += "# --- Internet Plans ---\n";
+      script += "/ppp profile\n";
       plans.forEach(plan => {
         // Extrai números do nome do plano (ex: "50 Mega" ou "100MB" -> 50 ou 100)
         const matches = plan.nome.match(/\d+/);
         const speed = matches ? matches[0] : "10";
         const limit = `${speed}M/${speed}M`;
-        script += `/ppp profile add name="${plan.nome}" local-address=10.0.0.1 rate-limit="${limit}" dns-server=8.8.8.8\n`;
+        script += `:if ([:len [/ppp profile find name="${plan.nome}"]] = 0) do={ add name="${plan.nome}" local-address=10.0.0.1 rate-limit="${limit}" dns-server=8.8.8.8 }\n`;
       });
       script += "\n";
 
       // 3. Customers (Secrets)
       script += "# --- PPPoE Users ---\n";
+      script += "/ppp secret\n";
       customers.forEach(customer => {
         if (customer.ativo) {
           const planName = plans.find(p => p.id === customer.plan_id)?.nome || "myllenet-default";
-          script += `/ppp secret add name="${customer.usuario_pppoe}" password="${customer.senha_pppoe}" profile="${planName}" service=pppoe comment="${customer.nome} - CPF: ${customer.cpf}"\n`;
+          script += `:if ([:len [/ppp secret find name="${customer.usuario_pppoe}"]] = 0) do={ add name="${customer.usuario_pppoe}" password="${customer.senha_pppoe}" profile="${planName}" service=pppoe comment="${customer.nome} - CPF: ${customer.cpf}" }\n`;
         }
       });
 
