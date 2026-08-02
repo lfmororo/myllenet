@@ -916,9 +916,9 @@ async function bulkCheckPayments(_req: Request) {
           const billet = match.payment?.banking_billet || {};
           let newStatus = inv.status;
           let paidAt: string | null = inv.paid_at;
-          if (match.status === "paid" || match.status === "settled" || match.status === "link") {
+          if (match.status === "paid" || match.status === "settled" || match.status === "link" || match.status === "active") {
             newStatus = "paid"; 
-            paidAt = match.paid_at || (match.status === "link" ? null : new Date().toISOString());
+            paidAt = match.paid_at || (["link", "active"].includes(match.status) ? null : new Date().toISOString());
           } else if (match.status === "canceled" || match.status === "refunded") {
             newStatus = "cancelled";
           } else if (match.status === "expired" || match.status === "unpaid") {
@@ -983,9 +983,9 @@ async function bulkCheckPayments(_req: Request) {
       let newStatus = inv.status;
       let paidAt = inv.paid_at;
 
-      if (efiStatus === "paid" || efiStatus === "settled" || efiStatus === "link") {
+      if (efiStatus === "paid" || efiStatus === "settled" || efiStatus === "link" || efiStatus === "active") {
         newStatus = "paid";
-        paidAt = paidAt || (efiStatus === "link" ? null : new Date().toISOString());
+        paidAt = paidAt || (["link", "active"].includes(efiStatus) ? null : new Date().toISOString());
       } else if (efiStatus === "canceled" || efiStatus === "refunded") {
         newStatus = "cancelled";
       } else if (efiStatus === "expired" || efiStatus === "unpaid") {
