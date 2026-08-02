@@ -73,47 +73,8 @@ export function useCustomers() {
     toast.success("Cliente cadastrado com sucesso!");
     fetchCustomers();
 
-    // Register PPPoE user on R3005G router
-    try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData?.session?.access_token;
-      if (token) {
-        // Get plan's nome_servidor to use as group
-        let group = "Default";
-        if (customer.plan_id) {
-          const { data: planData } = await supabase.from("plans").select("nome_servidor").eq("id", customer.plan_id).single();
-          if (planData?.nome_servidor) group = planData.nome_servidor;
-        }
-
-        const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-        const res = await fetch(
-          `https://${projectId}.supabase.co/functions/v1/r3005g-sync/add-user`,
-          {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-            },
-            body: JSON.stringify({
-              usuario_pppoe: customer.usuario_pppoe,
-              senha_pppoe: customer.senha_pppoe,
-              group,
-            }),
-          }
-        );
-        const result = await res.json();
-        if (result.success) {
-          toast.success(`PPPoE cadastrado no roteador (grupo: ${group})`);
-        } else {
-          console.warn("R3005G add-user error:", result);
-          toast.warning(`Cliente salvo, mas erro ao cadastrar no roteador: ${result.message || "Erro desconhecido"}`);
-        }
-      }
-    } catch (e) {
-      console.warn("Erro ao cadastrar PPPoE no roteador:", e);
-      toast.warning("Cliente salvo, mas não foi possível cadastrar no roteador");
-    }
+    // Placeholder for Mikrotik PPPoE registration
+    // toast.info("Integração Mikrotik pendente");
 
     // Send welcome notification via WhatsApp
     const phone = customer.telefone;
@@ -182,37 +143,8 @@ export function useCustomers() {
         .eq("id", id)
         .single();
 
-      // Toggle PPPoE user on router (best effort, don't block deactivation)
-      if (customerData?.usuario_pppoe) {
-        try {
-          const { data: sessionData } = await supabase.auth.getSession();
-          const token = sessionData?.session?.access_token;
-          if (token) {
-            const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-            const res = await fetch(
-              `https://${projectId}.supabase.co/functions/v1/r3005g-sync/toggle`,
-              {
-                method: "POST",
-                headers: {
-                  Authorization: `Bearer ${token}`,
-                  "Content-Type": "application/json",
-                  apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-                },
-                body: JSON.stringify({ usuario_pppoe: customerData.usuario_pppoe, enable: false }),
-              }
-            );
-            const result = await res.json();
-            if (result.success) {
-              toast.info("PPPoE desativado no roteador");
-            } else {
-              console.warn("PPPoE toggle failed:", result.message);
-            }
-          }
-        } catch (e) {
-          console.error("Erro ao desativar PPPoE no roteador:", e);
-        }
-      }
-
+      // Placeholder for Mikrotik toggle
+      
       const { data: openInvoices } = await supabase
         .from("invoices")
         .select("id, efi_charge_id")

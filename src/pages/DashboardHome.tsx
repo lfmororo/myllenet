@@ -140,7 +140,7 @@ export default function DashboardHome() {
         {/* Router Status */}
         <Card className={`border-l-4 ${routerStatus === "online" ? "border-l-success" : routerStatus === "offline" ? "border-l-destructive" : "border-l-muted"}`}>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">R3005G</CardTitle>
+            <CardTitle className="text-sm font-medium">Mikrotik</CardTitle>
             <div className={`rounded-lg p-2 ${routerStatus === "online" ? "bg-success/10" : routerStatus === "offline" ? "bg-destructive/10" : "bg-muted/10"}`}>
               {routerStatus === "loading" ? (
                 <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
@@ -155,7 +155,7 @@ export default function DashboardHome() {
             <div className={`text-2xl font-bold ${routerStatus === "online" ? "text-success" : routerStatus === "offline" ? "text-destructive" : "text-muted-foreground"}`}>
               {routerStatus === "loading" ? "Verificando..." : routerStatus === "online" ? "Online" : "Offline"}
             </div>
-            <p className="text-xs text-muted-foreground">Roteador Intelbras</p>
+            <p className="text-xs text-muted-foreground">Monitoramento Mikrotik</p>
           </CardContent>
         </Card>
         <Card className="border-l-4 border-l-primary">

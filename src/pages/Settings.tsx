@@ -35,12 +35,12 @@ export default function Settings() {
   const [uazapiToken, setUazapiToken] = useState("");
   const [savingWhatsapp, setSavingWhatsapp] = useState(false);
 
-  // R3005G settings
-  const [r3005gUrl, setR3005gUrl] = useState("");
-  const [r3005gUser, setR3005gUser] = useState("");
-  const [r3005gPass, setR3005gPass] = useState("");
-  const [r3005gSN, setR3005gSN] = useState("");
-  const [savingR3005g, setSavingR3005g] = useState(false);
+  // Mikrotik settings
+  const [mikrotikHost, setMikrotikHost] = useState("");
+  const [mikrotikUser, setMikrotikUser] = useState("");
+  const [mikrotikPass, setMikrotikPass] = useState("");
+  const [mikrotikApiPort, setMikrotikApiPort] = useState("8728");
+  const [savingMikrotik, setSavingMikrotik] = useState(false);
 
   // User management state
   interface SystemUser {
@@ -158,7 +158,7 @@ export default function Settings() {
     const { data } = await supabase
       .from("settings")
       .select("key, value")
-      .in("key", ["efi_client_id", "efi_client_secret", "efi_certificate_path", "uazapi_token", "r3005g_url", "r3005g_username", "r3005g_password", "r3005g_serial_number"]);
+      .in("key", ["efi_client_id", "efi_client_secret", "efi_certificate_path", "uazapi_token", "mikrotik_host", "mikrotik_username", "mikrotik_password", "mikrotik_api_port"]);
 
     if (data) {
       for (const row of data) {
@@ -166,10 +166,10 @@ export default function Settings() {
         if (row.key === "efi_client_secret") setClientSecret(row.value || "");
         if (row.key === "efi_certificate_path") setCertUploaded(!!row.value);
         if (row.key === "uazapi_token") setUazapiToken(row.value || "");
-        if (row.key === "r3005g_url") setR3005gUrl(row.value || "");
-        if (row.key === "r3005g_username") setR3005gUser(row.value || "");
-        if (row.key === "r3005g_password") setR3005gPass(row.value || "");
-        if (row.key === "r3005g_serial_number") setR3005gSN(row.value || "");
+        if (row.key === "mikrotik_host") setMikrotikHost(row.value || "");
+        if (row.key === "mikrotik_username") setMikrotikUser(row.value || "");
+        if (row.key === "mikrotik_password") setMikrotikPass(row.value || "");
+        if (row.key === "mikrotik_api_port") setMikrotikApiPort(row.value || "8728");
       }
     }
     setLoadingSettings(false);
@@ -287,8 +287,8 @@ export default function Settings() {
             <TabsTrigger value="users">
               <Users className="mr-1.5 h-4 w-4" /> Usuários
             </TabsTrigger>
-            <TabsTrigger value="r3005g">
-              <Router className="mr-1.5 h-4 w-4" /> R3005G
+            <TabsTrigger value="mikrotik">
+              <Router className="mr-1.5 h-4 w-4" /> Mikrotik
             </TabsTrigger>
           </TabsList>
 
@@ -577,8 +577,7 @@ export default function Settings() {
               <CardHeader>
                 <CardTitle>Roteador Intelbras R3005G</CardTitle>
                 <CardDescription>
-                  Configure o endereço IP e as credenciais de acesso ao roteador para sincronização PPPoE.
-                  Use os valores codificados (base64) capturados do navegador.
+                  Configure o endereço IP externo e as credenciais para o gerenciamento via API/SSH.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -589,67 +588,63 @@ export default function Settings() {
                 ) : (
                   <div className="space-y-5">
                     <div className="space-y-2">
-                      <Label htmlFor="r3005g_url">URL do Roteador</Label>
+                      <Label htmlFor="mikrotik_host">IP/Host Mikrotik</Label>
                       <Input
-                        id="r3005g_url"
-                        value={r3005gUrl}
-                        onChange={(e) => setR3005gUrl(e.target.value)}
-                        placeholder="http://IP_DO_ROTEADOR"
-                      />
-                      <p className="text-xs text-muted-foreground">Ex: http://189.xxx.xxx.xxx</p>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="r3005g_user">Usuário</Label>
-                      <Input
-                        id="r3005g_user"
-                        value={r3005gUser}
-                        onChange={(e) => setR3005gUser(e.target.value)}
-                        placeholder="Usuário de login do roteador"
+                        id="mikrotik_host"
+                        value={mikrotikHost}
+                        onChange={(e) => setMikrotikHost(e.target.value)}
+                        placeholder="IP Externo ou DNS"
                       />
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="r3005g_pass">Senha</Label>
+                      <Label htmlFor="mikrotik_user">Usuário</Label>
                       <Input
-                        id="r3005g_pass"
+                        id="mikrotik_user"
+                        value={mikrotikUser}
+                        onChange={(e) => setMikrotikUser(e.target.value)}
+                        placeholder="admin"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="mikrotik_pass">Senha</Label>
+                      <Input
+                        id="mikrotik_pass"
                         type="password"
-                        value={r3005gPass}
-                        onChange={(e) => setR3005gPass(e.target.value)}
-                        placeholder="Senha de login do roteador"
+                        value={mikrotikPass}
+                        onChange={(e) => setMikrotikPass(e.target.value)}
+                        placeholder="Senha do Mikrotik"
                       />
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="r3005g_sn">Serial Number (SN)</Label>
+                      <Label htmlFor="mikrotik_port">Porta API</Label>
                       <Input
-                        id="r3005g_sn"
-                        value={r3005gSN}
-                        onChange={(e) => setR3005gSN(e.target.value)}
-                        placeholder="Ex: INT1234567890"
+                        id="mikrotik_port"
+                        value={mikrotikApiPort}
+                        onChange={(e) => setMikrotikApiPort(e.target.value)}
+                        placeholder="8728"
                       />
-                      <p className="text-xs text-muted-foreground">
-                        Encontre na etiqueta do roteador ou em Status → Informações do Sistema na interface web. Necessário para descriptografar os dados PPPoE.
-                      </p>
                     </div>
 
                     <Button
                       onClick={async () => {
-                        setSavingR3005g(true);
+                        setSavingMikrotik(true);
                         try {
-                          await upsertSetting("r3005g_url", r3005gUrl);
-                          await upsertSetting("r3005g_username", r3005gUser);
-                          await upsertSetting("r3005g_password", r3005gPass);
-                          await upsertSetting("r3005g_serial_number", r3005gSN);
-                          toast.success("Configurações R3005G salvas!");
+                          await upsertSetting("mikrotik_host", mikrotikHost);
+                          await upsertSetting("mikrotik_username", mikrotikUser);
+                          await upsertSetting("mikrotik_password", mikrotikPass);
+                          await upsertSetting("mikrotik_api_port", mikrotikApiPort);
+                          toast.success("Configurações Mikrotik salvas!");
                         } catch (err: any) {
                           toast.error("Erro ao salvar: " + (err.message || "Erro desconhecido"));
                         }
-                        setSavingR3005g(false);
+                        setSavingMikrotik(false);
                       }}
-                      disabled={savingR3005g}
+                      disabled={savingMikrotik}
                     >
-                      {savingR3005g ? (
+                      {savingMikrotik ? (
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       ) : (
                         <Save className="mr-2 h-4 w-4" />

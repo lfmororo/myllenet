@@ -33,8 +33,7 @@ const navItems = [
   { title: "Clientes", url: "/clientes", icon: Users },
   { title: "Cobranças", url: "/cobrancas", icon: FileText },
   { title: "Notificações", url: "/notificacoes", icon: Bell },
-  { title: "R3005G", url: "/r3005g", icon: Router },
-  { title: "Comparação PPPoE", url: "/pppoe-compare", icon: GitCompare },
+  { title: "Mikrotik", url: "/mikrotik", icon: Router },
   { title: "Logs EFI", url: "/logs-efi", icon: AlertTriangle },
   { title: "Configurações", url: "/settings", icon: Settings },
 ];
@@ -44,8 +43,7 @@ const pageTitles: Record<string, string> = {
   "/clientes": "Clientes",
   "/cobrancas": "Cobranças",
   "/notificacoes": "Notificações",
-  "/r3005g": "R3005G - PPPoE",
-  "/pppoe-compare": "Comparação PPPoE",
+  "/mikrotik": "Mikrotik - Gestão",
   "/logs-efi": "Logs EFI",
   "/settings": "Configurações",
 };
