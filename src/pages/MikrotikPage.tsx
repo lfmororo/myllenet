@@ -5,13 +5,18 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2, RefreshCw, Router, Wifi, WifiOff } from "lucide-react";
+import { Download, Loader2, RefreshCw, Router, Wifi, WifiOff, FileCode } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { useCustomers } from "@/hooks/useCustomers";
+import { usePlans } from "@/hooks/usePlans";
 
 export default function MikrotikPage() {
   const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [status, setStatus] = useState<any>(null);
   const [search, setSearch] = useState("");
+  const { customers } = useCustomers();
+  const { plans } = usePlans();
 
   const checkStatus = async () => {
     setLoading(true);
@@ -30,6 +35,58 @@ export default function MikrotikPage() {
     }
   };
 
+  const downloadMikrotikScript = () => {
+    setExporting(true);
+    try {
+      if (customers.length === 0) {
+        toast.error("Nenhum cliente para exportar");
+        return;
+      }
+
+      let script = "# Mikrotik Import Script - Myllenet\n";
+      script += "# Generated on: " + new Date().toLocaleString() + "\n\n";
+
+      // 1. PPPoE Server Configuration
+      script += "/ppp profile\n";
+      script += "add name=myllenet-default local-address=10.0.0.1 remote-address=pppoe-pool dns-server=8.8.8.8,8.8.4.4\n\n";
+
+      script += "/interface pppoe-server server\n";
+      script += "add authentication=pap,chap,mschap1,mschap2 disabled=no interface=ether2 service-name=pppoe-myllenet\n\n";
+
+      // 2. Plans (Queues/Profiles)
+      script += "# --- Internet Plans ---\n";
+      plans.forEach(plan => {
+        // Simple queue based on plan
+        const limit = plan.nome.toLowerCase().includes("mb") ? plan.nome.toLowerCase().split("mb")[0] + "M/" + plan.nome.toLowerCase().split("mb")[0] + "M" : "10M/10M";
+        script += `/ppp profile add name="${plan.nome}" local-address=10.0.0.1 rate-limit=${limit} dns-server=8.8.8.8\n`;
+      });
+      script += "\n";
+
+      // 3. Customers (Secrets)
+      script += "# --- PPPoE Users ---\n";
+      customers.forEach(customer => {
+        if (customer.ativo) {
+          const planName = plans.find(p => p.id === customer.plan_id)?.nome || "myllenet-default";
+          script += `/ppp secret add name="${customer.usuario_pppoe}" password="${customer.senha_pppoe}" profile="${planName}" service=pppoe comment="${customer.nome} - CPF: ${customer.cpf}"\n`;
+        }
+      });
+
+      const blob = new Blob([script], { type: "text/plain" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `importar_mikrotik_${new Date().toISOString().slice(0, 10)}.rsc`;
+      link.click();
+      URL.revokeObjectURL(url);
+      toast.success("Script Mikrotik (.rsc) gerado com sucesso!");
+    } catch (err) {
+      console.error(err);
+      toast.error("Erro ao gerar script");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -37,10 +94,16 @@ export default function MikrotikPage() {
           <h2 className="text-2xl font-bold tracking-tight">Mikrotik - Gestão</h2>
           <p className="text-muted-foreground">Monitoramento e gerenciamento centralizado Mikrotik</p>
         </div>
-        <Button onClick={checkStatus} disabled={loading}>
-          {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
-          Verificar Status
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={downloadMikrotikScript} disabled={exporting}>
+            {exporting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Download className="h-4 w-4 mr-2" />}
+            Baixar Script (.rsc)
+          </Button>
+          <Button onClick={checkStatus} disabled={loading}>
+            {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+            Verificar Status
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
