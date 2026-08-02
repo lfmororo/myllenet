@@ -122,8 +122,24 @@ Deno.serve(async (req) => {
       .lt("vencimento", todayStr)
       .in("status", ["pending", "overdue"]);
 
+    // Fetch reconciliations and automated updates from logs for the last 24 hours
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const { data: efiLogs } = await supabase
+      .from("efi_api_logs")
+      .select("*")
+      .gte("created_at", yesterday.toISOString())
+      .eq("context", "bulk_check");
+
+    const { data: recentPaid } = await supabase
+      .from("invoices")
+      .select("id, valor_centavos, efi_charge_id")
+      .eq("status", "paid")
+      .gte("paid_at", yesterday.toISOString());
+
     const dueTodayList = dueToday || [];
     const overdueList = overdue || [];
+    const reconciledList = recentPaid || [];
 
     if (dueTodayList.length === 0 && overdueList.length === 0) {
       console.log("No overdue or due-today invoices found.");
