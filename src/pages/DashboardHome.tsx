@@ -1,8 +1,8 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import { useCustomers } from "@/hooks/useCustomers";
 import { useInvoices } from "@/hooks/useInvoices";
 import { usePlans } from "@/hooks/usePlans";
-import { supabase } from "@/integrations/supabase/client";
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, AlertTriangle, DollarSign, TrendingUp, Router, Wifi, WifiOff, Loader2 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
@@ -12,33 +12,8 @@ export default function DashboardHome() {
   const { allInvoices } = useInvoices();
   const { plans } = usePlans();
 
-  const [routerStatus, setRouterStatus] = useState<"loading" | "online" | "offline">("loading");
-
-  useEffect(() => {
-    const checkRouter = async () => {
-      try {
-        const { data: sessionData } = await supabase.auth.getSession();
-        const token = sessionData?.session?.access_token;
-        if (!token) { setRouterStatus("offline"); return; }
-
-        const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-        const res = await fetch(
-          `https://${projectId}.supabase.co/functions/v1/r3005g-sync/status`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-            },
-            signal: AbortSignal.timeout(15000),
-          }
-        );
-        setRouterStatus(res.ok ? "online" : "offline");
-      } catch {
-        setRouterStatus("offline");
-      }
-    };
-    checkRouter();
-  }, []);
+  // Integração Mikrotik pendente de configuração — sem chamada ao roteador legado
+  const [routerStatus] = useState<"loading" | "online" | "offline">("offline");
 
   const stats = useMemo(() => {
     const activeCustomers = customers.filter(c => c.ativo).length;
