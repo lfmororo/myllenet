@@ -144,8 +144,7 @@ export function useCustomers() {
         .single();
 
       // Placeholder for Mikrotik toggle
-    }
-
+      
       const { data: openInvoices } = await supabase
         .from("invoices")
         .select("id, efi_charge_id")

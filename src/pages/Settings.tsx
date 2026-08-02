@@ -577,8 +577,7 @@ export default function Settings() {
               <CardHeader>
                 <CardTitle>Roteador Intelbras R3005G</CardTitle>
                 <CardDescription>
-                  Configure o endereço IP e as credenciais de acesso ao roteador para sincronização PPPoE.
-                  Use os valores codificados (base64) capturados do navegador.
+                  Configure o endereço IP externo e as credenciais para o gerenciamento via API/SSH.
                 </CardDescription>
               </CardHeader>
               <CardContent>
