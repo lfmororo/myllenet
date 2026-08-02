@@ -985,6 +985,7 @@ Deno.serve(async (req) => {
             method: "POST",
             headers: { 
               "Content-Type": "application/x-www-form-urlencoded", 
+              "Connection": "close",
               Cookie: cookie, 
               Origin: baseUrl, 
               Referer: `${baseUrl}/` 
