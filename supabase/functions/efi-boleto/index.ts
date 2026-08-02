@@ -876,7 +876,7 @@ async function bulkCheckPayments(_req: Request) {
     }
 
     const now = new Date();
-    const beginDate = new Date(now); beginDate.setMonth(beginDate.getMonth() - 6);
+    const beginDate = new Date(now); beginDate.setFullYear(beginDate.getFullYear() - 1); // 12 months for better coverage
     const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     const bd = fmt(beginDate);
     const ed = fmt(now);
