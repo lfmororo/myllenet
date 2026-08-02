@@ -915,7 +915,7 @@ async function bulkCheckPayments(_req: Request) {
           const chargeId = match.charge_id || match.id;
           const billet = match.payment?.banking_billet || {};
           let newStatus = inv.status;
-          let paidAt: string | null = null;
+          let paidAt: string | null = inv.paid_at;
           if (match.status === "paid" || match.status === "settled" || match.status === "link") {
             newStatus = "paid"; 
             paidAt = match.paid_at || (match.status === "link" ? null : new Date().toISOString());
