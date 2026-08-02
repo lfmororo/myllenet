@@ -129,7 +129,7 @@ async function getRouterInfo(baseUrl: string): Promise<{ csrfprotect: string; ca
   let csrfprotect = Math.floor(Date.now() / 1000).toString();
   let captchaActive = false;
   try {
-    const csrfRes = await fetch(`${baseUrl}/csrfprotect.data`);
+    const csrfRes = await fetch(`${baseUrl}/csrfprotect.data`, { headers: { "Connection": "close" } });
     const csrfJson = await csrfRes.json();
     if (csrfJson?.data?.csrfprotect) csrfprotect = csrfJson.data.csrfprotect;
     if (csrfJson?.data?.code?.key && csrfJson.data.code.key !== "") captchaActive = true;
@@ -183,7 +183,7 @@ async function fetchSerialNumber(baseUrl: string, cookie: string): Promise<strin
 
   for (const ep of endpoints) {
     try {
-      const res = await fetch(`${baseUrl}/${ep}`, { headers: { Cookie: cookie } });
+      const res = await fetch(`${baseUrl}/${ep}`, { headers: { Cookie: cookie, "Connection": "close" } });
       if (!res.ok) continue;
       const text = await res.text();
       let json;
@@ -227,7 +227,7 @@ async function fetchKeyFromJS(baseUrl: string, cookie: string): Promise<string |
   // First, discover actual JS paths from index.html
   const jsFiles: string[] = [];
   try {
-    const htmlRes = await fetch(`${baseUrl}/index.html`, { headers: { Cookie: cookie } });
+    const htmlRes = await fetch(`${baseUrl}/index.html`, { headers: { Cookie: cookie, "Connection": "close" } });
     if (htmlRes.ok) {
       const html = await htmlRes.text();
       // Extract script src attributes
@@ -248,7 +248,7 @@ async function fetchKeyFromJS(baseUrl: string, cookie: string): Promise<string |
 
   for (const jsFile of jsFiles) {
     try {
-      const res = await fetch(`${baseUrl}/${jsFile}`, { headers: { Cookie: cookie } });
+      const res = await fetch(`${baseUrl}/${jsFile}`, { headers: { Cookie: cookie, "Connection": "close" } });
       if (!res.ok) continue;
       const text = await res.text();
 
@@ -292,7 +292,7 @@ async function fetchRawUsers(baseUrl: string, cookie: string): Promise<Record<st
   
   for (const ep of endpoints) {
     try {
-      const res = await fetch(`${baseUrl}/${ep}`, { headers: { Cookie: cookie } });
+      const res = await fetch(`${baseUrl}/${ep}`, { headers: { Cookie: cookie, "Connection": "close" } });
       if (!res.ok) { console.log(`R3005G fetchUsers: ${ep} => ${res.status}`); continue; }
       const text = await res.text();
       let json;
@@ -671,7 +671,7 @@ Deno.serve(async (req) => {
       
       for (const page of htmlPages) {
         try {
-          const res = await fetch(`${baseUrl}/${page}`, { headers: { Cookie: cookie } });
+          const res = await fetch(`${baseUrl}/${page}`, { headers: { Cookie: cookie, "Connection": "close" } });
           if (!res.ok) continue;
           const html = await res.text();
           
@@ -715,7 +715,7 @@ Deno.serve(async (req) => {
       for (const jsFile of jsFiles) {
         if (!jsFile.endsWith(".js")) continue;
         try {
-          const res = await fetch(`${baseUrl}/${jsFile}`, { headers: { Cookie: cookie } });
+          const res = await fetch(`${baseUrl}/${jsFile}`, { headers: { Cookie: cookie, "Connection": "close" } });
           if (!res.ok) continue;
           const text = await res.text();
           foundFiles.push(jsFile);
@@ -758,13 +758,13 @@ Deno.serve(async (req) => {
       const allCgis: string[] = [];
       const contexts: Record<string, string> = {};
       try {
-        const htmlRes = await fetch(`${baseUrl}/index.html`, { headers: { Cookie: cookie } });
+        const htmlRes = await fetch(`${baseUrl}/index.html`, { headers: { Cookie: cookie, "Connection": "close" } });
         if (htmlRes.ok) {
           const html = await htmlRes.text();
           const scriptPaths = [...html.matchAll(/(?:src|href)=["']?([^"'\s>]+\.js[^"'\s>]*)["']?/g)].map(m => m[1].replace(/^\.\//, "").replace(/^\//, ""));
           for (const jsPath of scriptPaths) {
             try {
-              const jsRes = await fetch(`${baseUrl}/${jsPath}`, { headers: { Cookie: cookie } });
+              const jsRes = await fetch(`${baseUrl}/${jsPath}`, { headers: { Cookie: cookie, "Connection": "close" } });
               if (!jsRes.ok) continue;
               const jsText = await jsRes.text();
               // Match .cgi, .data, and .asp endpoints
@@ -795,7 +795,7 @@ Deno.serve(async (req) => {
     if (action === "fetch-router-js") {
       const results: Record<string, string> = {};
       try {
-        const htmlRes = await fetch(`${baseUrl}/index.html`, { headers: { Cookie: cookie } });
+        const htmlRes = await fetch(`${baseUrl}/index.html`, { headers: { Cookie: cookie, "Connection": "close" } });
         if (htmlRes.ok) {
           const html = await htmlRes.text();
           const scriptPaths = [...html.matchAll(/(?:src|href)=["']?([^"'\s>]+\.js[^"'\s>]*)["']?/g)].map(m => m[1].replace(/^\.\//, "").replace(/^\//, ""));
@@ -804,7 +804,7 @@ Deno.serve(async (req) => {
           const additionalChunks: string[] = [];
           for (const jsPath of scriptPaths) {
             try {
-              const jsRes = await fetch(`${baseUrl}/${jsPath}`, { headers: { Cookie: cookie } });
+              const jsRes = await fetch(`${baseUrl}/${jsPath}`, { headers: { Cookie: cookie, "Connection": "close" } });
               if (!jsRes.ok) continue;
               const jsText = await jsRes.text();
 
@@ -915,7 +915,7 @@ Deno.serve(async (req) => {
       // First, get current user count for verification
       let userCountBefore = 0;
       try {
-        const beforeRes = await fetch(`${baseUrl}/user.data`, { headers: { Cookie: cookie } });
+        const beforeRes = await fetch(`${baseUrl}/user.data`, { headers: { Cookie: cookie, "Connection": "close" } });
         if (beforeRes.ok) {
           const beforeJson = JSON.parse(await beforeRes.text());
           if (beforeJson.code === 0 && beforeJson.data?.all) {
@@ -957,7 +957,7 @@ Deno.serve(async (req) => {
           // Verify user was actually added by checking user count
           let userCountAfter = 0;
           try {
-            const afterRes = await fetch(`${baseUrl}/user.data`, { headers: { Cookie: cookie } });
+            const afterRes = await fetch(`${baseUrl}/user.data`, { headers: { Cookie: cookie, "Connection": "close" } });
             if (afterRes.ok) {
               const afterJson = JSON.parse(await afterRes.text());
               if (afterJson.code === 0 && afterJson.data?.all) {
@@ -1002,7 +1002,7 @@ Deno.serve(async (req) => {
 
           // Re-check user count
           try {
-            const afterRes2 = await fetch(`${baseUrl}/user.data`, { headers: { Cookie: cookie } });
+            const afterRes2 = await fetch(`${baseUrl}/user.data`, { headers: { Cookie: cookie, "Connection": "close" } });
             if (afterRes2.ok) {
               const afterJson2 = JSON.parse(await afterRes2.text());
               if (afterJson2.code === 0 && afterJson2.data?.all) {
@@ -1034,7 +1034,7 @@ Deno.serve(async (req) => {
         console.log(`R3005G ADD-USER: Fallback trying user.data (form)`);
         const fallbackRes = await fetch(`${baseUrl}/user.data`, {
           method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded", Cookie: cookie, Origin: baseUrl, Referer: `${baseUrl}/` },
+          headers: { "Content-Type": "application/x-www-form-urlencoded", Cookie: cookie, "Connection": "close", Origin: baseUrl, Referer: `${baseUrl}/` },
           body: formBody,
         });
         const fallbackText = await fallbackRes.text();
