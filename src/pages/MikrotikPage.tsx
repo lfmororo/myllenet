@@ -204,7 +204,9 @@ export default function MikrotikPage() {
                 <Badge variant="outline" className="text-[10px] uppercase">O que está incluído:</Badge>
               </p>
               <ul className="list-disc list-inside space-y-1 text-muted-foreground">
-                <li>Configuração básica do PPPoE Server</li>
+                <li>Configuração básica do PPPoE Server + IP Pool</li>
+                <li>NAT (masquerade) e regras de firewall para navegação</li>
+                <li>Ajuste de MSS/MTU para evitar sites travando</li>
                 <li>Perfis de planos com limites de velocidade</li>
                 <li>Usuários (Secrets) e senhas ativos</li>
               </ul>
