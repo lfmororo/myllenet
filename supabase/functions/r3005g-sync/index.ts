@@ -292,7 +292,7 @@ async function fetchRawUsers(baseUrl: string, cookie: string): Promise<Record<st
   
   for (const ep of endpoints) {
     try {
-      const res = await fetch(`${baseUrl}/${ep}`, { headers: { Cookie: cookie } });
+      const res = await fetch(`${baseUrl}/${ep}`, { headers: { Cookie: cookie, "Connection": "close" } });
       if (!res.ok) { console.log(`R3005G fetchUsers: ${ep} => ${res.status}`); continue; }
       const text = await res.text();
       let json;
@@ -915,7 +915,7 @@ Deno.serve(async (req) => {
       // First, get current user count for verification
       let userCountBefore = 0;
       try {
-        const beforeRes = await fetch(`${baseUrl}/user.data`, { headers: { Cookie: cookie } });
+        const beforeRes = await fetch(`${baseUrl}/user.data`, { headers: { Cookie: cookie, "Connection": "close" } });
         if (beforeRes.ok) {
           const beforeJson = JSON.parse(await beforeRes.text());
           if (beforeJson.code === 0 && beforeJson.data?.all) {
@@ -957,7 +957,7 @@ Deno.serve(async (req) => {
           // Verify user was actually added by checking user count
           let userCountAfter = 0;
           try {
-            const afterRes = await fetch(`${baseUrl}/user.data`, { headers: { Cookie: cookie } });
+            const afterRes = await fetch(`${baseUrl}/user.data`, { headers: { Cookie: cookie, "Connection": "close" } });
             if (afterRes.ok) {
               const afterJson = JSON.parse(await afterRes.text());
               if (afterJson.code === 0 && afterJson.data?.all) {
@@ -1002,7 +1002,7 @@ Deno.serve(async (req) => {
 
           // Re-check user count
           try {
-            const afterRes2 = await fetch(`${baseUrl}/user.data`, { headers: { Cookie: cookie } });
+            const afterRes2 = await fetch(`${baseUrl}/user.data`, { headers: { Cookie: cookie, "Connection": "close" } });
             if (afterRes2.ok) {
               const afterJson2 = JSON.parse(await afterRes2.text());
               if (afterJson2.code === 0 && afterJson2.data?.all) {
@@ -1034,7 +1034,7 @@ Deno.serve(async (req) => {
         console.log(`R3005G ADD-USER: Fallback trying user.data (form)`);
         const fallbackRes = await fetch(`${baseUrl}/user.data`, {
           method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded", Cookie: cookie, Origin: baseUrl, Referer: `${baseUrl}/` },
+          headers: { "Content-Type": "application/x-www-form-urlencoded", Cookie: cookie, "Connection": "close", Origin: baseUrl, Referer: `${baseUrl}/` },
           body: formBody,
         });
         const fallbackText = await fallbackRes.text();
