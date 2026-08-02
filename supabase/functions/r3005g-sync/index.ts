@@ -937,9 +937,11 @@ Deno.serve(async (req) => {
             method: "POST",
             headers: { 
               "Content-Type": "application/json;charset=UTF-8", 
+              "Connection": "close",
               Cookie: cookie, 
               Origin: baseUrl, 
               Referer: `${baseUrl}/` 
+
             },
             body: JSON.stringify(userPayload),
           });
