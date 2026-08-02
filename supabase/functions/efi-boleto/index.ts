@@ -978,9 +978,9 @@ async function bulkCheckPayments(_req: Request) {
       let newStatus = inv.status;
       let paidAt = inv.paid_at;
 
-      if (efiStatus === "paid" || efiStatus === "settled") {
+      if (efiStatus === "paid" || efiStatus === "settled" || efiStatus === "link") {
         newStatus = "paid";
-        paidAt = paidAt || new Date().toISOString();
+        paidAt = paidAt || (efiStatus === "link" ? null : new Date().toISOString());
       } else if (efiStatus === "canceled" || efiStatus === "refunded") {
         newStatus = "cancelled";
       } else if (efiStatus === "expired" || efiStatus === "unpaid") {
