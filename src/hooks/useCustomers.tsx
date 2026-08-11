@@ -27,17 +27,19 @@ export interface Customer {
   alert_on_frequent_drops: boolean;
   alert_on_abnormal_usage: boolean;
   alert_on_block_change: boolean;
+  block_alerts_enabled: boolean;
   block_status: "active" | "blocked";
   created_at: string;
   updated_at: string;
 }
 
-export type CustomerInput = Omit<Customer, "id" | "created_at" | "updated_at" | "ativo" | "pago_ate" | "cortesia" | "alert_on_disconnect" | "alert_on_frequent_drops" | "alert_on_abnormal_usage" | "alert_on_block_change" | "block_status"> & { 
+export type CustomerInput = Omit<Customer, "id" | "created_at" | "updated_at" | "ativo" | "pago_ate" | "cortesia" | "alert_on_disconnect" | "alert_on_frequent_drops" | "alert_on_abnormal_usage" | "alert_on_block_change" | "block_alerts_enabled" | "block_status"> & { 
   cortesia?: boolean; 
   alert_on_disconnect?: boolean; 
   alert_on_frequent_drops?: boolean; 
   alert_on_abnormal_usage?: boolean; 
   alert_on_block_change?: boolean; 
+  block_alerts_enabled?: boolean;
   block_status?: "active" | "blocked" 
 };
 

@@ -36,7 +36,7 @@ Deno.serve(async (req) => {
     const { data: settings } = await supabase
       .from('settings')
       .select('key,value')
-      .in('key', ['mikrotik_host', 'mikrotik_username', 'mikrotik_password', 'mikrotik_rest_port'])
+      .in('key', ['mikrotik_host', 'mikrotik_username', 'mikrotik_password', 'mikrotik_rest_port', 'blocking_days'])
 
     const cfg: any = {}
     settings?.forEach(s => cfg[s.key] = s.value)
@@ -121,8 +121,9 @@ Deno.serve(async (req) => {
       for (const alert of pendingAlerts) {
         const customer = alert.customers;
         if (customer?.telefone) {
+          const blockingDays = cfg.blocking_days || '15';
           const message = alert.new_status === 'blocked' 
-            ? `⚠️ *Aviso de Bloqueio:* Olá ${customer.nome}, identificamos uma fatura com mais de 15 dias de atraso e seu sinal foi suspenso automaticamente. Regularize para restabelecer a conexão.`
+            ? `⚠️ *Aviso de Bloqueio:* Olá ${customer.nome}, identificamos uma fatura com mais de ${blockingDays} dias de atraso e seu sinal foi suspenso automaticamente. Regularize para restabelecer a conexão.`
             : `✅ *Sinal Liberado:* Olá ${customer.nome}, seu pagamento foi identificado e seu sinal já foi liberado no sistema. Obrigado!`;
           
           try {
