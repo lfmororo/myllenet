@@ -2,11 +2,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { RefreshCw, ExternalLink, Copy, XCircle, Loader2, MessageCircle, CheckCircle2, Send } from "lucide-react";
+import { RefreshCw, ExternalLink, Copy, XCircle, Loader2, MessageCircle, CheckCircle2, Send, FileText } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import type { Invoice } from "@/hooks/useInvoices";
 import { useWhatsApp, type NotificationType } from "@/hooks/useWhatsApp";
+import { useInvoicePDF } from "@/hooks/useInvoicePDF";
 
 interface Props {
   invoices: Invoice[];
@@ -32,6 +33,7 @@ const whatsappOptions: { type: NotificationType; label: string; statusFilter?: s
 export default function InvoiceTable({ invoices, onCheckPayment, onCancel, onMarkAsPaid }: Props) {
   const [checking, setChecking] = useState<string | null>(null);
   const { sendInvoiceNotification, sending } = useWhatsApp();
+  const { generatePDF, generating: generatingPDF } = useInvoicePDF();
 
   const handleCheck = async (id: string) => {
     setChecking(id);
@@ -112,6 +114,21 @@ export default function InvoiceTable({ invoices, onCheckPayment, onCancel, onMar
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-1">
+                    {/* PDF button */}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-blue-600 hover:text-blue-700"
+                      title="Ver Fatura PDF"
+                      disabled={generatingPDF}
+                      onClick={() => generatePDF(inv.id)}
+                    >
+                      {generatingPDF ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <FileText className="h-4 w-4" />
+                      )}
+                    </Button>
                     {/* WhatsApp dropdown */}
                     {waOptions.length > 0 && (
                       <DropdownMenu>
