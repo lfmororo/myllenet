@@ -216,6 +216,19 @@ export default function CustomersPage() {
           </Select>
         </div>
         <div className="flex gap-2 w-full sm:w-auto">
+          <Button 
+            variant="outline" 
+            size="icon" 
+            onClick={() => {
+              fetchStatus();
+              refetchCustomers();
+              toast.info("Atualizando dados...");
+            }}
+            className="shrink-0"
+            title="Atualizar agora"
+          >
+            <Loader2 className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+          </Button>
           <Button variant="outline" onClick={exportCSV} className="flex-1 sm:flex-none">
             <Download className="mr-2 h-4 w-4" /> Exportar CSV
           </Button>
