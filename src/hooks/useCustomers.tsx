@@ -23,11 +23,14 @@ export interface Customer {
   plan_id: string | null;
   desconto_especial_centavos: number;
   pago_ate: string | null;
+  alert_on_disconnect: boolean;
+  alert_on_frequent_drops: boolean;
+  alert_on_abnormal_usage: boolean;
   created_at: string;
   updated_at: string;
 }
 
-export type CustomerInput = Omit<Customer, "id" | "created_at" | "updated_at" | "ativo" | "pago_ate" | "cortesia"> & { cortesia?: boolean };
+export type CustomerInput = Omit<Customer, "id" | "created_at" | "updated_at" | "ativo" | "pago_ate" | "cortesia" | "alert_on_disconnect" | "alert_on_frequent_drops" | "alert_on_abnormal_usage"> & { cortesia?: boolean; alert_on_disconnect?: boolean; alert_on_frequent_drops?: boolean; alert_on_abnormal_usage?: boolean };
 
 export function useCustomers() {
   const [customers, setCustomers] = useState<Customer[]>([]);
