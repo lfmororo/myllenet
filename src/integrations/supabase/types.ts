@@ -14,6 +14,44 @@ export type Database = {
   }
   public: {
     Tables: {
+      block_history: {
+        Row: {
+          changed_by: string | null
+          created_at: string
+          customer_id: string
+          id: string
+          new_status: string
+          old_status: string | null
+          reason: string | null
+        }
+        Insert: {
+          changed_by?: string | null
+          created_at?: string
+          customer_id: string
+          id?: string
+          new_status: string
+          old_status?: string | null
+          reason?: string | null
+        }
+        Update: {
+          changed_by?: string | null
+          created_at?: string
+          customer_id?: string
+          id?: string
+          new_status?: string
+          old_status?: string | null
+          reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "block_history_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customer_alerts_sent: {
         Row: {
           alert_type: string
