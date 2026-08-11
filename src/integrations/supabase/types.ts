@@ -50,6 +50,7 @@ export type Database = {
           alert_on_frequent_drops: boolean | null
           ativo: boolean
           bairro: string | null
+          block_status: string | null
           cep: string | null
           cidade: string | null
           complemento: string | null
@@ -77,6 +78,7 @@ export type Database = {
           alert_on_frequent_drops?: boolean | null
           ativo?: boolean
           bairro?: string | null
+          block_status?: string | null
           cep?: string | null
           cidade?: string | null
           complemento?: string | null
@@ -104,6 +106,7 @@ export type Database = {
           alert_on_frequent_drops?: boolean | null
           ativo?: boolean
           bairro?: string | null
+          block_status?: string | null
           cep?: string | null
           cidade?: string | null
           complemento?: string | null
@@ -516,6 +519,7 @@ export type Database = {
           total_bytes: number
         }[]
       }
+      check_and_block_overdue_customers: { Args: never; Returns: undefined }
       check_frequent_drops: {
         Args: { drop_count: number; time_threshold: string }
         Returns: {
