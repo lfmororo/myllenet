@@ -59,6 +59,7 @@ export default function CustomerTable({ customers, onEdit, onDelete, onToggleAct
               <TableHead className="font-semibold">Usuário PPPoE</TableHead>
               <TableHead className="font-semibold">Senha PPPoE</TableHead>
               {customerIdsWithInvoice && <TableHead className="font-semibold text-center">Boleto</TableHead>}
+              <TableHead className="font-semibold text-center">Status Bloqueio</TableHead>
               <TableHead className="font-semibold text-center">Status</TableHead>
               <TableHead className="font-semibold text-right">Ações</TableHead>
             </TableRow>
@@ -143,6 +144,11 @@ export default function CustomerTable({ customers, onEdit, onDelete, onToggleAct
                         {c.ativo ? "Ativo" : "Inativo"}
                       </Badge>
                     </div>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <Badge variant={c.block_status === "blocked" ? "destructive" : "outline"} className="text-xs">
+                      {c.block_status === "blocked" ? "Bloqueado" : "Liberado"}
+                    </Badge>
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
