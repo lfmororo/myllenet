@@ -24,16 +24,16 @@ export const useMikrotikLogs = () => {
       .from('wan_logs' as any)
       .select('*')
       .order('created_at', { ascending: false })
-      .limit(50);
+      .limit(240);
     
     if (!error && data) {
       const grouped: Record<string, any> = {};
       data.forEach((log: any) => {
-        const time = new Date(log.created_at).toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit' });
+        const time = new Date(log.created_at).toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         if (!grouped[time]) grouped[time] = { time };
         grouped[time][log.interface_name] = (Number(log.rx_bps || 0) + Number(log.tx_bps || 0)) / 1_000_000; // Mbps
       });
-      setWanLogs(Object.values(grouped).reverse());
+      setWanLogs(Object.values(grouped).reverse().slice(-60));
     }
     setLoading(false);
   };
