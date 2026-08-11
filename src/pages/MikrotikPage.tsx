@@ -126,7 +126,7 @@ export default function MikrotikPage() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Mikrotik - Gestão</h2>
-          <p className="text-muted-foreground">Monitoramento e gerenciamento centralizado Mikrotik</p>
+          <p className="text-muted-foreground">sincronizar clientes do sistema com o mikrotik</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={downloadMikrotikScript} disabled={exporting}>
