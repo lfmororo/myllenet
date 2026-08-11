@@ -38,15 +38,26 @@ Deno.serve(async (req) => {
     }
 
     // 2. Check Customer Disconnection Alerts (5 minutes)
-    // Compare last 2 stats logs for each customer
-    const { data: logs } = await supabase
-      .from('pppoe_logs')
-      .select('customer_id, usuario_pppoe, logged_at')
-      .order('logged_at', { ascending: false })
-      .limit(500)
+    // We check for customers who were online in the previous sync but are not in the current one
+    // AND haven't been in the current one for 5+ minutes
+    const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString()
+    
+    // Get customers who "disappeared"
+    const { data: disconnections } = await supabase.rpc('get_recent_disconnections', {
+      since_time: fiveMinAgo
+    })
 
-    // This logic would be more robust comparing current active sessions vs previous
-    // Simplified for now: if a customer was seen in logs 10min ago but not in the last 2 cycles
+    if (disconnections && disconnections.length > 0) {
+      for (const disc of disconnections) {
+        console.log(`ALERT: Customer ${disc.usuario_pppoe} Offline for > 5 minutes`)
+        await supabase.functions.invoke('whatsapp-send/send-text', {
+          body: {
+            phone: '85986801458',
+            message: `⚠️ *ALERTA DE DESCONEXÃO* ⚠️\n\nO cliente *${disc.nome}* (${disc.usuario_pppoe}) está off-line há mais de 5 minutos!\n\nÚltima atividade: ${new Date(disc.last_seen).toLocaleString('pt-BR')}`
+          }
+        })
+      }
+    }
     
     return json({ success: true })
   } catch (e) {
