@@ -16,6 +16,8 @@ interface MikrotikSession {
   name: string;
   address?: string;
   uptime?: string;
+  rx_bytes?: number;
+  tx_bytes?: number;
 }
 
 interface Props {
@@ -32,6 +34,22 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
   const [checkingEfi, setCheckingEfi] = useState(false);
   const [pagoAte, setPagoAte] = useState("");
   const [savingPagoAte, setSavingPagoAte] = useState(false);
+  const [logs, setLogs] = useState<any[]>([]);
+  const [loadingLogs, setLoadingLogs] = useState(false);
+
+  const fetchLogs = useCallback(async () => {
+    if (!customer) return;
+    setLoadingLogs(true);
+    const { data, error } = await supabase
+      .from("pppoe_logs")
+      .select("*")
+      .eq("customer_id", customer.id)
+      .order("logged_at", { ascending: false })
+      .limit(100);
+    
+    if (!error) setLogs(data || []);
+    setLoadingLogs(false);
+  }, [customer]);
 
   const fetchInvoices = useCallback(() => {
     if (!customer) return;
@@ -54,6 +72,7 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
   useEffect(() => {
     if (open && customer) {
       fetchInvoices();
+      fetchLogs();
       setPagoAte(customer.pago_ate || "");
     } else {
       setInvoices([]);

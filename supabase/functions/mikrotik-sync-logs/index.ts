@@ -36,16 +36,6 @@ Deno.serve(async (req) => {
     const customerMap = new Map(customers.map(c => [c.usuario_pppoe, c.id]))
 
     // 3. Process logs
-    // We'll store:
-    // - Bandwidth snapshots (hourly or every sync)
-    // - Session events (connected/disconnected)
-    
-    // For bandwidth, we need interface stats which mikrotik-status doesn't have yet.
-    // For now, let's just log the presence in activeList as "online" events.
-    
-    // Get last state from a cache or table? 
-    // Let's just record the current active sessions in a "pppoe_sessions" log table
-    
     const logs = activeSessions
       .filter(s => customerMap.has(s.name))
       .map(s => ({
@@ -53,12 +43,15 @@ Deno.serve(async (req) => {
         usuario_pppoe: s.name,
         ip_address: s.address,
         uptime: s.uptime,
-        event_type: 'connected',
+        rx_bytes: s.rx_bytes || 0,
+        tx_bytes: s.tx_bytes || 0,
+        event_type: 'stats',
         logged_at: now
       }))
 
     if (logs.length > 0) {
-      await supabase.from('pppoe_logs').insert(logs)
+      const { error: insertErr } = await supabase.from('pppoe_logs').insert(logs)
+      if (insertErr) throw insertErr
     }
 
     return json({ success: true, processed: logs.length })
