@@ -408,7 +408,7 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <Label htmlFor="alert-disconnect" className="text-xs font-medium cursor-pointer">Desconexão (>5min)</Label>
+                <Label htmlFor="alert-disconnect" className="text-xs font-medium cursor-pointer">Desconexão (&gt;5min)</Label>
                 <Switch 
                   id="alert-disconnect"
                   checked={customer.alert_on_disconnect} 
