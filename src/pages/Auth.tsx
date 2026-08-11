@@ -53,7 +53,7 @@ export default function Auth() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@myllenet.com"
+                placeholder="admin@mororo.tech"
                 required
               />
             </div>
