@@ -190,8 +190,16 @@ export default function MikrotikPage() {
                     {w.running ? <Wifi className="h-3 w-3 text-success" /> : <WifiOff className="h-3 w-3 text-destructive" />}
                     {w.name}
                   </span>
-                  <span className="text-muted-foreground">
-                    {((w.rx_bps + w.tx_bps) / 1_000_000).toFixed(1)} Mbps
+                  <span className="flex items-center gap-2 text-muted-foreground">
+                    <span className="flex items-center gap-0.5 text-primary">
+                      <ArrowDownCircle className="h-3 w-3" />
+                      {((w.rx_bps ?? 0) / 1_000_000).toFixed(1)}
+                    </span>
+                    <span className="flex items-center gap-0.5 text-accent">
+                      <ArrowUpCircle className="h-3 w-3" />
+                      {((w.tx_bps ?? 0) / 1_000_000).toFixed(1)}
+                    </span>
+                    <span>Mbps</span>
                   </span>
                 </div>
               ))}
@@ -199,6 +207,7 @@ export default function MikrotikPage() {
                 <p className="text-xs text-muted-foreground">Nenhuma interface WAN detectada</p>
               )}
             </div>
+
           </CardContent>
         </Card>
       </div>
@@ -208,7 +217,7 @@ export default function MikrotikPage() {
           <div>
             <CardTitle className="text-base">Monitoramento de Tráfego WAN</CardTitle>
             <CardDescription>
-              Consumo (Download + Upload) por interface em Mbps — {live ? "atualizando a cada 10s" : "atualização pausada"}
+              Download (↓) e Upload (↑) por interface em Mbps — {live ? "atualizando a cada 10s" : "atualização pausada"}
             </CardDescription>
 
           </div>
@@ -225,14 +234,29 @@ export default function MikrotikPage() {
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" vertical={false} />
                 <XAxis dataKey="time" className="text-xs" />
                 <YAxis className="text-xs" tickFormatter={(v) => `${v.toFixed(1)}M`} />
-                <Tooltip />
+                <Tooltip formatter={(v: any) => [`${Number(v).toFixed(2)} Mbps`, ""]} />
                 <Legend />
-                {Object.keys(wanLogs[0] || {}).filter(k => k !== 'time').map((iface, index) => (
-                  <Line key={iface} type="monotone" dataKey={iface} name={iface} stroke={["hsl(var(--primary))", "hsl(var(--accent))", "hsl(var(--warning))", "hsl(var(--destructive))"][index % 4]} strokeWidth={2} dot={false} />
-                ))}
+                {Object.keys(wanLogs[wanLogs.length - 1] || {}).filter(k => k !== 'time').map((key, index) => {
+                  const isUpload = key.endsWith('↑');
+                  const palette = ["hsl(var(--primary))", "hsl(var(--warning))", "hsl(var(--success))", "hsl(var(--destructive))"];
+                  const color = isUpload ? "hsl(var(--accent))" : palette[Math.floor(index / 2) % palette.length];
+                  return (
+                    <Line
+                      key={key}
+                      type="monotone"
+                      dataKey={key}
+                      name={key}
+                      stroke={color}
+                      strokeWidth={2}
+                      strokeDasharray={isUpload ? "4 3" : undefined}
+                      dot={false}
+                    />
+                  );
+                })}
               </LineChart>
             </ResponsiveContainer>
           ) : (
+
             <p className="text-center py-12 text-muted-foreground">Nenhum dado de WAN encontrado.</p>
           )}
         </CardContent>
