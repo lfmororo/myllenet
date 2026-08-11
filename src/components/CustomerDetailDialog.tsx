@@ -252,7 +252,7 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
                         tickFormatter={(val) => `${(val / (1024*1024)).toFixed(0)}MB`}
                       />
                       <Tooltip 
-                        labelFormatter={(label) => new Date(label).toLocaleString('pt-BR')}
+                        labelFormatter={(label: any) => new Date(label).toLocaleString('pt-BR')}
                         formatter={(val: number) => [`${(val / (1024*1024)).toFixed(2)} MB`, 'Download']}
                       />
                       <Area type="monotone" dataKey="rx_bytes" stroke="#0d9488" fillOpacity={1} fill="url(#colorRx)" />
