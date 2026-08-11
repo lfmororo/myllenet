@@ -39,9 +39,9 @@ export default function Auth() {
       <Card className="w-full max-w-md shadow-lg">
         <CardHeader className="text-center space-y-3">
           <div className="mx-auto flex h-14 w-14 items-center justify-center">
-            <img src={logoImg} alt="MylleNet" className="h-14 w-14 object-contain" />
+            <img src={logoImg} alt="Mororo.Tech" className="h-14 w-14 object-contain" />
           </div>
-          <CardTitle className="text-2xl font-bold tracking-tight">Myllenet</CardTitle>
+          <CardTitle className="text-2xl font-bold tracking-tight">Mororo.Tech</CardTitle>
           <CardDescription>Acesse o painel de gerenciamento</CardDescription>
         </CardHeader>
         <CardContent>
