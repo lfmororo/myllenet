@@ -59,42 +59,52 @@ export function useInvoicePDF() {
       } catch (e) { console.error(e); }
 
       // Invoice Title & Number
-      doc.setFontSize(24);
+      doc.setFontSize(22);
       doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
       doc.setFont("helvetica", "bold");
-      doc.text("FATURA", pageWidth - 20, 28, { align: "right" });
+      doc.text("FATURA", pageWidth - 20, 26, { align: "right" });
       
-      doc.setFontSize(10);
+      doc.setFontSize(9);
       doc.setTextColor(lightTextColor[0], lightTextColor[1], lightTextColor[2]);
       doc.setFont("helvetica", "normal");
-      doc.text(`#${invoiceId.substring(0, 8).toUpperCase()}`, pageWidth - 20, 36, { align: "right" });
+      doc.text("IDENTIFICAÇÃO DO DOCUMENTO", pageWidth - 20, 32, { align: "right" });
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(textColor[0], textColor[1], textColor[2]);
+      doc.text(`#${invoiceId.substring(0, 8).toUpperCase()}`, pageWidth - 20, 37, { align: "right" });
 
-      let currentY = 65;
+      let currentY = 75;
 
       // 2. Client & Issuer Info (Grid)
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(lightTextColor[0], lightTextColor[1], lightTextColor[2]);
+      doc.text("DADOS DO EMISSOR", 20, currentY - 5);
+      doc.text("DADOS DO CLIENTE", 110, currentY - 5);
+
+      // Issuer Column
       doc.setFontSize(10);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-      doc.text("DADOS DO EMISSOR", 20, currentY);
-      doc.text("DADOS DO CLIENTE", 110, currentY);
-
-      currentY += 6;
+      doc.text("Mororo.Tech - Soluções em TI", 20, currentY);
+      
       doc.setFont("helvetica", "normal");
       doc.setTextColor(textColor[0], textColor[1], textColor[2]);
-      
-      // Issuer
-      doc.text("Mororo.Tech - Soluções em TI", 20, currentY);
-      doc.text(`CNPJ: ${pix.cnpj || "00.000.000/0000-00"}`, 20, currentY + 5);
-      doc.text("Ipu - Ceará, Brasil", 20, currentY + 10);
-      doc.text(pix.phone || "(88) 99999-9999", 20, currentY + 15);
+      doc.text(`CNPJ: ${pix.cnpj || "00.000.000/0000-00"}`, 20, currentY + 6);
+      doc.text("Ipu - Ceará, Brasil", 20, currentY + 11);
+      doc.text(`Contato: ${pix.phone || "(88) 99999-9999"}`, 20, currentY + 16);
 
-      // Client
+      // Client Column
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
       doc.text(customer.nome, 110, currentY);
-      doc.text(`CPF/CNPJ: ${customer.cpf}`, 110, currentY + 5);
-      doc.text(`${customer.rua || ""}, ${customer.numero || ""}`, 110, currentY + 10);
-      doc.text(`${customer.bairro || ""} - ${customer.cidade || ""}`, 110, currentY + 15);
+      
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(textColor[0], textColor[1], textColor[2]);
+      doc.text(`CPF/CNPJ: ${customer.cpf}`, 110, currentY + 6);
+      doc.text(`${customer.rua || ""}, ${customer.numero || ""}`, 110, currentY + 11);
+      doc.text(`${customer.bairro || ""} - ${customer.cidade || ""}`, 110, currentY + 16);
 
-      currentY += 30;
+      currentY += 35;
 
       // 3. Service Summary Table
       doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
