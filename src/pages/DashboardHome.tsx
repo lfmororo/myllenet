@@ -220,7 +220,7 @@ export default function DashboardHome() {
               {routerStatus === "loading" ? "..." : onlineUsers !== null ? onlineUsers : "—"}
             </div>
             <p className="text-xs text-muted-foreground">
-              {onlineUsers !== null ? "Autenticados no PPPoE" : "Habilite a API REST no Mikrotik"}
+              {onlineUsers !== null ? "Autenticados no PPPoE" : "API REST do Mikrotik não respondeu. Habilite com /ip service enable www e libere a porta no firewall"}
             </p>
           </CardContent>
         </Card>
