@@ -40,6 +40,8 @@ export default function Settings() {
   const [mikrotikUser, setMikrotikUser] = useState("");
   const [mikrotikPass, setMikrotikPass] = useState("");
   const [mikrotikApiPort, setMikrotikApiPort] = useState("8728");
+  const [mikrotikRestPort, setMikrotikRestPort] = useState("80");
+
   const [savingMikrotik, setSavingMikrotik] = useState(false);
 
   // User management state
