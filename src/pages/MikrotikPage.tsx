@@ -141,55 +141,82 @@ export default function MikrotikPage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
-        <Card className="border-l-4 border-l-muted">
+        <Card className={`border-l-4 ${status?.online ? "border-l-success" : "border-l-destructive"}`}>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">Status do IP Externo</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-2">
-              <WifiOff className="h-5 w-5 text-muted-foreground" />
-              <span className="text-2xl font-bold text-muted-foreground">Desconectado</span>
+              {loading ? (
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              ) : status?.online ? (
+                <Wifi className="h-5 w-5 text-success" />
+              ) : (
+                <WifiOff className="h-5 w-5 text-destructive" />
+              )}
+              <span className={`text-2xl font-bold ${status?.online ? "text-success" : "text-destructive"}`}>
+                {loading ? "Verificando..." : status?.online ? "Conectado" : "Desconectado"}
+              </span>
             </div>
+            <p className="text-xs text-muted-foreground mt-2">{status?.message}</p>
           </CardContent>
         </Card>
-        <Card className="border-l-4 border-l-muted">
+        <Card className="border-l-4 border-l-primary">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Planos Ativos</CardTitle>
+            <CardTitle className="text-sm font-medium">Roteador</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-2">
-              <Router className="h-5 w-5 text-muted-foreground" />
-              <span className="text-2xl font-bold">0</span>
+              <Router className="h-5 w-5 text-primary" />
+              <span className="text-lg font-bold">{status?.identity || status?.host || "—"}</span>
             </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              {status?.version ? `RouterOS ${status.version}` : "Versão indisponível"}
+              {status?.uptime ? ` • Uptime ${status.uptime}` : ""}
+            </p>
           </CardContent>
         </Card>
-        <Card className="border-l-4 border-l-muted">
+        <Card className="border-l-4 border-l-accent">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">Usuários PPPoE</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-2">
-              <Badge variant="outline">0 / 0</Badge>
+              <Badge variant="outline">
+                {(status?.activeUsers ?? "—")} online / {customers.filter(c => c.ativo).length} cadastrados
+              </Badge>
             </div>
           </CardContent>
         </Card>
       </div>
-      
+
       <div className="grid gap-6 md:grid-cols-2">
         <Card className="flex flex-col items-center justify-center text-center p-8 space-y-4">
-          <div className="bg-muted p-4 rounded-full">
-            <Router className="h-12 w-12 text-muted-foreground" />
+          <div className={`p-4 rounded-full ${status?.online ? "bg-success/10" : "bg-muted"}`}>
+            <Router className={`h-12 w-12 ${status?.online ? "text-success" : "text-muted-foreground"}`} />
           </div>
           <div className="max-w-md">
-            <h3 className="text-lg font-semibold">Configuração Mikrotik Pendente</h3>
+            <h3 className="text-lg font-semibold">
+              {status?.online ? "Mikrotik conectado" : "Mikrotik inacessível"}
+            </h3>
             <p className="text-sm text-muted-foreground mt-2">
-              A integração com Mikrotik via API requer a configuração do IP externo e credenciais na aba de Configurações.
+              {status?.online
+                ? status?.restApi
+                  ? "Comunicação via API REST do RouterOS funcionando normalmente."
+                  : "Host alcançável, porém a API REST não respondeu. Habilite o serviço www (RouterOS v7) e confira usuário/senha."
+                : "Verifique o IP externo, se a porta está liberada no firewall do roteador e as credenciais salvas em Configurações."}
             </p>
+            <div className="flex flex-wrap gap-2 justify-center mt-4 text-xs text-muted-foreground">
+              <Badge variant="outline">API {status?.ports?.api ? "OK" : "bloqueada"}</Badge>
+              <Badge variant="outline">HTTP {status?.ports?.http ? "OK" : "bloqueada"}</Badge>
+              <Badge variant="outline">HTTPS {status?.ports?.https ? "OK" : "bloqueada"}</Badge>
+            </div>
             <Button variant="outline" className="mt-6" asChild>
               <a href="/settings">Ir para Configurações</a>
             </Button>
           </div>
         </Card>
+
 
         <Card className="p-8 space-y-4">
           <div className="flex items-center gap-3">
