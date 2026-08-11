@@ -22,14 +22,27 @@ export function useInvoicePDF() {
       const doc = new jsPDF();
       const pageWidth = doc.internal.pageSize.getWidth();
 
-      // Header
+      // Logo and Header
+      try {
+        const img = new Image();
+        img.src = "/src/assets/logo.png";
+        await new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = reject;
+        });
+        doc.addImage(img, "PNG", 20, 10, 20, 20);
+      } catch (e) {
+        console.error("Logo not found for PDF", e);
+      }
+
       doc.setFontSize(20);
       doc.setTextColor(0, 128, 128);
-      doc.text("FATURA DE INTERNET", pageWidth / 2, 20, { align: "center" });
+      doc.text("FATURA DE INTERNET", pageWidth / 2 + 10, 20, { align: "center" });
       
       doc.setFontSize(10);
       doc.setTextColor(100);
-      doc.text(`Nº ${invoiceId.substring(0, 8).toUpperCase()}/${new Date().getFullYear()}`, pageWidth / 2, 26, { align: "center" });
+      doc.text(`Nº ${invoiceId.substring(0, 8).toUpperCase()}/${new Date().getFullYear()}`, pageWidth / 2 + 10, 26, { align: "center" });
+
 
       // Prestador
       doc.setFontSize(12);
