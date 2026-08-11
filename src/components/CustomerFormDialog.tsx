@@ -67,6 +67,8 @@ export default function CustomerFormDialog({ open, onOpenChange, customer, onSav
     dia_vencimento: 10, plan_id: null, desconto_especial_centavos: 0, cortesia: false,
   });
   const [saving, setSaving] = useState(false);
+  const [sendingMikrotik, setSendingMikrotik] = useState(false);
+
 
   useEffect(() => {
     if (customer) {
