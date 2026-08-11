@@ -149,8 +149,30 @@ Deno.serve(async (req) => {
           // Log WAN status
           try {
             await supabase.from('wan_logs').insert(wanLogs)
+            
+            // Check for status changes (up/down)
+            for (const wan of wanInterfaces) {
+              const isUp = wan['running'] === 'true'
+              const { data: lastStatus } = await supabase
+                .from('wan_status_history')
+                .select('status')
+                .eq('interface_name', wan.name)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .single()
+
+              const currentStatus = isUp ? 'up' : 'down'
+              if (!lastStatus || lastStatus.status !== currentStatus) {
+                await supabase.from('wan_status_history').insert({
+                  interface_name: wan.name,
+                  status: currentStatus,
+                  reason: isUp ? 'Interface is running' : 'Interface is down/not running'
+                })
+              }
+            }
           } catch (e) { console.error('Error logging WAN status:', e) }
         }
+
 
         if (Array.isArray(active.data)) {
           const list = active.data as Record<string, string>[]
