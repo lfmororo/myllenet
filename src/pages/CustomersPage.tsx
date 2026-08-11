@@ -136,7 +136,7 @@ export default function CustomersPage() {
     <div className="space-y-4">
       <div>
         <h2 className="text-2xl font-bold tracking-tight">Clientes</h2>
-        <p className="text-muted-foreground">sincronizar clientes do sistema com o mikrotik</p>
+        <p className="text-muted-foreground">Gerenciamento de assinantes Mororo.Tech</p>
       </div>
 
       {activeCustomersWithoutBoleto.length > 0 && !loading && (
@@ -256,7 +256,7 @@ export default function CustomersPage() {
             link.download = `r3005g_users_${new Date().toISOString().slice(0, 10)}.csv`;
             link.click();
             URL.revokeObjectURL(url);
-            toast.success("Arquivo Mikrotik exportado!");
+            toast.success("Arquivo Mororo.Tech exportado!");
           }} className="flex-1 sm:flex-none">
             <Download className="mr-2 h-4 w-4" /> Exportar Mikrotik
           </Button>
