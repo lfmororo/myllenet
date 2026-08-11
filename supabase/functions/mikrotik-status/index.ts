@@ -94,6 +94,7 @@ Deno.serve(async (req) => {
     let version: string | null = null
     let activeUsers: number | null = null
     let activeList: { name: string; address?: string; uptime?: string; rx_bytes?: number; tx_bytes?: number }[] = []
+    let wans: { name: string; running: boolean; disabled: boolean; rx_bps: number; tx_bps: number; type?: string }[] = []
     let restOk = false
     let restPort: number | null = null
     let lastStatus = 0
@@ -180,6 +181,18 @@ Deno.serve(async (req) => {
 
             await supabase.from('wan_logs').insert(rows)
 
+            wans = wanInterfaces.map((i) => {
+              const row = rows.find((r) => r.interface_name === i.name)
+              return {
+                name: i.name,
+                type: i.type,
+                running: String(i.running) === 'true' && String(i.disabled) !== 'true',
+                disabled: String(i.disabled) === 'true',
+                rx_bps: row?.rx_bps ?? 0,
+                tx_bps: row?.tx_bps ?? 0,
+              }
+            })
+
             // Check for status changes (up/down)
             for (const wan of wanInterfaces) {
               const isUp = String(wan.running) === 'true' && String(wan.disabled) !== 'true'
@@ -245,6 +258,7 @@ Deno.serve(async (req) => {
       uptime,
       activeUsers,
       activeList,
+      wans,
       message,
     }
 
