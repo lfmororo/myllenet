@@ -205,6 +205,30 @@ export type Database = {
           },
         ]
       }
+      mikrotik_status_history: {
+        Row: {
+          host: string
+          id: string
+          logged_at: string | null
+          message: string | null
+          online: boolean
+        }
+        Insert: {
+          host: string
+          id?: string
+          logged_at?: string | null
+          message?: string | null
+          online: boolean
+        }
+        Update: {
+          host?: string
+          id?: string
+          logged_at?: string | null
+          message?: string | null
+          online?: boolean
+        }
+        Relationships: []
+      }
       notification_logs: {
         Row: {
           created_at: string
@@ -412,6 +436,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_recent_disconnections: {
+        Args: { since_time: string }
+        Returns: {
+          customer_id: string
+          last_seen: string
+          nome: string
+          usuario_pppoe: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

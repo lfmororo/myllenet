@@ -23,3 +23,6 @@ verify_jwt = false
 
 [functions.mikrotik-sync-logs]
 verify_jwt = false
+
+[functions.mikrotik-alerts]
+verify_jwt = false
