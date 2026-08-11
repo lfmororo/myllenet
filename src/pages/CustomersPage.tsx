@@ -33,12 +33,16 @@ export default function CustomersPage() {
   const [customerActiveFilter, setCustomerActiveFilter] = useState<string>("active");
   const [connectionFilter, setConnectionFilter] = useState<string>("all");
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
+  const [activeSessions, setActiveSessions] = useState<any[]>([]);
 
   const fetchStatus = useCallback(async () => {
     try {
       const { data, error } = await supabase.functions.invoke("mikrotik-status");
-      if (!error && data?.activeList) {
-        setOnlineUsers(data.activeList.map((u: any) => u.name));
+      if (!error) {
+        if (data?.activeList) {
+          setOnlineUsers(data.activeList.map((u: any) => u.name));
+          setActiveSessions(data.activeList);
+        }
       }
     } catch (err) {
       console.error("Error fetching Mikrotik status:", err);
@@ -288,7 +292,13 @@ export default function CustomersPage() {
 
       <CustomerFormDialog open={formOpen} onOpenChange={setFormOpen} customer={editingCustomer} onSave={addCustomer} onUpdate={updateCustomer} plans={plans} />
       <CSVImportDialog open={csvImportOpen} onOpenChange={setCsvImportOpen} onImport={bulkImport} existingCpfs={customers.map(c => c.cpf)} plans={plans} allInvoices={allInvoices} onUpdateCustomer={updateCustomer} existingCustomers={customers.map(c => ({ id: c.id, cpf: c.cpf }))} />
-      <CustomerDetailDialog open={!!detailCustomer} onOpenChange={(open) => !open && setDetailCustomer(null)} customer={detailCustomer} onCustomerUpdated={refetchCustomers} />
+      <CustomerDetailDialog 
+        open={!!detailCustomer} 
+        onOpenChange={(open) => !open && setDetailCustomer(null)} 
+        customer={detailCustomer} 
+        onCustomerUpdated={refetchCustomers} 
+        mikrotikData={detailCustomer ? activeSessions.find(s => s.name === detailCustomer.usuario_pppoe) : null}
+      />
       <AlertDialog open={!!deletingCustomer} onOpenChange={(open) => !open && setDeletingCustomer(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>

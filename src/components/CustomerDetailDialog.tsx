@@ -11,14 +11,21 @@ import { toast } from "sonner";
 import type { Customer } from "@/hooks/useCustomers";
 import type { Invoice } from "@/hooks/useInvoices";
 
+interface MikrotikSession {
+  name: string;
+  address?: string;
+  uptime?: string;
+}
+
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   customer: Customer | null;
   onCustomerUpdated?: () => void;
+  mikrotikData?: MikrotikSession | null;
 }
 
-export default function CustomerDetailDialog({ open, onOpenChange, customer, onCustomerUpdated }: Props) {
+export default function CustomerDetailDialog({ open, onOpenChange, customer, onCustomerUpdated, mikrotikData }: Props) {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(false);
   const [checkingEfi, setCheckingEfi] = useState(false);
@@ -160,18 +167,70 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
           </DialogTitle>
         </DialogHeader>
 
-        {/* Customer Info */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-          <div><span className="text-muted-foreground">CPF:</span> <span className="font-mono">{formatCPF(customer.cpf)}</span></div>
-          <div><span className="text-muted-foreground">E-mail:</span> {customer.email}</div>
-          <div><span className="text-muted-foreground">Telefone:</span> {customer.telefone || "—"}</div>
-          <div><span className="text-muted-foreground">PPPoE:</span> <span className="font-mono">{customer.usuario_pppoe}</span></div>
-          {customer.rua && (
-            <div className="sm:col-span-2">
-              <span className="text-muted-foreground">Endereço:</span>{" "}
-              {[customer.rua, customer.numero, customer.complemento, customer.bairro, customer.cidade, customer.estado, customer.cep].filter(Boolean).join(", ")}
+        {/* Connection & Customer Info */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-4">
+            <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold flex items-center gap-2">
+                  <div className={`h-2 w-2 rounded-full ${mikrotikData ? "bg-green-500 animate-pulse" : "bg-gray-300"}`} />
+                  Status Mikrotik
+                </h3>
+                {mikrotikData && (
+                  <Badge variant="outline" className="text-[10px] uppercase font-bold text-green-600 border-green-200">
+                    Conectado
+                  </Badge>
+                )}
+              </div>
+              
+              {mikrotikData ? (
+                <div className="space-y-2 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Tempo Online:</span>
+                    <span className="font-mono font-medium">{mikrotikData.uptime || "—"}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Endereço IP:</span>
+                    <span className="font-mono font-medium">{mikrotikData.address || "—"}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Serviço:</span>
+                    <span className="font-medium">PPPoE</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="py-2 text-xs text-muted-foreground italic">
+                  O cliente não possui uma sessão PPPoE ativa no momento.
+                </div>
+              )}
             </div>
-          )}
+
+            <div className="grid grid-cols-1 gap-2 text-sm">
+              <div><span className="text-muted-foreground">CPF:</span> <span className="font-mono">{formatCPF(customer.cpf)}</span></div>
+              <div><span className="text-muted-foreground">E-mail:</span> {customer.email}</div>
+              <div><span className="text-muted-foreground">Telefone:</span> {customer.telefone || "—"}</div>
+              <div><span className="text-muted-foreground">PPPoE:</span> <span className="font-mono">{customer.usuario_pppoe}</span></div>
+            </div>
+          </div>
+
+          <div className="space-y-3 text-sm">
+            {customer.rua && (
+              <div className="rounded-lg border p-3 bg-muted/10">
+                <span className="text-xs font-semibold text-muted-foreground uppercase block mb-1">Endereço</span>
+                <p className="leading-relaxed">
+                  {[customer.rua, customer.numero, customer.complemento, customer.bairro, customer.cidade, customer.estado, customer.cep].filter(Boolean).join(", ")}
+                </p>
+              </div>
+            )}
+            <div className="rounded-lg border p-3 bg-muted/10">
+              <span className="text-xs font-semibold text-muted-foreground uppercase block mb-1">Dados Supabase</span>
+              <div className="space-y-1 text-xs">
+                <div className="flex justify-between"><span className="text-muted-foreground">ID Interno:</span> <span className="font-mono text-[10px]">{customer.id}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Criado em:</span> <span>{new Date(customer.created_at).toLocaleDateString("pt-BR")}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Vencimento:</span> <span>Dia {customer.dia_vencimento}</span></div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <Separator />
