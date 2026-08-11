@@ -161,7 +161,7 @@ Deno.serve(async (req) => {
     else if (reachable) message = 'Host alcançável, mas a API REST não respondeu. Veja o tutorial para habilitar (/ip service enable www) e liberar a porta no firewall.'
     else message = 'Não foi possível alcançar o Mikrotik neste IP/portas'
 
-    return json({
+    const response = {
       online,
       host,
       restApi: restOk,
@@ -175,7 +175,29 @@ Deno.serve(async (req) => {
       activeUsers,
       activeList,
       message,
-    })
+    }
+
+    // Log status for alert tracking
+    try {
+      await supabase.from('mikrotik_status_history').insert({
+        host,
+        online,
+        message
+      })
+    } catch (e) { console.error('Error logging status history:', e) }
+
+    return json(response)
+
+    // Log status for alert tracking
+    try {
+      await supabase.from('mikrotik_status_history').insert({
+        host,
+        online,
+        message
+      })
+    } catch (e) { console.error('Error logging status history:', e) }
+
+    return response
   } catch (e) {
     return json({ online: false, message: (e as Error).message }, 200)
   }

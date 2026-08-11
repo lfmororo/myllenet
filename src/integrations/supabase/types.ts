@@ -205,6 +205,30 @@ export type Database = {
           },
         ]
       }
+      mikrotik_status_history: {
+        Row: {
+          host: string
+          id: string
+          logged_at: string | null
+          message: string | null
+          online: boolean
+        }
+        Insert: {
+          host: string
+          id?: string
+          logged_at?: string | null
+          message?: string | null
+          online: boolean
+        }
+        Update: {
+          host?: string
+          id?: string
+          logged_at?: string | null
+          message?: string | null
+          online?: boolean
+        }
+        Relationships: []
+      }
       notification_logs: {
         Row: {
           created_at: string
