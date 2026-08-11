@@ -336,6 +336,60 @@ export default function DashboardHome() {
           </CardContent>
         </Card>
       )}
+      {/* WAN Traffic Chart */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle className="text-base">Consumo WAN em Tempo Real</CardTitle>
+            <CardDescription>Tráfego total (Download + Upload) por interface</CardDescription>
+          </div>
+          <Activity className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          {loadingWan ? (
+            <div className="flex h-[300px] items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : wanLogs.length > 0 ? (
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={wanLogs}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" vertical={false} />
+                <XAxis 
+                  dataKey="time" 
+                  className="text-xs" 
+                  minTickGap={30}
+                />
+                <YAxis 
+                  className="text-xs" 
+                  tickFormatter={(v) => `${v.toFixed(1)}M`}
+                  label={{ value: 'Mbps', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fontSize: '10px' } }}
+                />
+                <Tooltip
+                  formatter={(value: number) => [`${value.toFixed(2)} Mbps`, ""]}
+                  contentStyle={{ borderRadius: "8px", border: "1px solid hsl(var(--border))", background: "hsl(var(--card))" }}
+                />
+                <Legend />
+                {wanInterfaces.map((iface, index) => (
+                  <Line
+                    key={iface}
+                    type="monotone"
+                    dataKey={iface}
+                    name={iface}
+                    stroke={colors[index % colors.length]}
+                    strokeWidth={2}
+                    dot={false}
+                    activeDot={{ r: 4 }}
+                  />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex h-[300px] items-center justify-center text-muted-foreground">
+              Nenhum dado de WAN encontrado. Certifique-se de que o Mikrotik está online e as interfaces WAN estão identificadas.
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
