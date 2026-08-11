@@ -14,19 +14,28 @@ export default function DashboardHome() {
   const { plans } = usePlans();
 
   const [routerStatus, setRouterStatus] = useState<"loading" | "online" | "offline">("loading");
+  const [onlineUsers, setOnlineUsers] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    const check = async () => {
       try {
         const { data, error } = await supabase.functions.invoke("mikrotik-status");
-        if (!cancelled) setRouterStatus(!error && data?.online ? "online" : "offline");
+        if (cancelled) return;
+        setRouterStatus(!error && data?.online ? "online" : "offline");
+        setOnlineUsers(typeof data?.activeUsers === "number" ? data.activeUsers : null);
       } catch {
-        if (!cancelled) setRouterStatus("offline");
+        if (!cancelled) {
+          setRouterStatus("offline");
+          setOnlineUsers(null);
+        }
       }
-    })();
-    return () => { cancelled = true; };
+    };
+    check();
+    const timer = setInterval(check, 60000);
+    return () => { cancelled = true; clearInterval(timer); };
   }, []);
+
 
   const stats = useMemo(() => {
     const activeCustomers = customers.filter(c => c.ativo).length;
