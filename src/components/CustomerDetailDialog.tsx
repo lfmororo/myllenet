@@ -426,6 +426,62 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
 
         <Separator />
 
+        {/* Alertas de Monitoramento */}
+        <div className="rounded-lg border bg-muted/30 p-4 space-y-4">
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <Bell className="h-4 w-4 text-primary" />
+            Configurações de Alertas
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="flex items-center justify-between space-x-2">
+              <div className="space-y-0.5">
+                <Label className="text-sm">Quedas de Conexão</Label>
+                <p className="text-[10px] text-muted-foreground">Alerta quando desconectar por 5min.</p>
+              </div>
+              <Switch
+                checked={customer.alert_on_disconnect}
+                onCheckedChange={(val) => updateCustomer({ alert_on_disconnect: val })}
+              />
+            </div>
+
+            <div className="flex items-center justify-between space-x-2">
+              <div className="space-y-0.5">
+                <Label className="text-sm">Quedas Frequentes</Label>
+                <p className="text-[10px] text-muted-foreground">Alerta se reconectar 3x em 1h.</p>
+              </div>
+              <Switch
+                checked={customer.alert_on_frequent_drops}
+                onCheckedChange={(val) => updateCustomer({ alert_on_frequent_drops: val })}
+              />
+            </div>
+
+            <div className="flex items-center justify-between space-x-2">
+              <div className="space-y-0.5">
+                <Label className="text-sm">Consumo Anormal</Label>
+                <p className="text-[10px] text-muted-foreground">Alerta tráfego {'>'} 500MB em 15min.</p>
+              </div>
+              <Switch
+                checked={customer.alert_on_abnormal_usage}
+                onCheckedChange={(val) => updateCustomer({ alert_on_abnormal_usage: val })}
+              />
+            </div>
+
+            <div className="flex items-center justify-between space-x-2">
+              <div className="space-y-0.5">
+                <Label className="text-sm text-primary font-bold">Bloqueio Automático</Label>
+                <p className="text-[10px] text-muted-foreground font-medium">Alerta WhatsApp ao ser bloqueado ou liberado.</p>
+              </div>
+              <Switch
+                checked={customer.alert_on_block_change}
+                onCheckedChange={(val) => updateCustomer({ alert_on_block_change: val })}
+              />
+            </div>
+          </div>
+        </div>
+
+        <Separator />
+
         {/* Configurações de Alertas */}
         <div className="rounded-lg border bg-muted/30 p-4 space-y-4">
           <h3 className="text-sm font-semibold flex items-center gap-2">
