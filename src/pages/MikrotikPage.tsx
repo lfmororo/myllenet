@@ -249,7 +249,7 @@ export default function MikrotikPage() {
                         <span className="text-sm font-medium flex items-center gap-2 col-span-1">
                           <Activity className="h-4 w-4 text-muted-foreground" /> Status:
                         </span>
-                        <Badge variant={e.status === 'up' ? "default" : "destructive"} className={`w-fit col-span-3 ${e.status === 'up' ? "bg-success hover:bg-success/80" : ""}`}>
+                        <Badge variant="outline" className={`w-fit col-span-3 ${e.status === 'up' ? "bg-success text-success-foreground border-transparent" : "bg-destructive text-destructive-foreground border-transparent"}`}>
                           {e.status === 'up' ? "ONLINE / UP" : "OFFLINE / DOWN"}
                         </Badge>
                       </div>
