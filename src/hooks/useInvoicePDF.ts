@@ -97,7 +97,7 @@ export function useInvoicePDF() {
       // Footer
       doc.setFontSize(8);
       doc.setTextColor(150);
-      doc.text("Esta é uma fatura gerada automaticamente pelo sistema Myllenet.", pageWidth / 2, doc.internal.pageSize.getHeight() - 20, { align: "center" });
+      doc.text("Esta é uma fatura gerada automaticamente pelo sistema Mororo.Tech.", pageWidth / 2, doc.internal.pageSize.getHeight() - 20, { align: "center" });
       doc.text("Mororo.Tech - Soluções em Tecnologia", pageWidth / 2, doc.internal.pageSize.getHeight() - 15, { align: "center" });
 
       if (open) {
