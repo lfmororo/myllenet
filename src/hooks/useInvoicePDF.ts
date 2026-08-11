@@ -25,24 +25,22 @@ export function useInvoicePDF() {
       // Logo and Header
       try {
         const img = new Image();
-        // Use a relative path that works in Vite dev and prod
         img.src = "/logo.png"; 
         
         await new Promise((resolve) => {
           img.onload = resolve;
           img.onerror = () => {
-            // Fallback to internal path if the above fails
             img.src = new URL("/src/assets/logo.png", window.location.origin).href;
             img.onload = resolve;
-            img.onerror = () => {
-              console.warn("Could not load logo from standard paths");
-              resolve(null);
-            };
+            img.onerror = () => resolve(null);
           };
         });
         
         if (img.complete && img.naturalWidth > 0) {
-          doc.addImage(img, "PNG", 20, 10, 20, 20);
+          // Adjusted dimensions for the new horizontal logo (maintain aspect ratio)
+          const imgWidth = 60;
+          const imgHeight = (img.naturalHeight * imgWidth) / img.naturalWidth;
+          doc.addImage(img, "PNG", 20, 10, imgWidth, imgHeight);
         }
       } catch (e) {
         console.error("Logo loading error", e);
