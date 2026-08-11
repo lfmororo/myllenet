@@ -305,14 +305,14 @@ async function sendInvoiceNotification(req: Request) {
   switch (notifType) {
     case "boleto_gerado":
       const mesRef = new Date(invoice.vencimento + "T12:00:00").toLocaleDateString("pt-BR", { month: 'long', year: 'numeric' });
-      message = `Olá ${customer.nome}! 🌐\n\nSua fatura da *Myllenet* referente a *${mesRef}* foi gerada:\n\n📋 ${invoice.descricao}\n💰 Valor: ${valor}\n📅 Vencimento: ${vencimento}`;
+      message = `Olá ${customer.nome}! 🌐\n\nSua fatura da *Mororo.Tech* referente a *${mesRef}* foi gerada:\n\n📋 ${invoice.descricao}\n💰 Valor: ${valor}\n📅 Vencimento: ${vencimento}`;
       if (invoice.efi_link) message += `\n\n🔗 Boleto: ${invoice.efi_link}`;
       if (invoice.efi_barcode) message += `\n\n📊 Código de barras:\n${invoice.efi_barcode}`;
       if (invoice.efi_pix_copiacola) message += `\n\n📱 PIX Copia e Cola:\n${invoice.efi_pix_copiacola}`;
       message += "\n\nQualquer dúvida, estamos à disposição! 😊";
       break;
     case "lembrete_vencimento":
-      message = `Olá ${customer.nome}! 🌐\n\n⏰ Lembrete: sua fatura da *Myllenet* vence em breve!\n\n📋 ${invoice.descricao}\n💰 Valor: ${valor}\n📅 Vencimento: ${vencimento}`;
+      message = `Olá ${customer.nome}! 🌐\n\n⏰ Lembrete: sua fatura da *Mororo.Tech* vence em breve!\n\n📋 ${invoice.descricao}\n💰 Valor: ${valor}\n📅 Vencimento: ${vencimento}`;
       if (invoice.efi_link) message += `\n\n🔗 Boleto: ${invoice.efi_link}`;
       message += "\n\nEvite a suspensão do serviço. Pague em dia! 😊";
       break;
@@ -320,7 +320,7 @@ async function sendInvoiceNotification(req: Request) {
       message = `Olá ${customer.nome}! 🌐\n\n✅ Pagamento confirmado!\n\n📋 ${invoice.descricao}\n💰 Valor: ${valor}\n\nObrigado por manter sua internet em dia! 🚀`;
       break;
     case "cobranca_atrasada":
-      message = `Olá ${customer.nome}! 🌐\n\n⚠️ Sua fatura da *Myllenet* está vencida!\n\n📋 ${invoice.descricao}\n💰 Valor: ${valor}\n📅 Vencimento: ${vencimento}`;
+      message = `Olá ${customer.nome}! 🌐\n\n⚠️ Sua fatura da *Mororo.Tech* está vencida!\n\n📋 ${invoice.descricao}\n💰 Valor: ${valor}\n📅 Vencimento: ${vencimento}`;
       if (invoice.efi_link) message += `\n\n🔗 Boleto: ${invoice.efi_link}`;
       message += "\n\nRegularize para evitar a suspensão do serviço. Em caso de dúvidas, entre em contato!";
       break;

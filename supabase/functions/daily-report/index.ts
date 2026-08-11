@@ -154,7 +154,7 @@ Deno.serve(async (req) => {
       return `${day}/${m}/${y}`;
     };
 
-    let message = `📊 *Relatório Diário Myllenet* - ${formatDate(todayStr)}\n\n`;
+    let message = `📊 *Relatório Diário Mororo.Tech* - ${formatDate(todayStr)}\n\n`;
 
     if (dueTodayList.length > 0) {
       message += `📅 *Vencendo hoje (${dueTodayList.length}):*\n`;
@@ -190,7 +190,7 @@ Deno.serve(async (req) => {
       message += `💰 *Total Recuperado: ${formatCurrency(totalReconciled)}*\n\n`;
     }
 
-    message += "\n_Relatório automático do sistema Myllenet_";
+    message += "\n_Relatório automático do sistema Mororo.Tech_";
 
     const { data: adminRoles } = await supabase
       .from("user_roles")

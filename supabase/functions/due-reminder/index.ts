@@ -152,7 +152,7 @@ Deno.serve(async (req) => {
       const nome = customer.nome.split(" ")[0];
       const message = `Olá ${nome}! 🌐
 
-⏰ *Lembrete da Myllenet*: sua fatura vence em *3 dias*!
+⏰ *Lembrete da Mororo.Tech*: sua fatura vence em *3 dias*!
 
 📋 ${inv.descricao}
 💰 Valor: ${formatCurrency(inv.valor_centavos)}
@@ -160,7 +160,7 @@ Deno.serve(async (req) => {
 
 Evite a suspensão do serviço. Pague em dia! 😊
 
-_Equipe Myllenet_`;
+_Equipe Mororo.Tech_`;
 
       try {
         const fullMessage = message + BOT_DISCLAIMER;
