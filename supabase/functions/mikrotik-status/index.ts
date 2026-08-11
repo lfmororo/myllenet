@@ -1,17 +1,18 @@
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors'
 import { createClient } from 'npm:@supabase/supabase-js@2'
 
-async function tcpCheck(host: string, port: number, timeoutMs = 6000) {
-  const ac = new AbortController()
-  const t = setTimeout(() => ac.abort(), timeoutMs)
+async function tcpCheck(host: string, port: number, timeoutMs = 5000) {
+  let conn: Deno.Conn | null = null
   try {
-    const conn = await Deno.connect({ hostname: host, port, signal: ac.signal } as any)
-    conn.close()
+    conn = await Promise.race([
+      Deno.connect({ hostname: host, port }),
+      new Promise<never>((_, rej) => setTimeout(() => rej(new Error('timeout')), timeoutMs)),
+    ])
     return true
   } catch (_e) {
     return false
   } finally {
-    clearTimeout(t)
+    try { conn?.close() } catch (_e) { /* ignore */ }
   }
 }
 
