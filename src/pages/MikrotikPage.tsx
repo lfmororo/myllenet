@@ -148,8 +148,12 @@ export default function MikrotikPage() {
             {exporting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Download className="h-4 w-4 mr-2" />}
             Baixar Script (.rsc)
           </Button>
-          <Button onClick={checkStatus} disabled={loading}>
-            {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+          <Button variant="secondary" onClick={syncWithMikrotik} disabled={syncing || loading}>
+            {syncing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+            Sincronizar Mikrotik
+          </Button>
+          <Button onClick={checkStatus} disabled={loading || syncing}>
+            {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Router className="h-4 w-4 mr-2" />}
             Verificar Status
           </Button>
         </div>
