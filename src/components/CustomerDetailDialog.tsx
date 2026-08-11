@@ -459,7 +459,7 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
             <div className="flex items-center justify-between space-x-2">
               <div className="space-y-0.5">
                 <Label className="text-sm">Consumo Anormal</Label>
-                <p className="text-[10px] text-muted-foreground">Alerta tráfego > 500MB em 15min.</p>
+                <p className="text-[10px] text-muted-foreground">Alerta tráfego {'>'} 500MB em 15min.</p>
               </div>
               <Switch
                 checked={customer.alert_on_abnormal_usage}
