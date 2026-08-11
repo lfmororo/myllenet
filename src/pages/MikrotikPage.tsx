@@ -315,7 +315,7 @@ export default function MikrotikPage() {
             <BookOpen className="h-5 w-5 text-primary" />
             Otimização da Integração com Mikrotik
           </CardTitle>
-          <CardDescription>Melhorar a estabilidade e o desempenho da integração</CardDescription>
+          <CardDescription>NAO ESTA CONSEGUINDO MONITORAR AS WANS no mikrotik</CardDescription>
         </CardHeader>
         <CardContent className="prose prose-sm dark:prose-invert max-w-none">
           <div className="space-y-4 text-sm leading-relaxed">
