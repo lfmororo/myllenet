@@ -35,6 +35,12 @@ export default function Settings() {
   const [uazapiToken, setUazapiToken] = useState("");
   const [savingWhatsapp, setSavingWhatsapp] = useState(false);
 
+  // PIX settings
+  const [pixKey, setPixKey] = useState("");
+  const [pixName, setPixName] = useState("");
+  const [pixCity, setPixCity] = useState("");
+  const [savingPix, setSavingPix] = useState(false);
+
   // Mikrotik settings
   const [mikrotikHost, setMikrotikHost] = useState("");
   const [mikrotikUser, setMikrotikUser] = useState("");
@@ -161,7 +167,7 @@ export default function Settings() {
     const { data } = await supabase
       .from("settings")
       .select("key, value")
-      .in("key", ["efi_client_id", "efi_client_secret", "efi_certificate_path", "uazapi_token", "mikrotik_host", "mikrotik_username", "mikrotik_password", "mikrotik_api_port", "mikrotik_rest_port", "blocking_days"]);
+      .in("key", ["efi_client_id", "efi_client_secret", "efi_certificate_path", "uazapi_token", "mikrotik_host", "mikrotik_username", "mikrotik_password", "mikrotik_api_port", "mikrotik_rest_port", "blocking_days", "pix_key", "pix_name", "pix_city"]);
 
     if (data) {
       for (const row of data) {
@@ -175,6 +181,9 @@ export default function Settings() {
         if (row.key === "mikrotik_api_port") setMikrotikApiPort(row.value || "8728");
         if (row.key === "mikrotik_rest_port") setMikrotikRestPort(row.value || "80");
         if (row.key === "blocking_days") setBlockingDays(row.value || "15");
+        if (row.key === "pix_key") setPixKey(row.value || "");
+        if (row.key === "pix_name") setPixName(row.value || "");
+        if (row.key === "pix_city") setPixCity(row.value || "");
       }
     }
 
@@ -296,6 +305,7 @@ export default function Settings() {
             <TabsTrigger value="mikrotik">
               <Router className="mr-1.5 h-4 w-4" /> Mikrotik
             </TabsTrigger>
+            <TabsTrigger value="pix">PIX Local</TabsTrigger>
           </TabsList>
 
           {/* Plans Tab */}
