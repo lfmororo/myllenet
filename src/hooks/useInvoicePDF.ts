@@ -188,50 +188,63 @@ export function useInvoicePDF() {
       
       // QR Code Box
       try {
-        const qrSize = 50;
+        const qrSize = 52;
         const qrCodeDataUrl = await QRCode.toDataURL(pix.payload, { 
           margin: 1, 
-          width: 250,
+          width: 300,
           color: { dark: "#0f172a", light: "#ffffff" }
         });
         
         doc.setFillColor(255, 255, 255);
-        doc.rect(20, currentY, qrSize + 10, qrSize + 10, "F");
+        doc.rect(20, currentY, qrSize + 8, qrSize + 8, "F");
         doc.setDrawColor(226, 232, 240);
-        doc.rect(20, currentY, qrSize + 10, qrSize + 10, "S");
-        doc.addImage(qrCodeDataUrl, "PNG", 25, currentY + 5, qrSize, qrSize);
+        doc.rect(20, currentY, qrSize + 8, qrSize + 8, "S");
+        doc.addImage(qrCodeDataUrl, "PNG", 24, currentY + 4, qrSize, qrSize);
         
         // PIX Instructions
         const textX = 85;
-        doc.setFontSize(10);
-        doc.setFont("helvetica", "bold");
-        doc.text("COMO PAGAR:", textX, currentY + 5);
-        
-        doc.setFont("helvetica", "normal");
         doc.setFontSize(9);
-        doc.text("1. Abra o app do seu banco", textX, currentY + 12);
-        doc.text("2. Escolha pagar via PIX (QR Code ou Copia e Cola)", textX, currentY + 17);
-        doc.text("3. Escaneie o código ao lado ou cole o código abaixo", textX, currentY + 22);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+        doc.text("PASSO A PASSO PARA PAGAR:", textX, currentY + 4);
+        
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8.5);
+        doc.setTextColor(textColor[0], textColor[1], textColor[2]);
+        doc.text("1. Abra o aplicativo do seu banco", textX, currentY + 10);
+        doc.text("2. Selecione a opção PIX (QR Code ou Copia e Cola)", textX, currentY + 15);
+        doc.text("3. Escaneie o QR Code ou cole o código abaixo", textX, currentY + 20);
         
         doc.setFont("helvetica", "bold");
-        doc.text("PIX COPIA E COLA:", textX, currentY + 32);
-        doc.setFontSize(8);
+        doc.setTextColor(accentColor[0], accentColor[1], accentColor[2]);
+        doc.text("PIX COPIA E COLA:", textX, currentY + 30);
+        
         doc.setFont("helvetica", "normal");
+        doc.setFontSize(7.5);
+        doc.setTextColor(textColor[0], textColor[1], textColor[2]);
         const splitPayload = doc.splitTextToSize(pix.payload, pageWidth - textX - 20);
-        doc.text(splitPayload, textX, currentY + 37);
+        doc.text(splitPayload, textX, currentY + 35);
 
+        doc.setFontSize(8.5);
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(9);
-        doc.text(`Favorecido: ${pix.name || "Mororo Tech"}`, textX, currentY + 52);
-        doc.text(`Chave: ${pix.key || "N/A"}`, textX, currentY + 57);
+        doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+        doc.text(`Favorecido:`, textX, currentY + 52);
+        doc.setFont("helvetica", "normal");
+        doc.text(`${pix.name || "Mororo Tech"}`, textX + 18, currentY + 52);
+        
+        doc.setFont("helvetica", "bold");
+        doc.text(`Chave:`, textX, currentY + 57);
+        doc.setFont("helvetica", "normal");
+        doc.text(`${pix.key || "N/A"}`, textX + 11, currentY + 57);
 
       } catch (e) { console.error(e); }
 
       // 6. Footer
-      doc.setFontSize(8);
+      doc.setFontSize(7);
       doc.setTextColor(lightTextColor[0], lightTextColor[1], lightTextColor[2]);
-      const footerY = pageHeight - 15;
+      const footerY = pageHeight - 12;
       doc.text("ESTA É UMA FATURA DE SERVIÇOS DE COMUNICAÇÃO MULTIMÍDIA.", 20, footerY);
+      doc.setFont("helvetica", "bold");
       doc.text("Mororo.Tech © 2026", pageWidth - 20, footerY, { align: "right" });
 
       if (open) {
