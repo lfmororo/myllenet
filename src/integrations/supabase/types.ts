@@ -548,6 +548,30 @@ export type Database = {
         }
         Relationships: []
       }
+      wan_status_history: {
+        Row: {
+          created_at: string | null
+          id: string
+          interface_name: string
+          reason: string | null
+          status: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          interface_name: string
+          reason?: string | null
+          status: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          interface_name?: string
+          reason?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
