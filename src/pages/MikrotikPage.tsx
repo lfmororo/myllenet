@@ -217,6 +217,73 @@ export default function MikrotikPage() {
           </div>
         </Card>
 
+        {/* Tutorial API REST */}
+        <Card className="p-8 space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="bg-accent/10 p-3 rounded-lg">
+              <BookOpen className="h-6 w-6 text-accent" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold">Como ativar a API REST (clientes on-line)</h3>
+              <p className="text-sm text-muted-foreground">
+                Necessário para exibir os usuários autenticados no PPPoE
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-3 text-sm">
+            <div>
+              <p className="font-medium">1. Habilite o serviço www no RouterOS v7 (Terminal)</p>
+              <pre className="bg-muted/60 border rounded-md p-3 mt-1 text-xs overflow-x-auto">{`/ip service enable www
+/ip service set www port=80
+# (opcional, mais seguro)
+/ip service enable www-ssl`}</pre>
+            </div>
+            <div>
+              <p className="font-medium">2. Libere a porta no firewall (apenas do seu IP se possível)</p>
+              <pre className="bg-muted/60 border rounded-md p-3 mt-1 text-xs overflow-x-auto">{`/ip firewall filter
+add chain=input protocol=tcp dst-port=80 action=accept comment="API REST Myllenet" place-before=0`}</pre>
+            </div>
+            <div>
+              <p className="font-medium">3. Garanta um usuário com permissão de leitura via web</p>
+              <pre className="bg-muted/60 border rounded-md p-3 mt-1 text-xs overflow-x-auto">{`/user set admin group=full
+# ou crie um usuário só para o sistema:
+/user add name=myllenet password=SUA_SENHA group=full`}</pre>
+            </div>
+            <div>
+              <p className="font-medium">4. Se usa NAT/roteador na frente do Mikrotik</p>
+              <p className="text-muted-foreground text-xs mt-1">
+                Encaminhe a porta escolhida (ex.: 80 ou 8080) para o IP interno do Mikrotik.
+              </p>
+            </div>
+            <div>
+              <p className="font-medium">5. Salve host, usuário, senha e a porta REST em Configurações</p>
+              <p className="text-muted-foreground text-xs mt-1">
+                Depois clique em "Verificar" nesta página. Testamos automaticamente as portas 80, 443, 8080, 8443, 81 e 4443.
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-muted/50 border rounded-md p-3 text-xs space-y-1">
+            <p className="font-medium">Diagnóstico atual</p>
+            <p className="text-muted-foreground">Host: {status?.host || "—"}</p>
+            <p className="text-muted-foreground">
+              Portas abertas: {status?.openPorts?.length ? status.openPorts.join(", ") : "nenhuma detectada"}
+            </p>
+            <p className="text-muted-foreground">
+              API REST: {status?.restApi ? `OK (porta ${status?.restPort})` : "não respondeu"}
+              {status?.lastHttpStatus === 401 ? " • usuário/senha rejeitados" : ""}
+            </p>
+          </div>
+
+          <Button variant="outline" className="w-full" onClick={checkStatus} disabled={loading}>
+            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+            Verificar novamente
+          </Button>
+        </Card>
+
+
+
 
         <Card className="p-8 space-y-4">
           <div className="flex items-center gap-3">
