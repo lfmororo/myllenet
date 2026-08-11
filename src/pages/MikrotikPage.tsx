@@ -164,7 +164,7 @@ export default function MikrotikPage() {
             <div className="flex items-center gap-2">
               <Activity className="h-5 w-5 text-warning" />
               <span className="text-2xl font-bold">
-                {status?.online ? (wanLogs.length > 0 ? "Ativa" : "Offline") : "Offline"}
+                Offline
               </span>
             </div>
           </CardContent>
