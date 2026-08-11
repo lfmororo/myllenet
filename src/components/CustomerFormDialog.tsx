@@ -4,7 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, AlertCircle } from "lucide-react";
+import { Loader2, AlertCircle, UploadCloud } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import type { Customer, CustomerInput } from "@/hooks/useCustomers";
