@@ -74,23 +74,21 @@ Deno.serve(async (req) => {
 
     // Candidate REST ports: user-defined first, then common ones
     const configured = parseInt(cfg.mikrotik_rest_port || '', 10)
-    const candidates: { port: number; scheme: 'http' | 'https' }[] = []
-    if (configured) {
-      candidates.push({ port: configured, scheme: configured === 443 || configured === 8443 ? 'https' : 'http' })
-      candidates.push({ port: configured, scheme: configured === 443 || configured === 8443 ? 'http' : 'https' })
-    }
-    for (const p of [80, 443, 8080, 8443, 81, 4443, 8081]) {
-      candidates.push({ port: p, scheme: p === 443 || p === 8443 || p === 4443 ? 'https' : 'http' })
-    }
+    const restPorts = [...new Set([configured, 80, 8080, 443, 8443, 81, 4443, 8081].filter(Boolean))] as number[]
+    const schemeFor = (p: number): 'http' | 'https' => (p === 443 || p === 8443 || p === 4443 ? 'https' : 'http')
 
-    // 1) Reachability
-    const [apiOpen, p80, p443] = await Promise.all([
-      tcpCheck(host, apiPort),
-      tcpCheck(host, 80),
-      tcpCheck(host, 443),
-    ])
+    // 1) Probe all ports in parallel with short timeouts
+    const probePorts = [...new Set([apiPort, ...restPorts])]
+    const probes = await Promise.all(probePorts.map((p) => tcpCheck(host, p, 1500)))
+    const openMap = new Map<number, boolean>()
+    probePorts.forEach((p, i) => openMap.set(p, probes[i]))
 
-    // 2) Try RouterOS v7 REST for details on open ports
+    const apiOpen = !!openMap.get(apiPort)
+    const p80 = !!openMap.get(80)
+    const p443 = !!openMap.get(443)
+    const openPorts = probePorts.filter((p) => openMap.get(p))
+
+    // 2) Try RouterOS v7 REST in parallel on open ports; first success wins
     let identity: string | null = null
     let uptime: string | null = null
     let version: string | null = null
@@ -100,38 +98,38 @@ Deno.serve(async (req) => {
     let restPort: number | null = null
     let lastStatus = 0
     let authFailed = false
-    const tried = new Set<string>()
-    const openPorts: number[] = []
-    if (apiOpen) openPorts.push(apiPort)
-    if (p80) openPorts.push(80)
-    if (p443) openPorts.push(443)
 
-    for (const c of candidates) {
-      const key = `${c.scheme}:${c.port}`
-      if (tried.has(key)) continue
-      tried.add(key)
+    const openRest = restPorts.filter((p) => openMap.get(p))
+    if (openRest.length) {
+      const attempts = await Promise.all(
+        openRest.map(async (p) => {
+          const base = `${schemeFor(p)}://${host}:${p}`
+          const res = await restCall(base, '/system/resource', auth, 4000)
+          if (res.ok || res.status === 401) return { port: p, base, res }
+          // try the alternate scheme once
+          const altBase = `${schemeFor(p) === 'http' ? 'https' : 'http'}://${host}:${p}`
+          const alt = await restCall(altBase, '/system/resource', auth, 4000)
+          return { port: p, base: altBase, res: alt }
+        }),
+      )
 
-      if (c.port !== 80 && c.port !== 443) {
-        const open = await tcpCheck(host, c.port, 3000)
-        if (!open) continue
-        if (!openPorts.includes(c.port)) openPorts.push(c.port)
-      } else if ((c.port === 80 && !p80) || (c.port === 443 && !p443)) {
-        continue
+      for (const a of attempts) {
+        if (a.res.status) lastStatus = a.res.status
+        if (a.res.status === 401) authFailed = true
       }
 
-      const base = `${c.scheme}://${host}:${c.port}`
-      const resource = await restCall(base, '/system/resource', auth)
-      lastStatus = resource.status || lastStatus
-      if (resource.status === 401) authFailed = true
-      if (resource.ok && resource.data) {
-        const r = resource.data as Record<string, string>
+      const winner = attempts.find((a) => a.res.ok && a.res.data)
+      if (winner) {
+        const r = winner.res.data as Record<string, string>
         restOk = true
-        restPort = c.port
+        restPort = winner.port
         uptime = r.uptime ?? null
         version = r.version ?? null
-        const idty = await restCall(base, '/system/identity', auth)
+        const [idty, active] = await Promise.all([
+          restCall(winner.base, '/system/identity', auth, 4000),
+          restCall(winner.base, '/ppp/active', auth, 5000),
+        ])
         identity = (idty.data as Record<string, string> | null)?.name ?? null
-        const active = await restCall(base, '/ppp/active', auth)
         if (Array.isArray(active.data)) {
           const list = active.data as Record<string, string>[]
           activeUsers = list.length
@@ -141,9 +139,9 @@ Deno.serve(async (req) => {
             uptime: a.uptime,
           }))
         }
-        break
       }
     }
+
 
     const reachable = openPorts.length > 0
     const online = restOk || reachable
