@@ -16,9 +16,10 @@ interface Props {
   onDetail: (customer: Customer) => void;
   customerIdsWithInvoice?: Set<string>;
   plans?: Plan[];
+  onlineList?: string[];
 }
 
-export default function CustomerTable({ customers, onEdit, onDelete, onToggleActive, onDetail, customerIdsWithInvoice, plans = [] }: Props) {
+export default function CustomerTable({ customers, onEdit, onDelete, onToggleActive, onDetail, customerIdsWithInvoice, plans = [], onlineList = [] }: Props) {
   const now = new Date();
   const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
   const planMap = Object.fromEntries(plans.map(p => [p.id, p.nome]));
@@ -54,6 +55,7 @@ export default function CustomerTable({ customers, onEdit, onDelete, onToggleAct
               <TableHead className="font-semibold hidden md:table-cell">E-mail</TableHead>
               <TableHead className="font-semibold hidden lg:table-cell">Telefone</TableHead>
               <TableHead className="font-semibold hidden lg:table-cell">Plano</TableHead>
+              <TableHead className="font-semibold text-center">Conexão</TableHead>
               <TableHead className="font-semibold">Usuário PPPoE</TableHead>
               <TableHead className="font-semibold">Senha PPPoE</TableHead>
               {customerIdsWithInvoice && <TableHead className="font-semibold text-center">Boleto</TableHead>}
@@ -65,6 +67,7 @@ export default function CustomerTable({ customers, onEdit, onDelete, onToggleAct
             {customers.map((c) => {
               const hasPagoAte = c.pago_ate && new Date(c.pago_ate + "T12:00:00") >= currentMonthEnd;
               const hasInvoice = hasPagoAte || (customerIdsWithInvoice?.has(c.id) ?? false);
+              const isOnline = onlineList.includes(c.usuario_pppoe);
               return (
                 <TableRow key={c.id} className={`hover:bg-muted/30 ${!c.ativo ? "opacity-50" : ""}`}>
                   <TableCell className="font-medium">
@@ -81,6 +84,18 @@ export default function CustomerTable({ customers, onEdit, onDelete, onToggleAct
                   <TableCell className="hidden md:table-cell">{c.email}</TableCell>
                   <TableCell className="hidden lg:table-cell">{c.telefone || "—"}</TableCell>
                   <TableCell className="hidden lg:table-cell">{c.plan_id ? planMap[c.plan_id] || "—" : "—"}</TableCell>
+                  <TableCell className="text-center">
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <div className="flex justify-center">
+                          <div className={`h-2.5 w-2.5 rounded-full ${isOnline ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" : "bg-gray-300"}`} />
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        {isOnline ? "Conectado agora" : "Desconectado"}
+                      </TooltipContent>
+                    </Tooltip>
+                  </TableCell>
                   <TableCell className="font-mono text-sm">{c.usuario_pppoe}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
