@@ -19,6 +19,7 @@ export default function MikrotikPage() {
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [status, setStatus] = useState<any>(null);
+  const [selectedEvent, setSelectedEvent] = useState<any>(null);
   const { customers } = useCustomers();
   const { plans } = usePlans();
   const { wanLogs, wanHistory, loading: loadingWan } = useMikrotikLogs();
