@@ -214,13 +214,80 @@ export default function MikrotikPage() {
           <CardContent>
             <div className="space-y-4 max-h-[400px] overflow-y-auto">
               {wanHistory.length > 0 ? wanHistory.map((e, i) => (
-                <div key={i} className="flex items-start gap-3 p-3 rounded-lg border bg-muted/30">
-                  {e.status === 'up' ? <ArrowUpCircle className="h-5 w-5 text-success" /> : <ArrowDownCircle className="h-5 w-5 text-destructive" />}
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">{e.interface_name}</p>
-                    <p className="text-xs text-muted-foreground">{e.status === 'up' ? "ONLINE" : "OFFLINE"} - {format(new Date(e.created_at), "dd/MM HH:mm:ss", { locale: ptBR })}</p>
-                  </div>
-                </div>
+                <Dialog key={i}>
+                  <DialogTrigger asChild>
+                    <div 
+                      className="flex items-start gap-3 p-3 rounded-lg border bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => setSelectedEvent(e)}
+                    >
+                      {e.status === 'up' ? <ArrowUpCircle className="h-5 w-5 text-success" /> : <ArrowDownCircle className="h-5 w-5 text-destructive" />}
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">{e.interface_name}</p>
+                        <p className="text-xs text-muted-foreground">{e.status === 'up' ? "ONLINE" : "OFFLINE"} - {format(new Date(e.created_at), "dd/MM HH:mm:ss", { locale: ptBR })}</p>
+                      </div>
+                      <Info className="h-4 w-4 text-muted-foreground mt-1" />
+                    </div>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle className="flex items-center gap-2">
+                        {e.status === 'up' ? <ArrowUpCircle className="h-5 w-5 text-success" /> : <ArrowDownCircle className="h-5 w-5 text-destructive" />}
+                        Detalhes da Oscilação
+                      </DialogTitle>
+                      <DialogDescription>
+                        Informações técnicas sobre o evento na interface {e.interface_name}
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                      <div className="grid grid-cols-4 items-center gap-4 border-b pb-2">
+                        <span className="text-sm font-medium flex items-center gap-2 col-span-1">
+                          <Network className="h-4 w-4 text-muted-foreground" /> Interface:
+                        </span>
+                        <span className="text-sm col-span-3">{e.interface_name}</span>
+                      </div>
+                      <div className="grid grid-cols-4 items-center gap-4 border-b pb-2">
+                        <span className="text-sm font-medium flex items-center gap-2 col-span-1">
+                          <Activity className="h-4 w-4 text-muted-foreground" /> Status:
+                        </span>
+                        <Badge variant={e.status === 'up' ? "success" : "destructive"} className="w-fit col-span-3">
+                          {e.status === 'up' ? "ONLINE / UP" : "OFFLINE / DOWN"}
+                        </Badge>
+                      </div>
+                      <div className="grid grid-cols-4 items-center gap-4 border-b pb-2">
+                        <span className="text-sm font-medium flex items-center gap-2 col-span-1">
+                          <Calendar className="h-4 w-4 text-muted-foreground" /> Data:
+                        </span>
+                        <span className="text-sm col-span-3">
+                          {format(new Date(e.created_at), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-4 items-center gap-4 border-b pb-2">
+                        <span className="text-sm font-medium flex items-center gap-2 col-span-1">
+                          <Clock className="h-4 w-4 text-muted-foreground" /> Horário:
+                        </span>
+                        <span className="text-sm col-span-3">
+                          {format(new Date(e.created_at), "HH:mm:ss", { locale: ptBR })}
+                        </span>
+                      </div>
+                      <div className="space-y-2">
+                        <span className="text-sm font-medium flex items-center gap-2">
+                          <Info className="h-4 w-4 text-muted-foreground" /> Motivo / Contexto:
+                        </span>
+                        <div className="text-sm bg-muted p-3 rounded-md italic">
+                          {e.reason || (e.status === 'up' ? "Interface estabelecida e trafegando dados." : "Queda de link detectada ou interface desativada no roteador.")}
+                        </div>
+                      </div>
+                      {status?.host && (
+                        <div className="grid grid-cols-4 items-center gap-4 border-t pt-2 mt-2">
+                          <span className="text-sm font-medium flex items-center gap-2 col-span-1">
+                            <Router className="h-4 w-4 text-muted-foreground" /> Roteador:
+                          </span>
+                          <span className="text-xs text-muted-foreground col-span-3">{status.host}:{status.restPort || '80'}</span>
+                        </div>
+                      )}
+                    </div>
+                  </DialogContent>
+                </Dialog>
               )) : <p className="text-sm text-center italic py-4">Nenhum evento registrado.</p>}
             </div>
           </CardContent>
