@@ -125,7 +125,7 @@ export default function MikrotikPage() {
             {syncing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
             Sincronizar Mikrotik
           </Button>
-          <Button onClick={checkStatus} disabled={loading || syncing}>
+          <Button onClick={() => checkStatus()} disabled={loading || syncing}>
             {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Router className="h-4 w-4 mr-2" />}
             Verificar Status
           </Button>
