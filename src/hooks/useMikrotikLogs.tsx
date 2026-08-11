@@ -3,9 +3,23 @@ import { supabase } from "@/integrations/supabase/client";
 
 export const useMikrotikLogs = () => {
   const [wanLogs, setWanLogs] = useState<any[]>([]);
+  const [wanHistory, setWanHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const fetchWanHistory = async () => {
+    const { data, error } = await supabase
+      .from('wan_status_history')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(50);
+    
+    if (!error && data) {
+      setWanHistory(data);
+    }
+  };
+
   const fetchWanLogs = async () => {
+
     const { data, error } = await supabase
       .from('wan_logs' as any)
       .select('*')
@@ -26,15 +40,19 @@ export const useMikrotikLogs = () => {
 
   useEffect(() => {
     fetchWanLogs();
+    fetchWanHistory();
     const channel = supabase
       .channel('wan_updates_mikrotik_page')
       .on('postgres_changes' as any, { event: 'INSERT', schema: 'public', table: 'wan_logs' }, () => {
         fetchWanLogs();
+      })
+      .on('postgres_changes' as any, { event: 'INSERT', schema: 'public', table: 'wan_status_history' }, () => {
+        fetchWanHistory();
       })
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
   }, []);
 
-  return { wanLogs, loading };
+  return { wanLogs, wanHistory, loading };
 };
