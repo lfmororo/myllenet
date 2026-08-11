@@ -5,8 +5,8 @@ import { useInvoices } from "@/hooks/useInvoices";
 import { usePlans } from "@/hooks/usePlans";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, AlertTriangle, DollarSign, TrendingUp, Router, Wifi, WifiOff, Loader2 } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
+import { Users, AlertTriangle, DollarSign, TrendingUp, Router, Wifi, WifiOff, Loader2, Activity } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, LineChart, Line } from "recharts";
 
 export default function DashboardHome() {
   const { customers } = useCustomers();
@@ -15,6 +15,54 @@ export default function DashboardHome() {
 
   const [routerStatus, setRouterStatus] = useState<"loading" | "online" | "offline">("loading");
   const [onlineUsers, setOnlineUsers] = useState<number | null>(null);
+  const [wanLogs, setWanLogs] = useState<any[]>([]);
+  const [loadingWan, setLoadingWan] = useState(true);
+
+  useEffect(() => {
+    const fetchWanLogs = async () => {
+      const { data, error } = await supabase
+        .from('wan_logs' as any)
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(100);
+      
+      if (!error && data) {
+        // Group by created_at and interface
+        const grouped: Record<string, any> = {};
+        data.forEach((log: any) => {
+          const time = new Date(log.created_at).toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit' });
+          if (!grouped[time]) grouped[time] = { time };
+          grouped[time][log.interface_name] = (Number(log.rx_bps || 0) + Number(log.tx_bps || 0)) / 1024 / 1024; // Mbps
+        });
+        setWanLogs(Object.values(grouped).reverse());
+      }
+      setLoadingWan(false);
+    };
+
+    fetchWanLogs();
+    
+    const channel = supabase
+      .channel('wan_updates')
+      .on('postgres_changes' as any, { event: 'INSERT', schema: 'public', table: 'wan_logs' }, () => {
+        fetchWanLogs();
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, []);
+
+  const wanInterfaces = useMemo(() => {
+    const interfaces = new Set<string>();
+    wanLogs.forEach(log => {
+      Object.keys(log).forEach(key => {
+        if (key !== 'time') interfaces.add(key);
+      });
+    });
+    return Array.from(interfaces);
+  }, [wanLogs]);
+
+  const colors = ["hsl(var(--primary))", "hsl(var(--accent))", "hsl(var(--success))", "hsl(var(--warning))"];
+
 
   useEffect(() => {
     let cancelled = false;
@@ -288,6 +336,60 @@ export default function DashboardHome() {
           </CardContent>
         </Card>
       )}
+      {/* WAN Traffic Chart */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle className="text-base">Consumo WAN em Tempo Real</CardTitle>
+            <CardDescription>Tráfego total (Download + Upload) por interface</CardDescription>
+          </div>
+          <Activity className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          {loadingWan ? (
+            <div className="flex h-[300px] items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : wanLogs.length > 0 ? (
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={wanLogs}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" vertical={false} />
+                <XAxis 
+                  dataKey="time" 
+                  className="text-xs" 
+                  minTickGap={30}
+                />
+                <YAxis 
+                  className="text-xs" 
+                  tickFormatter={(v) => `${v.toFixed(1)}M`}
+                  label={{ value: 'Mbps', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fontSize: '10px' } }}
+                />
+                <Tooltip
+                  formatter={(value: number) => [`${value.toFixed(2)} Mbps`, ""]}
+                  contentStyle={{ borderRadius: "8px", border: "1px solid hsl(var(--border))", background: "hsl(var(--card))" }}
+                />
+                <Legend />
+                {wanInterfaces.map((iface, index) => (
+                  <Line
+                    key={iface}
+                    type="monotone"
+                    dataKey={iface}
+                    name={iface}
+                    stroke={colors[index % colors.length]}
+                    strokeWidth={2}
+                    dot={false}
+                    activeDot={{ r: 4 }}
+                  />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex h-[300px] items-center justify-center text-muted-foreground">
+              Nenhum dado de WAN encontrado. Certifique-se de que o Mikrotik está online e as interfaces WAN estão identificadas.
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -134,6 +134,24 @@ Deno.serve(async (req) => {
         
         const interfaces = Array.isArray(resource.data) ? resource.data as any[] : []
 
+        // Extract WAN traffic data
+        const wanInterfaces = interfaces.filter(i => 
+          i.type === 'ether' && (i.name.toLowerCase().includes('wan') || i.comment?.toLowerCase().includes('wan'))
+        )
+        
+        if (wanInterfaces.length > 0) {
+          const wanLogs = wanInterfaces.map(i => ({
+            interface_name: i.name,
+            rx_bps: parseInt(i['rx-byte'] || '0', 10),
+            tx_bps: parseInt(i['tx-byte'] || '0', 10),
+          }))
+          
+          // Log WAN status
+          try {
+            await supabase.from('wan_logs').insert(wanLogs)
+          } catch (e) { console.error('Error logging WAN status:', e) }
+        }
+
         if (Array.isArray(active.data)) {
           const list = active.data as Record<string, string>[]
           activeUsers = list.length
