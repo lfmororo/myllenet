@@ -24,11 +24,12 @@ export function useInvoicePDF() {
       const pageHeight = doc.internal.pageSize.getHeight();
 
       // Colors - Mororo.Tech Palette
-      const primaryColor = [15, 23, 42]; // Deep Blue
-      const accentColor = [13, 148, 136]; // Teal/Cyan
-      const bgColor = [248, 250, 252];
-      const textColor = [51, 65, 85];
-      const lightTextColor = [100, 116, 139];
+      const primaryColor = [15, 23, 42]; // Deep Blue (Slate-900)
+      const accentColor = [13, 148, 136]; // Teal/Cyan (Teal-600)
+      const bgColor = [248, 250, 252]; // Slate-50
+      const textColor = [30, 41, 59]; // Slate-800
+      const lightTextColor = [71, 85, 105]; // Slate-600
+      const borderColor = [226, 232, 240]; // Slate-200
 
       // 1. Header with Accent Bar
       doc.setFillColor(accentColor[0], accentColor[1], accentColor[2]);
