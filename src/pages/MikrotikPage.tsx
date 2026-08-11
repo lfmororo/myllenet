@@ -320,7 +320,7 @@ export default function MikrotikPage() {
         <CardContent className="prose prose-sm dark:prose-invert max-w-none">
           <div className="space-y-4 text-sm leading-relaxed">
             <h4 className="text-base font-semibold border-b pb-1">Funcionalidade Solicitada</h4>
-            <p>Melhorar a estabilidade e o desempenho da integração atual com dispositivos Mikrotik, abordando especificamente as seguintes falhas:</p>
+            <p>a comunicacao com o mikrotik esta muito falha</p>
             <ul className="list-disc pl-5 space-y-1">
               <li><strong>Monitoramento de WANs:</strong> Implementar um monitoramento confiável e em tempo real do status das conexões WAN.</li>
               <li><strong>Carregamento de Informações:</strong> Reduzir significativamente o tempo de carregamento de informações provenientes dos dispositivos Mikrotik.</li>
