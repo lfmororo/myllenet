@@ -4,12 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, ExternalLink, Copy, CheckCircle2, Clock, Import, CalendarCheck, X, XCircle } from "lucide-react";
+import { Loader2, ExternalLink, Copy, CheckCircle2, Clock, Import, CalendarCheck, X, XCircle, Activity, History } from "lucide-react";
 import { toast } from "sonner";
 import type { Customer } from "@/hooks/useCustomers";
 import type { Invoice } from "@/hooks/useInvoices";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 
 interface MikrotikSession {
   name: string;
