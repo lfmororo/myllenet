@@ -304,7 +304,8 @@ async function sendInvoiceNotification(req: Request) {
 
   switch (notifType) {
     case "boleto_gerado":
-      message = `Olá ${customer.nome}! 🌐\n\nSua fatura da *Myllenet* foi gerada:\n\n📋 ${invoice.descricao}\n💰 Valor: ${valor}\n📅 Vencimento: ${vencimento}`;
+      const mesRef = new Date(invoice.vencimento + "T12:00:00").toLocaleDateString("pt-BR", { month: 'long', year: 'numeric' });
+      message = `Olá ${customer.nome}! 🌐\n\nSua fatura da *Myllenet* referente a *${mesRef}* foi gerada:\n\n📋 ${invoice.descricao}\n💰 Valor: ${valor}\n📅 Vencimento: ${vencimento}`;
       if (invoice.efi_link) message += `\n\n🔗 Boleto: ${invoice.efi_link}`;
       if (invoice.efi_barcode) message += `\n\n📊 Código de barras:\n${invoice.efi_barcode}`;
       if (invoice.efi_pix_copiacola) message += `\n\n📱 PIX Copia e Cola:\n${invoice.efi_pix_copiacola}`;
