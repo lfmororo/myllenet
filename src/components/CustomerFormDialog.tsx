@@ -253,13 +253,20 @@ export default function CustomerFormDialog({ open, onOpenChange, customer, onSav
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="flex-col gap-2 sm:flex-row">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-            <Button type="submit" disabled={saving}>
+            {customer && (
+              <Button type="button" variant="secondary" disabled={saving || sendingMikrotik} onClick={handleSaveAndSend}>
+                {sendingMikrotik ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-2 h-4 w-4" />}
+                Salvar e enviar ao Mikrotik
+              </Button>
+            )}
+            <Button type="submit" disabled={saving || sendingMikrotik}>
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {customer ? "Salvar" : "Cadastrar"}
             </Button>
           </DialogFooter>
+
         </form>
       </DialogContent>
     </Dialog>
