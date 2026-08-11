@@ -257,55 +257,86 @@ export default function MikrotikPage() {
                 />
                 <Legend
                   verticalAlign="bottom"
-                  height={44}
-                  content={({ payload }) => (
-                    <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 pt-3 text-xs">
-                      {(payload || []).map((entry: any) => {
-                        const isUpload = String(entry.value).endsWith("↑");
-                        const iface = String(entry.value).replace(/ [↑↓]$/, "");
-                        const last = Number(wanLogs[wanLogs.length - 1]?.[entry.value] ?? 0);
-                        return (
-                          <span key={entry.value} className="flex items-center gap-1.5 text-muted-foreground">
-                            <svg width="18" height="8" aria-hidden="true">
-                              <line
-                                x1="0"
-                                y1="4"
-                                x2="18"
-                                y2="4"
-                                stroke={entry.color}
-                                strokeWidth="2.5"
-                                strokeDasharray={isUpload ? "4 3" : undefined}
-                              />
-                            </svg>
-                            <span className="font-medium text-foreground">{iface}</span>
-                            <span>{isUpload ? "Upload ↑" : "Download ↓"}</span>
-                            <span className="tabular-nums">
-                              {last >= 1 ? `${last.toFixed(2)} Mb/s` : `${(last * 1000).toFixed(0)} Kb/s`}
-                            </span>
-                          </span>
-                        );
-                      })}
-                    </div>
-                  )}
+                  height={56}
+                  content={({ payload }) => {
+                    const entries = (payload || []);
+                    const groups = entries.reduce((acc: Record<string, any[]>, entry: any) => {
+                      const iface = String(entry.value).replace(/ [↑↓]$/, "");
+                      if (!acc[iface]) acc[iface] = [];
+                      acc[iface].push(entry);
+                      return acc;
+                    }, {});
+                    return (
+                      <div className="flex flex-wrap items-start justify-center gap-x-6 gap-y-2 pt-3 text-xs">
+                        {Object.entries(groups).map(([iface, items]) => {
+                          const down = items.find((e: any) => String(e.value).endsWith("↓"));
+                          const up = items.find((e: any) => String(e.value).endsWith("↑"));
+                          const lastDown = Number(wanLogs[wanLogs.length - 1]?.[down?.value] ?? 0);
+                          const lastUp = Number(wanLogs[wanLogs.length - 1]?.[up?.value] ?? 0);
+                          return (
+                            <div key={iface} className="flex flex-col gap-1">
+                              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-tight">{iface}</span>
+                              <div className="flex items-center gap-3">
+                                {down && (
+                                  <span className="flex items-center gap-1.5 text-muted-foreground">
+                                    <svg width="14" height="6" aria-hidden="true">
+                                      <line x1="0" y1="3" x2="14" y2="3" stroke={down.color} strokeWidth="2.5" />
+                                    </svg>
+                                    <span className="text-foreground">↓ {lastDown >= 1 ? `${lastDown.toFixed(2)}` : `${(lastDown * 1000).toFixed(0)}`}</span>
+                                    <span className="text-[10px]">{lastDown >= 1 ? 'Mb/s' : 'Kb/s'}</span>
+                                  </span>
+                                )}
+                                {up && (
+                                  <span className="flex items-center gap-1.5 text-muted-foreground">
+                                    <svg width="14" height="6" aria-hidden="true">
+                                      <line x1="0" y1="3" x2="14" y2="3" stroke={up.color} strokeWidth="1.5" strokeDasharray="4 3" />
+                                    </svg>
+                                    <span className="text-foreground">↑ {lastUp >= 1 ? `${lastUp.toFixed(2)}` : `${(lastUp * 1000).toFixed(0)}`}</span>
+                                    <span className="text-[10px]">{lastUp >= 1 ? 'Mb/s' : 'Kb/s'}</span>
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  }}
                 />
-                {Object.keys(wanLogs[wanLogs.length - 1] || {}).filter(k => k !== 'time').map((key, index) => {
-                  const isUpload = key.endsWith('↑');
-                  const palette = ["hsl(var(--primary))", "hsl(var(--warning))", "hsl(var(--success))", "hsl(var(--destructive))"];
-                  const color = isUpload ? "hsl(var(--accent))" : palette[Math.floor(index / 2) % palette.length];
-                  return (
-                    <Line
-                      key={key}
-                      type="monotone"
-                      dataKey={key}
-                      name={key}
-                      stroke={color}
-                      strokeWidth={2}
-                      strokeDasharray={isUpload ? "4 3" : undefined}
-                      dot={false}
-                      activeDot={{ r: 3 }}
-                    />
-                  );
-                })}
+                {(() => {
+                  const last = wanLogs[wanLogs.length - 1] || {};
+                  const keys = Object.keys(last).filter(k => k !== 'time');
+                  const interfaces = Array.from(new Set(keys.map(k => k.replace(/ [↑↓]$/, ''))));
+                  const families = [
+                    { download: '#14b8a6', upload: '#2dd4bf' },   // teal
+                    { download: '#8b5cf6', upload: '#a78bfa' },     // violet
+                    { download: '#f59e0b', upload: '#fbbf24' },     // amber
+                    { download: '#f43f5e', upload: '#fb7185' },     // rose
+                    { download: '#10b981', upload: '#34d399' },     // emerald
+                    { download: '#3b82f6', upload: '#60a5fa' },     // blue
+                  ];
+                  const colorMap = new Map<string, { download: string; upload: string }>();
+                  interfaces.forEach((iface, i) => colorMap.set(iface, families[i % families.length]));
+                  return keys.map((key) => {
+                    const isUpload = key.endsWith('↑');
+                    const iface = key.replace(/ [↑↓]$/, '');
+                    const family = colorMap.get(iface) || families[0];
+                    const color = isUpload ? family.upload : family.download;
+                    return (
+                      <Line
+                        key={key}
+                        type="monotone"
+                        dataKey={key}
+                        name={key}
+                        stroke={color}
+                        strokeWidth={isUpload ? 1.5 : 2.5}
+                        strokeDasharray={isUpload ? "4 3" : undefined}
+                        dot={false}
+                        activeDot={{ r: 3, strokeWidth: 0, fill: color }}
+                      />
+                    );
+                  });
+                })()}
               </LineChart>
             </ResponsiveContainer>
 
