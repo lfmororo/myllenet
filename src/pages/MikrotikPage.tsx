@@ -17,6 +17,7 @@ export default function MikrotikPage() {
   const [search, setSearch] = useState("");
   const { customers } = useCustomers();
   const { plans } = usePlans();
+  const [syncing, setSyncing] = useState(false);
 
   const checkStatus = async () => {
     setLoading(true);
@@ -31,6 +32,20 @@ export default function MikrotikPage() {
       toast.error("Erro ao verificar Mikrotik");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const syncWithMikrotik = async () => {
+    setSyncing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("mikrotik-sync");
+      if (error) throw error;
+      toast.success("Sincronização com Mikrotik concluída com sucesso!");
+    } catch (err: any) {
+      console.error("Erro na sincronização:", err);
+      toast.error("Erro ao sincronizar com Mikrotik");
+    } finally {
+      setSyncing(false);
     }
   };
 
