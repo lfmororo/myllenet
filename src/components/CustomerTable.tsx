@@ -145,6 +145,11 @@ export default function CustomerTable({ customers, onEdit, onDelete, onToggleAct
                       </Badge>
                     </div>
                   </TableCell>
+                  <TableCell className="text-center">
+                    <Badge variant={c.block_status === "blocked" ? "destructive" : "outline"} className="text-xs">
+                      {c.block_status === "blocked" ? "Bloqueado" : "Liberado"}
+                    </Badge>
+                  </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
                       <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onDetail(c)} title="Detalhes">
