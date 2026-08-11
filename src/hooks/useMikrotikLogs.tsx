@@ -3,9 +3,23 @@ import { supabase } from "@/integrations/supabase/client";
 
 export const useMikrotikLogs = () => {
   const [wanLogs, setWanLogs] = useState<any[]>([]);
+  const [wanHistory, setWanHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const fetchWanHistory = async () => {
+    const { data, error } = await supabase
+      .from('wan_status_history')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(50);
+    
+    if (!error && data) {
+      setWanHistory(data);
+    }
+  };
+
   const fetchWanLogs = async () => {
+
     const { data, error } = await supabase
       .from('wan_logs' as any)
       .select('*')
