@@ -21,19 +21,23 @@ export default function MikrotikPage() {
   const checkStatus = async () => {
     setLoading(true);
     try {
-      // Mocking status for now as we remove the old integration
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setStatus({
-        online: false,
-        message: "Monitoramento Mikrotik via IP Externo (Aguardando Configuração)"
-      });
-      toast.info("Configuração do Mikrotik pendente");
-    } catch (err) {
+      const { data, error } = await supabase.functions.invoke("mikrotik-status");
+      if (error) throw error;
+      setStatus(data);
+      if (data?.online) toast.success(data.message || "Mikrotik online");
+      else toast.error(data?.message || "Mikrotik offline");
+    } catch (err: any) {
+      setStatus({ online: false, message: err?.message || "Erro ao verificar Mikrotik" });
       toast.error("Erro ao verificar Mikrotik");
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    checkStatus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const downloadMikrotikScript = () => {
     setExporting(true);
