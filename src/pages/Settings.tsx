@@ -747,10 +747,7 @@ export default function Settings() {
             </Card>
           </TabsContent>
         </Tabs>
-      </div>
-    </div>
-  );
-}
+
 
         {/* Plan Form */}
         <PlanFormDialog
