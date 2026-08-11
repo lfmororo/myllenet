@@ -136,7 +136,7 @@ export default function CustomersPage() {
     <div className="space-y-4">
       <div>
         <h2 className="text-2xl font-bold tracking-tight">Clientes</h2>
-        <p className="text-muted-foreground">Gerencie seus clientes cadastrados</p>
+        <p className="text-muted-foreground">sincronizar clientes do sistema com o mikrotik</p>
       </div>
 
       {activeCustomersWithoutBoleto.length > 0 && !loading && (
