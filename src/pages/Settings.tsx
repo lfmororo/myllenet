@@ -40,6 +40,8 @@ export default function Settings() {
   const [mikrotikUser, setMikrotikUser] = useState("");
   const [mikrotikPass, setMikrotikPass] = useState("");
   const [mikrotikApiPort, setMikrotikApiPort] = useState("8728");
+  const [mikrotikRestPort, setMikrotikRestPort] = useState("80");
+
   const [savingMikrotik, setSavingMikrotik] = useState(false);
 
   // User management state
@@ -158,7 +160,7 @@ export default function Settings() {
     const { data } = await supabase
       .from("settings")
       .select("key, value")
-      .in("key", ["efi_client_id", "efi_client_secret", "efi_certificate_path", "uazapi_token", "mikrotik_host", "mikrotik_username", "mikrotik_password", "mikrotik_api_port"]);
+      .in("key", ["efi_client_id", "efi_client_secret", "efi_certificate_path", "uazapi_token", "mikrotik_host", "mikrotik_username", "mikrotik_password", "mikrotik_api_port", "mikrotik_rest_port"]);
 
     if (data) {
       for (const row of data) {
@@ -170,8 +172,10 @@ export default function Settings() {
         if (row.key === "mikrotik_username") setMikrotikUser(row.value || "");
         if (row.key === "mikrotik_password") setMikrotikPass(row.value || "");
         if (row.key === "mikrotik_api_port") setMikrotikApiPort(row.value || "8728");
+        if (row.key === "mikrotik_rest_port") setMikrotikRestPort(row.value || "80");
       }
     }
+
     setLoadingSettings(false);
   };
 
@@ -628,6 +632,19 @@ export default function Settings() {
                       />
                     </div>
 
+                    <div className="space-y-2">
+                      <Label htmlFor="mikrotik_rest_port">Porta API REST (www)</Label>
+                      <Input
+                        id="mikrotik_rest_port"
+                        value={mikrotikRestPort}
+                        onChange={(e) => setMikrotikRestPort(e.target.value)}
+                        placeholder="80"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Porta do serviço www/www-ssl do RouterOS v7. Necessária para ver clientes on-line no PPPoE.
+                      </p>
+                    </div>
+
                     <Button
                       onClick={async () => {
                         setSavingMikrotik(true);
@@ -636,9 +653,11 @@ export default function Settings() {
                           await upsertSetting("mikrotik_username", mikrotikUser);
                           await upsertSetting("mikrotik_password", mikrotikPass);
                           await upsertSetting("mikrotik_api_port", mikrotikApiPort);
+                          await upsertSetting("mikrotik_rest_port", mikrotikRestPort);
                           toast.success("Configurações Mikrotik salvas!");
                         } catch (err: any) {
                           toast.error("Erro ao salvar: " + (err.message || "Erro desconhecido"));
+
                         }
                         setSavingMikrotik(false);
                       }}
