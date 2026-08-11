@@ -20,7 +20,9 @@ export default function MikrotikPage() {
   const [search, setSearch] = useState("");
   const { customers } = useCustomers();
   const { plans } = usePlans();
+  const { wanLogs, loading: loadingWan } = useMikrotikLogs();
   const [syncing, setSyncing] = useState(false);
+
 
   const checkStatus = async () => {
     setLoading(true);
