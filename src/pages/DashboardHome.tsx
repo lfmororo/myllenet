@@ -14,19 +14,28 @@ export default function DashboardHome() {
   const { plans } = usePlans();
 
   const [routerStatus, setRouterStatus] = useState<"loading" | "online" | "offline">("loading");
+  const [onlineUsers, setOnlineUsers] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    const check = async () => {
       try {
         const { data, error } = await supabase.functions.invoke("mikrotik-status");
-        if (!cancelled) setRouterStatus(!error && data?.online ? "online" : "offline");
+        if (cancelled) return;
+        setRouterStatus(!error && data?.online ? "online" : "offline");
+        setOnlineUsers(typeof data?.activeUsers === "number" ? data.activeUsers : null);
       } catch {
-        if (!cancelled) setRouterStatus("offline");
+        if (!cancelled) {
+          setRouterStatus("offline");
+          setOnlineUsers(null);
+        }
       }
-    })();
-    return () => { cancelled = true; };
+    };
+    check();
+    const timer = setInterval(check, 60000);
+    return () => { cancelled = true; clearInterval(timer); };
   }, []);
+
 
   const stats = useMemo(() => {
     const activeCustomers = customers.filter(c => c.ativo).length;
@@ -124,7 +133,7 @@ export default function DashboardHome() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-6">
         {/* Router Status */}
         <Card className={`border-l-4 ${routerStatus === "online" ? "border-l-success" : routerStatus === "offline" ? "border-l-destructive" : "border-l-muted"}`}>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -146,6 +155,28 @@ export default function DashboardHome() {
             <p className="text-xs text-muted-foreground">Monitoramento Mikrotik</p>
           </CardContent>
         </Card>
+        {/* PPPoE Online */}
+        <Card className="border-l-4 border-l-accent">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Clientes On-line</CardTitle>
+            <div className="rounded-lg bg-accent/10 p-2">
+              {routerStatus === "loading" ? (
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              ) : (
+                <Router className="h-4 w-4 text-accent" />
+              )}
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {routerStatus === "loading" ? "..." : onlineUsers !== null ? onlineUsers : "—"}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {onlineUsers !== null ? "Autenticados no PPPoE" : "Habilite a API REST no Mikrotik"}
+            </p>
+          </CardContent>
+        </Card>
+
         <Card className="border-l-4 border-l-primary">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Clientes Ativos</CardTitle>
