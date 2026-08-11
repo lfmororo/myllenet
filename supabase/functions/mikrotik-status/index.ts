@@ -134,39 +134,71 @@ Deno.serve(async (req) => {
         
         const interfaces = Array.isArray(resource.data) ? resource.data as any[] : []
 
-        // Extract WAN traffic data
-        const wanInterfaces = interfaces.filter(i => 
-          i.type === 'ether' && (i.name.toLowerCase().includes('wan') || i.comment?.toLowerCase().includes('wan'))
-        )
-        
+        // Identify WAN interfaces: prefer explicit naming, fallback to physical/uplink types
+        const isWanName = (i: any) => /wan|uplink|internet|link/i.test(`${i.name ?? ''} ${i.comment ?? ''}`)
+        const uplinkTypes = ['ether', 'vlan', 'pppoe-out', 'lte', 'wireless', 'wlan']
+        const candidates = interfaces.filter(i => uplinkTypes.includes(String(i.type ?? '').toLowerCase()))
+        let wanInterfaces = candidates.filter(isWanName)
+        if (wanInterfaces.length === 0) {
+          // No explicit WAN naming: use pppoe-out clients, otherwise the physical uplinks
+          const pppoeOut = candidates.filter(i => String(i.type).toLowerCase() === 'pppoe-out')
+          wanInterfaces = (pppoeOut.length ? pppoeOut : candidates.filter(i => String(i.type).toLowerCase() === 'ether')).slice(0, 4)
+        }
+
         if (wanInterfaces.length > 0) {
-          const wanLogs = wanInterfaces.map(i => ({
-            interface_name: i.name,
-            rx_bps: parseInt(i['rx-byte'] || '0', 10),
-            tx_bps: parseInt(i['tx-byte'] || '0', 10),
-          }))
-          
-          // Log WAN status
           try {
-            await supabase.from('wan_logs').insert(wanLogs)
-            
+            // Previous samples to convert cumulative byte counters into bits per second
+            const { data: prevLogs } = await supabase
+              .from('wan_logs')
+              .select('interface_name, rx_bytes, tx_bytes, created_at')
+              .in('interface_name', wanInterfaces.map(i => i.name))
+              .order('created_at', { ascending: false })
+              .limit(wanInterfaces.length * 3)
+
+            const now = Date.now()
+            const rows = wanInterfaces.map(i => {
+              const rxBytes = parseInt(i['rx-byte'] ?? '0', 10) || 0
+              const txBytes = parseInt(i['tx-byte'] ?? '0', 10) || 0
+              const prev = (prevLogs ?? []).find((p: any) => p.interface_name === i.name)
+              let rxBps = 0
+              let txBps = 0
+              if (prev) {
+                const secs = Math.max(1, (now - new Date(prev.created_at).getTime()) / 1000)
+                const dRx = rxBytes - Number(prev.rx_bytes ?? 0)
+                const dTx = txBytes - Number(prev.tx_bytes ?? 0)
+                if (dRx >= 0) rxBps = Math.round((dRx * 8) / secs)
+                if (dTx >= 0) txBps = Math.round((dTx * 8) / secs)
+              }
+              return {
+                interface_name: i.name,
+                rx_bps: rxBps,
+                tx_bps: txBps,
+                rx_bytes: rxBytes,
+                tx_bytes: txBytes,
+              }
+            })
+
+            await supabase.from('wan_logs').insert(rows)
+
             // Check for status changes (up/down)
             for (const wan of wanInterfaces) {
-              const isUp = wan['running'] === 'true'
-              const { data: lastStatus } = await supabase
+              const isUp = String(wan.running) === 'true' && String(wan.disabled) !== 'true'
+              const { data: lastEvents } = await supabase
                 .from('wan_status_history')
                 .select('status')
                 .eq('interface_name', wan.name)
                 .order('created_at', { ascending: false })
                 .limit(1)
-                .single()
 
+              const previous = lastEvents?.[0]?.status ?? null
               const currentStatus = isUp ? 'up' : 'down'
-              if (!lastStatus || lastStatus.status !== currentStatus) {
+              if (previous !== currentStatus) {
                 await supabase.from('wan_status_history').insert({
                   interface_name: wan.name,
                   status: currentStatus,
-                  reason: isUp ? 'Interface is running' : 'Interface is down/not running'
+                  reason: isUp
+                    ? 'Interface running e trafegando dados'
+                    : (String(wan.disabled) === 'true' ? 'Interface desabilitada no roteador' : 'Link caiu (running=false)'),
                 })
               }
             }
