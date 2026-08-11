@@ -288,24 +288,40 @@ export default function MikrotikPage() {
                     </div>
                   )}
                 />
-                {Object.keys(wanLogs[wanLogs.length - 1] || {}).filter(k => k !== 'time').map((key, index) => {
-                  const isUpload = key.endsWith('↑');
-                  const palette = ["hsl(var(--primary))", "hsl(var(--warning))", "hsl(var(--success))", "hsl(var(--destructive))"];
-                  const color = isUpload ? "hsl(var(--accent))" : palette[Math.floor(index / 2) % palette.length];
-                  return (
-                    <Line
-                      key={key}
-                      type="monotone"
-                      dataKey={key}
-                      name={key}
-                      stroke={color}
-                      strokeWidth={2}
-                      strokeDasharray={isUpload ? "4 3" : undefined}
-                      dot={false}
-                      activeDot={{ r: 3 }}
-                    />
-                  );
-                })}
+                {(() => {
+                  const last = wanLogs[wanLogs.length - 1] || {};
+                  const keys = Object.keys(last).filter(k => k !== 'time');
+                  const interfaces = Array.from(new Set(keys.map(k => k.replace(/ [↑↓]$/, ''))));
+                  const families = [
+                    { download: '#14b8a6', upload: '#2dd4bf' },   // teal
+                    { download: '#8b5cf6', upload: '#a78bfa' },     // violet
+                    { download: '#f59e0b', upload: '#fbbf24' },     // amber
+                    { download: '#f43f5e', upload: '#fb7185' },     // rose
+                    { download: '#10b981', upload: '#34d399' },     // emerald
+                    { download: '#3b82f6', upload: '#60a5fa' },     // blue
+                  ];
+                  const colorMap = new Map<string, { download: string; upload: string }>();
+                  interfaces.forEach((iface, i) => colorMap.set(iface, families[i % families.length]));
+                  return keys.map((key) => {
+                    const isUpload = key.endsWith('↑');
+                    const iface = key.replace(/ [↑↓]$/, '');
+                    const family = colorMap.get(iface) || families[0];
+                    const color = isUpload ? family.upload : family.download;
+                    return (
+                      <Line
+                        key={key}
+                        type="monotone"
+                        dataKey={key}
+                        name={key}
+                        stroke={color}
+                        strokeWidth={isUpload ? 1.5 : 2.5}
+                        strokeDasharray={isUpload ? "4 3" : undefined}
+                        dot={false}
+                        activeDot={{ r: 3, strokeWidth: 0, fill: color }}
+                      />
+                    );
+                  });
+                })()}
               </LineChart>
             </ResponsiveContainer>
 
