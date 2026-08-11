@@ -15,6 +15,54 @@ export default function DashboardHome() {
 
   const [routerStatus, setRouterStatus] = useState<"loading" | "online" | "offline">("loading");
   const [onlineUsers, setOnlineUsers] = useState<number | null>(null);
+  const [wanLogs, setWanLogs] = useState<any[]>([]);
+  const [loadingWan, setLoadingWan] = useState(true);
+
+  useEffect(() => {
+    const fetchWanLogs = async () => {
+      const { data, error } = await supabase
+        .from('wan_logs')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(100);
+      
+      if (!error && data) {
+        // Group by created_at and interface
+        const grouped: Record<string, any> = {};
+        data.forEach(log => {
+          const time = new Date(log.created_at).toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit' });
+          if (!grouped[time]) grouped[time] = { time };
+          grouped[time][log.interface_name] = (log.rx_bps + log.tx_bps) / 1024 / 1024; // Mbps
+        });
+        setWanLogs(Object.values(grouped).reverse());
+      }
+      setLoadingWan(false);
+    };
+
+    fetchWanLogs();
+    
+    const channel = supabase
+      .channel('wan_updates')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'wan_logs' }, () => {
+        fetchWanLogs();
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, []);
+
+  const wanInterfaces = useMemo(() => {
+    const interfaces = new Set<string>();
+    wanLogs.forEach(log => {
+      Object.keys(log).forEach(key => {
+        if (key !== 'time') interfaces.add(key);
+      });
+    });
+    return Array.from(interfaces);
+  }, [wanLogs]);
+
+  const colors = ["hsl(var(--primary))", "hsl(var(--accent))", "hsl(var(--success))", "hsl(var(--warning))"];
+
 
   useEffect(() => {
     let cancelled = false;
