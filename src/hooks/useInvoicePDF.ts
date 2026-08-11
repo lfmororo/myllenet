@@ -111,16 +111,17 @@ export function useInvoicePDF() {
       doc.rect(20, currentY, pageWidth - 40, 10, "F");
       
       doc.setTextColor(255, 255, 255);
-      doc.setFontSize(9);
+      doc.setFontSize(8);
       doc.setFont("helvetica", "bold");
-      doc.text("DESCRIÇÃO DO SERVIÇO", 25, currentY + 7);
-      doc.text("REFERÊNCIA", 85, currentY + 7);
-      doc.text("CONSUMO", 125, currentY + 7);
-      doc.text("TOTAL", pageWidth - 25, currentY + 7, { align: "right" });
+      doc.text("DESCRIÇÃO DO SERVIÇO", 25, currentY + 6.5);
+      doc.text("REFERÊNCIA", 85, currentY + 6.5);
+      doc.text("CONSUMO", 125, currentY + 6.5);
+      doc.text("TOTAL", pageWidth - 25, currentY + 6.5, { align: "right" });
 
       currentY += 10;
       doc.setTextColor(textColor[0], textColor[1], textColor[2]);
       doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
       
       const rowHeight = 12;
       doc.setDrawColor(226, 232, 240);
@@ -129,13 +130,16 @@ export function useInvoicePDF() {
       const refMonth = new Date(invoice.vencimento + "T12:00:00").toLocaleDateString("pt-BR", { month: 'long', year: 'numeric' }).toUpperCase();
       doc.text(plan?.nome || "Internet Residencial", 25, currentY + 8);
       doc.text(refMonth, 85, currentY + 8);
+      
+      doc.setFontSize(8);
       doc.text(`${consumption.download} DL / ${consumption.upload} UL`, 125, currentY + 8);
       
+      doc.setFontSize(10);
       const totalValue = (invoice.valor_centavos / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
       doc.setFont("helvetica", "bold");
       doc.text(totalValue, pageWidth - 25, currentY + 8, { align: "right" });
 
-      currentY += 25;
+      currentY += 20;
 
       // 4. Financial Highlight Box
       const boxWidth = 60;
