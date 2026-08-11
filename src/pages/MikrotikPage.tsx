@@ -207,7 +207,10 @@ export default function MikrotikPage() {
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <div>
             <CardTitle className="text-base">Monitoramento de Tráfego WAN</CardTitle>
-            <CardDescription>Consumo em tempo real (Download + Upload) por interface</CardDescription>
+            <CardDescription>
+              Consumo (Download + Upload) por interface em Mbps — {live ? "atualizando a cada 10s" : "atualização pausada"}
+            </CardDescription>
+
           </div>
           <Activity className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
