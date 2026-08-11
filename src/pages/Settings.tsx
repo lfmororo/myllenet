@@ -844,7 +844,6 @@ export default function Settings() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-      </Tabs>
       </div>
     </div>
   );
