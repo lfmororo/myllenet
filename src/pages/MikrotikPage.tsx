@@ -229,13 +229,64 @@ export default function MikrotikPage() {
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
           ) : wanLogs.length > 0 ? (
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={wanLogs}>
+            <ResponsiveContainer width="100%" height={320}>
+              <LineChart data={wanLogs} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" vertical={false} />
                 <XAxis dataKey="time" className="text-xs" />
-                <YAxis className="text-xs" tickFormatter={(v) => `${v.toFixed(1)}M`} />
-                <Tooltip formatter={(v: any) => [`${Number(v).toFixed(2)} Mbps`, ""]} />
-                <Legend />
+                <YAxis
+                  className="text-xs"
+                  width={64}
+                  tickFormatter={(v) => (v >= 1 ? `${v.toFixed(1)} Mb/s` : `${(v * 1000).toFixed(0)} Kb/s`)}
+                />
+                <Tooltip
+                  contentStyle={{
+                    background: "hsl(var(--popover))",
+                    border: "1px solid hsl(var(--border))",
+                    borderRadius: "0.5rem",
+                    fontSize: "0.75rem",
+                  }}
+                  labelFormatter={(l) => `Horário: ${l}`}
+                  formatter={(v: any, name: any) => {
+                    const num = Number(v);
+                    const label = String(name).endsWith("↑") ? "Upload" : "Download";
+                    const iface = String(name).replace(/ [↑↓]$/, "");
+                    const value = num >= 1 ? `${num.toFixed(2)} Mb/s` : `${(num * 1000).toFixed(0)} Kb/s`;
+                    return [value, `${iface} · ${label}`];
+                  }}
+                />
+                <Legend
+                  verticalAlign="bottom"
+                  height={44}
+                  content={({ payload }) => (
+                    <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 pt-3 text-xs">
+                      {(payload || []).map((entry: any) => {
+                        const isUpload = String(entry.value).endsWith("↑");
+                        const iface = String(entry.value).replace(/ [↑↓]$/, "");
+                        const last = Number(wanLogs[wanLogs.length - 1]?.[entry.value] ?? 0);
+                        return (
+                          <span key={entry.value} className="flex items-center gap-1.5 text-muted-foreground">
+                            <svg width="18" height="8" aria-hidden="true">
+                              <line
+                                x1="0"
+                                y1="4"
+                                x2="18"
+                                y2="4"
+                                stroke={entry.color}
+                                strokeWidth="2.5"
+                                strokeDasharray={isUpload ? "4 3" : undefined}
+                              />
+                            </svg>
+                            <span className="font-medium text-foreground">{iface}</span>
+                            <span>{isUpload ? "Upload ↑" : "Download ↓"}</span>
+                            <span className="tabular-nums">
+                              {last >= 1 ? `${last.toFixed(2)} Mb/s` : `${(last * 1000).toFixed(0)} Kb/s`}
+                            </span>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+                />
                 {Object.keys(wanLogs[wanLogs.length - 1] || {}).filter(k => k !== 'time').map((key, index) => {
                   const isUpload = key.endsWith('↑');
                   const palette = ["hsl(var(--primary))", "hsl(var(--warning))", "hsl(var(--success))", "hsl(var(--destructive))"];
@@ -250,11 +301,13 @@ export default function MikrotikPage() {
                       strokeWidth={2}
                       strokeDasharray={isUpload ? "4 3" : undefined}
                       dot={false}
+                      activeDot={{ r: 3 }}
                     />
                   );
                 })}
               </LineChart>
             </ResponsiveContainer>
+
           ) : (
 
             <p className="text-center py-12 text-muted-foreground">Nenhum dado de WAN encontrado.</p>
