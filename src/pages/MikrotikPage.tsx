@@ -313,54 +313,34 @@ export default function MikrotikPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <BookOpen className="h-5 w-5 text-primary" />
-            Guia: Otimização e Monitoramento Mikrotik
+            Otimização da Integração com Mikrotik
           </CardTitle>
-          <CardDescription>Estratégias para performance e estabilidade</CardDescription>
+          <CardDescription>Melhorar a estabilidade e o desempenho da integração</CardDescription>
         </CardHeader>
         <CardContent className="prose prose-sm dark:prose-invert max-w-none">
           <div className="space-y-4 text-sm leading-relaxed">
-            <p><strong>Objetivo:</strong> Otimizar a conexão com o Mikrotik e aprimorar os sistemas de monitoramento.</p>
-
-            <h4 className="text-base font-semibold border-b pb-1">Funcionalidades</h4>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <h5 className="font-bold flex items-center gap-2 mb-2">
-                  <Router className="h-4 w-4 text-primary" /> Conexão Mikrotik
-                </h5>
-                <ul className="list-disc pl-5 space-y-1">
-                  <li>Identificar e resolver gargalos na conexão atual.</li>
-                  <li>Implementar configurações de rede mais eficientes (ex: QoS, balanceamento de carga).</li>
-                  <li>Garantir estabilidade e baixa latência.</li>
-                </ul>
-              </div>
-              <div>
-                <h5 className="font-bold flex items-center gap-2 mb-2">
-                  <Activity className="h-4 w-4 text-primary" /> Monitoramento
-                </h5>
-                <ul className="list-disc pl-5 space-y-1">
-                  <li>Configurar ferramentas de monitoramento para coletar dados relevantes (uso de CPU, memória, tráfego de rede, status de interfaces).</li>
-                  <li>Estabelecer alertas para condições anormais.</li>
-                  <li>Criar dashboards visuais para fácil acompanhamento.</li>
-                </ul>
-              </div>
-            </div>
+            <h4 className="text-base font-semibold border-b pb-1">Funcionalidade Solicitada</h4>
+            <p>Melhorar a estabilidade e o desempenho da integração atual com dispositivos Mikrotik, abordando especificamente as seguintes falhas:</p>
+            <ul className="list-disc pl-5 space-y-1">
+              <li><strong>Monitoramento de WANs:</strong> Implementar um monitoramento confiável e em tempo real do status das conexões WAN.</li>
+              <li><strong>Carregamento de Informações:</strong> Reduzir significativamente o tempo de carregamento de informações provenientes dos dispositivos Mikrotik.</li>
+            </ul>
 
             <h4 className="text-base font-semibold border-b pb-1">Requisitos Técnicos</h4>
             <ul className="list-disc pl-5 space-y-1">
-              <li>Acesso administrativo ao Mikrotik.</li>
-              <li>Conhecimento em protocolos de rede (TCP/IP, SNMP).</li>
-              <li>Familiaridade com ferramentas de monitoramento (ex: Zabbix, Nagios, Prometheus, Grafana).</li>
+              <li>Analisar a comunicação atual entre o sistema e os dispositivos Mikrotik (protocolos, métodos de consulta).</li>
+              <li>Identificar gargalos e pontos de falha no processo de monitoramento de WANs.</li>
+              <li>Otimizar as consultas e o processamento de dados para agilizar o carregamento de informações.</li>
+              <li>Garantir a robustez da integração para evitar falhas recorrentes.</li>
             </ul>
 
             <h4 className="text-base font-semibold border-b pb-1">Passos Necessários</h4>
             <ol className="list-decimal pl-5 space-y-2">
-              <li>Analisar a configuração atual do Mikrotik.</li>
-              <li>Realizar testes de conectividade e performance.</li>
-              <li>Implementar as otimizações de rede.</li>
-              <li>Selecionar e configurar as ferramentas de monitoramento.</li>
-              <li>Definir métricas e criar alertas.</li>
-              <li>Desenvolver dashboards.</li>
-              <li>Testar e validar as melhorias.</li>
+              <li><strong>Diagnóstico:</strong> Investigar a fundo as causas das falhas atuais no monitoramento de WANs e no carregamento de informações.</li>
+              <li><strong>Refatoração da Integração:</strong> Reescrever ou otimizar o código responsável pela comunicação com o Mikrotik.</li>
+              <li><strong>Implementação do Monitoramento de WANs:</strong> Desenvolver ou aprimorar o módulo de monitoramento, possivelmente utilizando SNMP, API ou outros métodos adequados.</li>
+              <li><strong>Otimização de Performance:</strong> Aplicar técnicas de otimização para acelerar o acesso e a exibição dos dados.</li>
+              <li><strong>Testes:</strong> Realizar testes exaustivos para validar a estabilidade, o desempenho e a correção das funcionalidades implementadas.</li>
             </ol>
           </div>
         </CardContent>
