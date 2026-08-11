@@ -31,6 +31,7 @@ export default function CustomersPage() {
   const [notifyNoBoletoOpen, setNotifyNoBoletoOpen] = useState(false);
   const [bulkGenerating, setBulkGenerating] = useState(false);
   const [customerActiveFilter, setCustomerActiveFilter] = useState<string>("active");
+  const [connectionFilter, setConnectionFilter] = useState<string>("all");
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
 
   useEffect(() => {
@@ -104,8 +105,10 @@ export default function CustomersPage() {
       });
     }
     if (filterNoPlan) filtered = filtered.filter(c => c.ativo && !c.plan_id);
+    if (connectionFilter === "online") filtered = filtered.filter(c => onlineUsers.includes(c.usuario_pppoe));
+    else if (connectionFilter === "offline") filtered = filtered.filter(c => !onlineUsers.includes(c.usuario_pppoe));
     return filtered;
-  }, [customers, customerActiveFilter, filterNoBoleto, filterNoPlan, customerIdsWithInvoiceThisMonth]);
+  }, [customers, customerActiveFilter, filterNoBoleto, filterNoPlan, customerIdsWithInvoiceThisMonth, connectionFilter, onlineUsers]);
 
   const handleEdit = (customer: Customer) => {
     setEditingCustomer(customer);
@@ -201,6 +204,14 @@ export default function CustomersPage() {
               <SelectItem value="all">Todos</SelectItem>
               <SelectItem value="active">Ativos</SelectItem>
               <SelectItem value="inactive">Inativos</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={connectionFilter} onValueChange={setConnectionFilter}>
+            <SelectTrigger className="w-40"><SelectValue placeholder="Conexão" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Conexão: Todos</SelectItem>
+              <SelectItem value="online">Apenas Online</SelectItem>
+              <SelectItem value="offline">Apenas Offline</SelectItem>
             </SelectContent>
           </Select>
         </div>
