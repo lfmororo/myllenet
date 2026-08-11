@@ -50,6 +50,7 @@ export type Database = {
           alert_on_frequent_drops: boolean | null
           ativo: boolean
           bairro: string | null
+          block_alerts_enabled: boolean | null
           block_status: string | null
           cep: string | null
           cidade: string | null
@@ -78,6 +79,7 @@ export type Database = {
           alert_on_frequent_drops?: boolean | null
           ativo?: boolean
           bairro?: string | null
+          block_alerts_enabled?: boolean | null
           block_status?: string | null
           cep?: string | null
           cidade?: string | null
@@ -106,6 +108,7 @@ export type Database = {
           alert_on_frequent_drops?: boolean | null
           ativo?: boolean
           bairro?: string | null
+          block_alerts_enabled?: boolean | null
           block_status?: string | null
           cep?: string | null
           cidade?: string | null

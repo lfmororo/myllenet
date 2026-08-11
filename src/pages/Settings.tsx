@@ -41,6 +41,7 @@ export default function Settings() {
   const [mikrotikPass, setMikrotikPass] = useState("");
   const [mikrotikApiPort, setMikrotikApiPort] = useState("8728");
   const [mikrotikRestPort, setMikrotikRestPort] = useState("80");
+  const [blockingDays, setBlockingDays] = useState("15");
 
   const [savingMikrotik, setSavingMikrotik] = useState(false);
 
@@ -160,7 +161,7 @@ export default function Settings() {
     const { data } = await supabase
       .from("settings")
       .select("key, value")
-      .in("key", ["efi_client_id", "efi_client_secret", "efi_certificate_path", "uazapi_token", "mikrotik_host", "mikrotik_username", "mikrotik_password", "mikrotik_api_port", "mikrotik_rest_port"]);
+      .in("key", ["efi_client_id", "efi_client_secret", "efi_certificate_path", "uazapi_token", "mikrotik_host", "mikrotik_username", "mikrotik_password", "mikrotik_api_port", "mikrotik_rest_port", "blocking_days"]);
 
     if (data) {
       for (const row of data) {
@@ -173,6 +174,7 @@ export default function Settings() {
         if (row.key === "mikrotik_password") setMikrotikPass(row.value || "");
         if (row.key === "mikrotik_api_port") setMikrotikApiPort(row.value || "8728");
         if (row.key === "mikrotik_rest_port") setMikrotikRestPort(row.value || "80");
+        if (row.key === "blocking_days") setBlockingDays(row.value || "15");
       }
     }
 
@@ -645,6 +647,22 @@ export default function Settings() {
                       </p>
                     </div>
 
+                    <div className="space-y-2">
+                      <Label htmlFor="blocking_days">Dias para Bloqueio Automático</Label>
+                      <Input
+                        id="blocking_days"
+                        type="number"
+                        min="1"
+                        max="90"
+                        value={blockingDays}
+                        onChange={(e) => setBlockingDays(e.target.value)}
+                        placeholder="15"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Permita que eu configure quantos dias após o vencimento o cliente deve ser bloqueado, por exemplo 15 dias, diretamente no painel de configurações.
+                      </p>
+                    </div>
+
                     <Button
                       onClick={async () => {
                         setSavingMikrotik(true);
@@ -654,6 +672,7 @@ export default function Settings() {
                           await upsertSetting("mikrotik_password", mikrotikPass);
                           await upsertSetting("mikrotik_api_port", mikrotikApiPort);
                           await upsertSetting("mikrotik_rest_port", mikrotikRestPort);
+                          await upsertSetting("blocking_days", blockingDays);
                           toast.success("Configurações Mikrotik salvas!");
                         } catch (err: any) {
                           toast.error("Erro ao salvar: " + (err.message || "Erro desconhecido"));
