@@ -23,15 +23,24 @@ export function useInvoicePDF() {
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
 
-      // Background Color for Header
-      doc.setFillColor(248, 250, 252);
-      doc.rect(0, 0, pageWidth, 60, "F");
+      // Colors - Mororo.Tech Palette
+      const primaryColor = [15, 23, 42]; // Deep Blue
+      const accentColor = [13, 148, 136]; // Teal/Cyan
+      const bgColor = [248, 250, 252];
+      const textColor = [51, 65, 85];
+      const lightTextColor = [100, 116, 139];
 
-      // Logo and Header
+      // 1. Header with Accent Bar
+      doc.setFillColor(accentColor[0], accentColor[1], accentColor[2]);
+      doc.rect(0, 0, pageWidth, 5, "F");
+
+      doc.setFillColor(bgColor[0], bgColor[1], bgColor[2]);
+      doc.rect(0, 5, pageWidth, 50, "F");
+
+      // Logo
       try {
         const img = new Image();
-        img.src = "/logo.png"; 
-        
+        img.src = "/logo.png";
         await new Promise((resolve) => {
           img.onload = resolve;
           img.onerror = () => {
@@ -42,158 +51,169 @@ export function useInvoicePDF() {
         });
         
         if (img.complete && img.naturalWidth > 0) {
-          const imgWidth = 55;
+          const imgWidth = 50;
           const imgHeight = (img.naturalHeight * imgWidth) / img.naturalWidth;
-          // PNG format preserves transparency (will show the light background)
           doc.addImage(img, "PNG", 20, 15, imgWidth, imgHeight);
         }
-      } catch (e) {
-        console.error("Logo loading error", e);
-      }
+      } catch (e) { console.error(e); }
 
-      doc.setFontSize(22);
-      doc.setTextColor(15, 23, 42); // Slate 900
+      // Invoice Title & Number
+      doc.setFontSize(24);
+      doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
       doc.setFont("helvetica", "bold");
-      doc.text("FATURA MENSAL", pageWidth - 20, 30, { align: "right" });
+      doc.text("FATURA", pageWidth - 20, 28, { align: "right" });
       
       doc.setFontSize(10);
-      doc.setTextColor(71, 85, 105); // Slate 600
+      doc.setTextColor(lightTextColor[0], lightTextColor[1], lightTextColor[2]);
       doc.setFont("helvetica", "normal");
-      doc.text(`Nº DOCUMENTO: ${invoiceId.substring(0, 8).toUpperCase()}/${new Date().getFullYear()}`, pageWidth - 20, 38, { align: "right" });
+      doc.text(`#${invoiceId.substring(0, 8).toUpperCase()}`, pageWidth - 20, 36, { align: "right" });
 
-      // Divider
-      doc.setDrawColor(226, 232, 240); // Slate 200
-      doc.line(20, 60, pageWidth - 20, 60);
+      let currentY = 65;
 
-      // Info Sections Grid
-      const col1 = 20;
-      const col2 = 110;
-      let currentY = 75;
-
-      // Prestador
-      doc.setFontSize(11);
-      doc.setTextColor(15, 23, 42);
-      doc.setFont("helvetica", "bold");
-      doc.text("DADOS DO EMISSOR", col1, currentY);
-      
+      // 2. Client & Issuer Info (Grid)
       doc.setFontSize(10);
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(51, 65, 85);
-      doc.text("Mororo.Tech - Soluções em Tecnologia", col1, currentY + 7);
-      doc.text("CNPJ: 00.000.000/0000-00", col1, currentY + 12);
-      doc.text("Ipu - Ceará, Brasil", col1, currentY + 17);
-      doc.text("contato@mororo.tech", col1, currentY + 22);
-
-      // Cliente
-      doc.setFontSize(11);
       doc.setFont("helvetica", "bold");
-      doc.setTextColor(15, 23, 42);
-      doc.text("DADOS DO CLIENTE", col2, currentY);
-      
-      doc.setFontSize(10);
+      doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+      doc.text("DADOS DO EMISSOR", 20, currentY);
+      doc.text("DADOS DO CLIENTE", 110, currentY);
+
+      currentY += 6;
       doc.setFont("helvetica", "normal");
-      doc.setTextColor(51, 65, 85);
-      doc.text(customer.nome, col2, currentY + 7);
-      doc.text(`CPF/CNPJ: ${customer.cpf}`, col2, currentY + 12);
-      doc.text(`${customer.rua || ""}, ${customer.numero || ""}`, col2, currentY + 17);
-      doc.text(`${customer.bairro || ""} - ${customer.cidade || ""}`, col2, currentY + 22);
+      doc.setTextColor(textColor[0], textColor[1], textColor[2]);
+      
+      // Issuer
+      doc.text("Mororo.Tech - Soluções em TI", 20, currentY);
+      doc.text(`CNPJ: ${pix.cnpj || "00.000.000/0000-00"}`, 20, currentY + 5);
+      doc.text("Ipu - Ceará, Brasil", 20, currentY + 10);
+      doc.text(pix.phone || "(88) 99999-9999", 20, currentY + 15);
+
+      // Client
+      doc.text(customer.nome, 110, currentY);
+      doc.text(`CPF/CNPJ: ${customer.cpf}`, 110, currentY + 5);
+      doc.text(`${customer.rua || ""}, ${customer.numero || ""}`, 110, currentY + 10);
+      doc.text(`${customer.bairro || ""} - ${customer.cidade || ""}`, 110, currentY + 15);
+
+      currentY += 30;
+
+      // 3. Service Summary Table
+      doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+      doc.rect(20, currentY, pageWidth - 40, 10, "F");
+      
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "bold");
+      doc.text("DESCRIÇÃO DO SERVIÇO", 25, currentY + 7);
+      doc.text("REFERÊNCIA", 85, currentY + 7);
+      doc.text("CONSUMO", 125, currentY + 7);
+      doc.text("TOTAL", pageWidth - 25, currentY + 7, { align: "right" });
+
+      currentY += 10;
+      doc.setTextColor(textColor[0], textColor[1], textColor[2]);
+      doc.setFont("helvetica", "normal");
+      
+      const rowHeight = 12;
+      doc.setDrawColor(226, 232, 240);
+      doc.line(20, currentY + rowHeight, pageWidth - 20, currentY + rowHeight);
+
+      const refMonth = new Date(invoice.vencimento + "T12:00:00").toLocaleDateString("pt-BR", { month: 'long', year: 'numeric' }).toUpperCase();
+      doc.text(plan?.nome || "Internet Residencial", 25, currentY + 8);
+      doc.text(refMonth, 85, currentY + 8);
+      doc.text(`${consumption.download} DL / ${consumption.upload} UL`, 125, currentY + 8);
+      
+      const totalValue = (invoice.valor_centavos / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+      doc.setFont("helvetica", "bold");
+      doc.text(totalValue, pageWidth - 25, currentY + 8, { align: "right" });
+
+      currentY += 25;
+
+      // 4. Financial Highlight Box
+      const boxWidth = 60;
+      const boxX = pageWidth - 20 - boxWidth;
+      
+      doc.setFillColor(bgColor[0], bgColor[1], bgColor[2]);
+      doc.rect(boxX, currentY, boxWidth, 25, "F");
+      doc.setDrawColor(accentColor[0], accentColor[1], accentColor[2]);
+      doc.setLineWidth(0.5);
+      doc.line(boxX + boxWidth, currentY, boxX + boxWidth, currentY + 25);
+
+      doc.setTextColor(lightTextColor[0], lightTextColor[1], lightTextColor[2]);
+      doc.setFontSize(8);
+      doc.text("VALOR TOTAL", boxX + 5, currentY + 8);
+      doc.text("VENCIMENTO", boxX + 5, currentY + 18);
+
+      doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "bold");
+      doc.text(totalValue, boxX + boxWidth - 5, currentY + 8, { align: "right" });
+      
+      const dueDate = new Date(invoice.vencimento + "T12:00:00").toLocaleDateString("pt-BR");
+      doc.text(dueDate, boxX + boxWidth - 5, currentY + 18, { align: "right" });
 
       currentY += 40;
 
-      // Details Table-like Layout
-      doc.setFillColor(248, 250, 252);
-      doc.rect(20, currentY, pageWidth - 40, 45, "F");
-      doc.setDrawColor(226, 232, 240);
-      doc.rect(20, currentY, pageWidth - 40, 45, "S");
-
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(15, 23, 42);
-      
-      const tableY = currentY + 10;
-      doc.text("MÊS DE REFERÊNCIA", 30, tableY);
-      doc.text("PLANO", 75, tableY);
-      doc.text("CONSUMO (DL/UL)", 120, tableY);
-      doc.text("VENCIMENTO", 175, tableY, { align: "right" });
-
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(51, 65, 85);
-      const refMonth = new Date(invoice.vencimento + "T12:00:00").toLocaleDateString("pt-BR", { month: 'long', year: 'numeric' });
-      doc.text(refMonth.toUpperCase(), 30, tableY + 8);
-      doc.text(plan?.nome || "Internet", 75, tableY + 8);
-      doc.text(`${consumption.download} / ${consumption.upload}`, 120, tableY + 8);
-      doc.text(new Date(invoice.vencimento + "T12:00:00").toLocaleDateString("pt-BR"), 175, tableY + 8, { align: "right" });
-
-      // Total Value Box
-      currentY += 55;
-      doc.setFillColor(15, 23, 42);
-      doc.rect(pageWidth - 90, currentY, 70, 20, "F");
-      
-      doc.setFontSize(9);
-      doc.setTextColor(255, 255, 255);
-      doc.setFont("helvetica", "normal");
-      doc.text("VALOR TOTAL", pageWidth - 80, currentY + 7);
-      
-      doc.setFontSize(16);
-      doc.setFont("helvetica", "bold");
-      const totalValue = (invoice.valor_centavos / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-      doc.text(totalValue, pageWidth - 80, currentY + 15);
-
-      // Payment Section
-      currentY += 35;
-      doc.setFontSize(12);
-      doc.setTextColor(15, 23, 42);
-      doc.setFont("helvetica", "bold");
-      doc.text("INSTRUÇÕES DE PAGAMENTO", 20, currentY);
-      
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(51, 65, 85);
-      doc.text("Pague via PIX para liberação imediata do sinal.", 20, currentY + 7);
-
-      // PIX Container
-      currentY += 15;
+      // 5. Payment Area (PIX Focus)
       doc.setDrawColor(226, 232, 240);
       doc.line(20, currentY, pageWidth - 20, currentY);
       
-      const pixY = currentY + 10;
+      currentY += 10;
+      doc.setFontSize(14);
+      doc.setTextColor(accentColor[0], accentColor[1], accentColor[2]);
+      doc.text("PAGAMENTO VIA PIX", 20, currentY);
+      
       doc.setFontSize(10);
-      doc.setFont("helvetica", "bold");
-      doc.text("DADOS DO PIX", 20, pixY);
-      
+      doc.setTextColor(textColor[0], textColor[1], textColor[2]);
       doc.setFont("helvetica", "normal");
-      doc.text(`Favorecido: ${pix.name || "Mororo Tech"}`, 20, pixY + 7);
-      doc.text(`Chave PIX: ${pix.key || "Não configurada"}`, 20, pixY + 12);
-      
-      doc.setFont("helvetica", "bold");
-      doc.text("PIX COPIA E COLA:", 20, pixY + 22);
-      doc.setFontSize(8);
-      doc.setFont("helvetica", "normal");
-      const splitPayload = doc.splitTextToSize(pix.payload, pageWidth - 100);
-      doc.text(splitPayload, 20, pixY + 28);
+      doc.text("Liberação imediata da conexão após o pagamento.", 20, currentY + 7);
 
+      currentY += 15;
+      
       // QR Code Box
       try {
+        const qrSize = 50;
         const qrCodeDataUrl = await QRCode.toDataURL(pix.payload, { 
           margin: 1, 
-          width: 200,
+          width: 250,
           color: { dark: "#0f172a", light: "#ffffff" }
         });
+        
         doc.setFillColor(255, 255, 255);
-        doc.rect(pageWidth - 75, pixY, 55, 55, "F");
+        doc.rect(20, currentY, qrSize + 10, qrSize + 10, "F");
         doc.setDrawColor(226, 232, 240);
-        doc.rect(pageWidth - 75, pixY, 55, 55, "S");
-        doc.addImage(qrCodeDataUrl, "PNG", pageWidth - 72, pixY + 3, 49, 49);
+        doc.rect(20, currentY, qrSize + 10, qrSize + 10, "S");
+        doc.addImage(qrCodeDataUrl, "PNG", 25, currentY + 5, qrSize, qrSize);
+        
+        // PIX Instructions
+        const textX = 85;
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "bold");
+        doc.text("COMO PAGAR:", textX, currentY + 5);
+        
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        doc.text("1. Abra o app do seu banco", textX, currentY + 12);
+        doc.text("2. Escolha pagar via PIX (QR Code ou Copia e Cola)", textX, currentY + 17);
+        doc.text("3. Escaneie o código ao lado ou cole o código abaixo", textX, currentY + 22);
+        
+        doc.setFont("helvetica", "bold");
+        doc.text("PIX COPIA E COLA:", textX, currentY + 32);
         doc.setFontSize(8);
-        doc.text("ESCANEIE O CÓDIGO", pageWidth - 47.5, pixY + 62, { align: "center" });
-      } catch (e) {
-        console.error("Error generating QR Code", e);
-      }
+        doc.setFont("helvetica", "normal");
+        const splitPayload = doc.splitTextToSize(pix.payload, pageWidth - textX - 20);
+        doc.text(splitPayload, textX, currentY + 37);
 
-      // Footer
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(9);
+        doc.text(`Favorecido: ${pix.name || "Mororo Tech"}`, textX, currentY + 52);
+        doc.text(`Chave: ${pix.key || "N/A"}`, textX, currentY + 57);
+
+      } catch (e) { console.error(e); }
+
+      // 6. Footer
       doc.setFontSize(8);
-      doc.setTextColor(148, 163, 184); // Slate 400
-      doc.text("Mororo.Tech © 2026 - Soluções em Tecnologia e Desenvolvimento de Sistemas", pageWidth / 2, pageHeight - 15, { align: "center" });
+      doc.setTextColor(lightTextColor[0], lightTextColor[1], lightTextColor[2]);
+      const footerY = pageHeight - 15;
+      doc.text("ESTA É UMA FATURA DE SERVIÇOS DE COMUNICAÇÃO MULTIMÍDIA.", 20, footerY);
+      doc.text("Mororo.Tech © 2026", pageWidth - 20, footerY, { align: "right" });
 
       if (open) {
         doc.output("dataurlnewwindow");

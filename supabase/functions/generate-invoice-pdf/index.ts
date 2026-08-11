@@ -30,8 +30,17 @@ function crc16(data: string): string {
   return crc.toString(16).toUpperCase().padStart(4, "0");
 }
 
+// Remove accents and special characters
+function sanitize(str: string): string {
+  return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9 ]/g, "").toUpperCase();
+}
+
 function generatePixPayload(key: string, name: string, city: string, amount: number, description: string): string {
   const f = (id: string, val: string) => id + val.length.toString().padStart(2, "0") + val;
+  
+  const sName = sanitize(name).substring(0, 25);
+  const sCity = sanitize(city).substring(0, 15);
+  const sDesc = sanitize(description).substring(0, 25);
   
   const merchantAccountInfo = f("00", "BR.GOV.BCB.PIX") + f("01", key);
   
@@ -41,10 +50,10 @@ function generatePixPayload(key: string, name: string, city: string, amount: num
   payload += f("53", "986"); // Transaction Currency (BRL)
   payload += f("54", amount.toFixed(2)); // Transaction Amount
   payload += f("58", "BR"); // Country Code
-  payload += f("59", name.substring(0, 25)); // Merchant Name
-  payload += f("60", city.substring(0, 15)); // Merchant City
+  payload += f("59", sName); // Merchant Name
+  payload += f("60", sCity); // Merchant City
   
-  const additionalData = f("05", description.substring(0, 25)); // Reference Label
+  const additionalData = f("05", sDesc); // Reference Label
   payload += f("62", additionalData);
   
   payload += "6304"; // CRC16 indicator
@@ -92,7 +101,7 @@ Deno.serve(async (req) => {
     const { data: settings } = await supabase
       .from("settings")
       .select("key, value")
-      .in("key", ["pix_key", "pix_name", "pix_city"]);
+      .in("key", ["pix_key", "pix_name", "pix_city", "company_cnpj", "company_phone"]);
 
     const pixSettings = Object.fromEntries(settings?.map(s => [s.key, s.value]) || []);
     const pixPayload = generatePixPayload(
@@ -121,7 +130,9 @@ Deno.serve(async (req) => {
         pix: {
           payload: pixPayload,
           key: pixSettings.pix_key,
-          name: pixSettings.pix_name
+          name: pixSettings.pix_name,
+          cnpj: pixSettings.company_cnpj,
+          phone: pixSettings.company_phone
         }
       }
     }), {
