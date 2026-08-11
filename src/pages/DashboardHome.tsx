@@ -21,7 +21,7 @@ export default function DashboardHome() {
   useEffect(() => {
     const fetchWanLogs = async () => {
       const { data, error } = await supabase
-        .from('wan_logs')
+        .from('wan_logs' as any)
         .select('*')
         .order('created_at', { ascending: false })
         .limit(100);
@@ -29,10 +29,10 @@ export default function DashboardHome() {
       if (!error && data) {
         // Group by created_at and interface
         const grouped: Record<string, any> = {};
-        data.forEach(log => {
+        data.forEach((log: any) => {
           const time = new Date(log.created_at).toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit' });
           if (!grouped[time]) grouped[time] = { time };
-          grouped[time][log.interface_name] = (log.rx_bps + log.tx_bps) / 1024 / 1024; // Mbps
+          grouped[time][log.interface_name] = (Number(log.rx_bps || 0) + Number(log.tx_bps || 0)) / 1024 / 1024; // Mbps
         });
         setWanLogs(Object.values(grouped).reverse());
       }
@@ -43,7 +43,7 @@ export default function DashboardHome() {
     
     const channel = supabase
       .channel('wan_updates')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'wan_logs' }, () => {
+      .on('postgres_changes' as any, { event: 'INSERT', schema: 'public', table: 'wan_logs' }, () => {
         fetchWanLogs();
       })
       .subscribe();
