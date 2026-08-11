@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS public.block_alerts_sent (
     old_status text,
     new_status text,
     sent_at timestamptz DEFAULT now()
+    processed boolean DEFAULT null,
 );
 
 GRANT SELECT, INSERT ON public.block_alerts_sent TO authenticated;
