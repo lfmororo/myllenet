@@ -17,6 +17,7 @@ export default function MikrotikPage() {
   const [search, setSearch] = useState("");
   const { customers } = useCustomers();
   const { plans } = usePlans();
+  const [syncing, setSyncing] = useState(false);
 
   const checkStatus = async () => {
     setLoading(true);
@@ -31,6 +32,20 @@ export default function MikrotikPage() {
       toast.error("Erro ao verificar Mikrotik");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const syncWithMikrotik = async () => {
+    setSyncing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("mikrotik-sync");
+      if (error) throw error;
+      toast.success("Sincronização com Mikrotik concluída com sucesso!");
+    } catch (err: any) {
+      console.error("Erro na sincronização:", err);
+      toast.error("Erro ao sincronizar com Mikrotik");
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -133,8 +148,12 @@ export default function MikrotikPage() {
             {exporting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Download className="h-4 w-4 mr-2" />}
             Baixar Script (.rsc)
           </Button>
-          <Button onClick={checkStatus} disabled={loading}>
-            {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+          <Button variant="secondary" onClick={syncWithMikrotik} disabled={syncing || loading}>
+            {syncing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+            Sincronizar Mikrotik
+          </Button>
+          <Button onClick={checkStatus} disabled={loading || syncing}>
+            {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Router className="h-4 w-4 mr-2" />}
             Verificar Status
           </Button>
         </div>
