@@ -109,7 +109,7 @@ Deno.serve(async (req) => {
       service: 'pppoe',
       profile: planName,
       disabled: disabled ? 'true' : 'false',
-      comment: `ID: ${customer.id} | Status: ${customer.block_status || 'active'}`,
+      comment: `${customer.nome} | ID: ${customer.id} | Status: ${customer.block_status || 'active'}`,
     }
 
     // Ensure the plan profile exists before assigning it
