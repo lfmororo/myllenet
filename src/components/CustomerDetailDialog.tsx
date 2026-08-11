@@ -6,10 +6,11 @@ import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, ExternalLink, Copy, CheckCircle2, Clock, Import, CalendarCheck, X, XCircle, Activity, History, Bell, BellOff, AlertTriangle } from "lucide-react";
+import { Loader2, ExternalLink, Copy, CheckCircle2, Clock, Import, CalendarCheck, X, XCircle, Activity, History, Bell, BellOff, AlertTriangle, ShieldCheck, ShieldAlert, Lock, Unlock } from "lucide-react";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Customer } from "@/hooks/useCustomers";
 import type { Invoice } from "@/hooks/useInvoices";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
@@ -37,8 +38,11 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
   const [pagoAte, setPagoAte] = useState("");
   const [savingPagoAte, setSavingPagoAte] = useState(false);
   const [logs, setLogs] = useState<any[]>([]);
+  const [blockHistory, setBlockHistory] = useState<any[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
+  const [loadingBlockHistory, setLoadingBlockHistory] = useState(false);
   const [hasMoreLogs, setHasMoreLogs] = useState(true);
+  const [unlocking, setUnlocking] = useState(false);
 
   const fetchLogs = useCallback(async (isLoadMore = false) => {
     if (!customer) return;
@@ -65,6 +69,22 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
     }
     setLoadingLogs(false);
   }, [customer, logs.length, hasMoreLogs]);
+  
+  const fetchBlockHistory = useCallback(async () => {
+    if (!customer) return;
+    setLoadingBlockHistory(true);
+    const { data, error } = await supabase
+      .from("block_history" as any)
+      .select("*")
+      .eq("customer_id", customer.id)
+      .order("created_at", { ascending: false })
+      .limit(10);
+    
+    if (!error && data) {
+      setBlockHistory(data);
+    }
+    setLoadingBlockHistory(false);
+  }, [customer]);
 
   const fetchInvoices = useCallback(() => {
     if (!customer) return;
@@ -88,6 +108,7 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
     if (open && customer) {
       fetchInvoices();
       fetchLogs();
+      fetchBlockHistory();
       setPagoAte(customer.pago_ate || "");
 
       // Escutar mudanças em tempo real na tabela de logs para este cliente
@@ -114,8 +135,9 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
       setInvoices([]);
       setPagoAte("");
       setLogs([]);
+      setBlockHistory([]);
     }
-  }, [open, customer, fetchInvoices, fetchLogs]);
+  }, [open, customer, fetchInvoices, fetchLogs, fetchBlockHistory]);
 
   const handleSavePagoAte = async () => {
     if (!customer) return;
@@ -145,6 +167,49 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
       toast.success("Dados atualizados!");
       onCustomerUpdated?.();
     }
+  };
+
+  const handleManualUnlock = async () => {
+    if (!customer) return;
+    setUnlocking(true);
+    try {
+      const { error } = await supabase
+        .from("customers")
+        .update({ block_status: "active" } as any)
+        .eq("id", customer.id);
+      
+      if (error) throw error;
+
+      // Log the manual unlock
+      const { data: { user } } = await supabase.auth.getUser();
+      await supabase.from("block_history" as any).insert({
+        customer_id: customer.id,
+        old_status: customer.block_status,
+        new_status: "active",
+        reason: "Desbloqueio manual pelo administrador",
+        changed_by: user?.id
+      } as any);
+
+      toast.success("Cliente desbloqueado manualmente!");
+      fetchBlockHistory();
+      onCustomerUpdated?.();
+      
+      // Request Mikrotik sync
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      if (token) {
+        const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+        fetch(`https://${projectId}.supabase.co/functions/v1/mikrotik-sync`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` }
+        }).catch(e => console.error("Sync error:", e));
+      }
+
+    } catch (err) {
+      console.error(err);
+      toast.error("Erro ao desbloquear cliente");
+    }
+    setUnlocking(false);
   };
 
   const handleClearPagoAte = async () => {
@@ -223,9 +288,28 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {customer.nome}
-            <Badge variant={customer.ativo ? "default" : "secondary"}>
-              {customer.ativo ? "Ativo" : "Inativo"}
-            </Badge>
+            <div className="flex gap-2">
+              <Badge variant={customer.ativo ? "default" : "secondary"}>
+                {customer.ativo ? "Ativo" : "Inativo"}
+              </Badge>
+              {customer.block_status === 'blocked' && (
+                <Badge variant="destructive" className="animate-pulse">
+                  BLOQUEADO
+                </Badge>
+              )}
+            </div>
+            {customer.block_status === 'blocked' && (
+              <Button 
+                size="sm" 
+                variant="outline" 
+                className="h-7 text-xs border-green-500 text-green-600 hover:bg-green-50 ml-auto"
+                onClick={handleManualUnlock}
+                disabled={unlocking}
+              >
+                {unlocking ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Unlock className="h-3 w-3 mr-1" />}
+                Desbloquear Manual
+              </Button>
+            )}
           </DialogTitle>
         </DialogHeader>
 
@@ -304,6 +388,37 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
                   <div className="h-full flex items-center justify-center text-xs text-muted-foreground italic">
                     Dados insuficientes para gerar gráfico.
                   </div>
+                )}
+              </div>
+            </div>
+
+            {/* Histórico de Bloqueios */}
+            <div className="rounded-lg border bg-muted/30 p-4 space-y-3 border-orange-100">
+              <h3 className="text-sm font-semibold flex items-center gap-2">
+                <ShieldAlert className="h-4 w-4 text-orange-500" />
+                Histórico de Bloqueio/Desbloqueio
+              </h3>
+              <div className="space-y-2 max-h-[150px] overflow-y-auto pr-2 custom-scrollbar">
+                {blockHistory.length > 0 ? (
+                  blockHistory.map((h, idx) => (
+                    <div key={idx} className="flex flex-col text-[11px] border-b border-muted py-2 last:border-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-medium text-muted-foreground">
+                          {new Date(h.created_at).toLocaleString('pt-BR')}
+                        </span>
+                        <Badge variant={h.new_status === 'active' ? 'outline' : 'destructive'} className="text-[9px] h-4 px-1 leading-none">
+                          {h.new_status === 'active' ? 'LIBERADO' : 'BLOQUEADO'}
+                        </Badge>
+                      </div>
+                      <span className="text-[10px] text-muted-foreground leading-tight italic">
+                        "{h.reason}"
+                      </span>
+                    </div>
+                  ))
+                ) : loadingBlockHistory ? (
+                  <div className="flex justify-center py-4"><Loader2 className="h-4 w-4 animate-spin" /></div>
+                ) : (
+                  <div className="text-xs text-muted-foreground italic py-2">Nenhuma alteração de status registrada.</div>
                 )}
               </div>
             </div>
