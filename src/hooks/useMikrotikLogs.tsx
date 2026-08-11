@@ -40,15 +40,19 @@ export const useMikrotikLogs = () => {
 
   useEffect(() => {
     fetchWanLogs();
+    fetchWanHistory();
     const channel = supabase
       .channel('wan_updates_mikrotik_page')
       .on('postgres_changes' as any, { event: 'INSERT', schema: 'public', table: 'wan_logs' }, () => {
         fetchWanLogs();
+      })
+      .on('postgres_changes' as any, { event: 'INSERT', schema: 'public', table: 'wan_status_history' }, () => {
+        fetchWanHistory();
       })
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
   }, []);
 
-  return { wanLogs, loading };
+  return { wanLogs, wanHistory, loading };
 };
