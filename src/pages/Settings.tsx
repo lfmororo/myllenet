@@ -632,6 +632,19 @@ export default function Settings() {
                       />
                     </div>
 
+                    <div className="space-y-2">
+                      <Label htmlFor="mikrotik_rest_port">Porta API REST (www)</Label>
+                      <Input
+                        id="mikrotik_rest_port"
+                        value={mikrotikRestPort}
+                        onChange={(e) => setMikrotikRestPort(e.target.value)}
+                        placeholder="80"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Porta do serviço www/www-ssl do RouterOS v7. Necessária para ver clientes on-line no PPPoE.
+                      </p>
+                    </div>
+
                     <Button
                       onClick={async () => {
                         setSavingMikrotik(true);
@@ -640,9 +653,11 @@ export default function Settings() {
                           await upsertSetting("mikrotik_username", mikrotikUser);
                           await upsertSetting("mikrotik_password", mikrotikPass);
                           await upsertSetting("mikrotik_api_port", mikrotikApiPort);
+                          await upsertSetting("mikrotik_rest_port", mikrotikRestPort);
                           toast.success("Configurações Mikrotik salvas!");
                         } catch (err: any) {
                           toast.error("Erro ao salvar: " + (err.message || "Erro desconhecido"));
+
                         }
                         setSavingMikrotik(false);
                       }}
