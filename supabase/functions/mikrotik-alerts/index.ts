@@ -165,6 +165,43 @@ Deno.serve(async (req) => {
       }
     }
     
+    // 5. Check WAN Status Alerts
+    const { data: recentWanHistory } = await supabase
+      .from('wan_status_history')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(10)
+
+    if (recentWanHistory && recentWanHistory.length > 0) {
+      for (const event of recentWanHistory) {
+        // Check if this specific event was already alerted
+        const { data: alerted } = await supabase
+          .from('customer_alerts_sent')
+          .select('id')
+          .eq('alert_type', `wan_${event.interface_name}_${event.status}`)
+          .gt('sent_at', new Date(Date.now() - 60 * 60 * 1000).toISOString()) // 1 hour cooldown
+          .single()
+
+        if (!alerted) {
+          const isUp = event.status === 'up'
+          const emoji = isUp ? '✅' : '❌'
+          const statusText = isUp ? 'RECUPERADA' : 'FORA DO AR'
+          
+          await supabase.functions.invoke('whatsapp-send/send-text', {
+            body: {
+              phone: ADMIN_PHONE,
+              message: `${emoji} *ALERTA WAN: ${event.interface_name}* ${emoji}\n\nA interface está *${statusText}*!\n\nMotivo: ${event.reason || 'N/A'}\nData: ${new Date(event.created_at).toLocaleString('pt-BR')}`
+            }
+          })
+
+          await supabase.from('customer_alerts_sent').insert({
+            alert_type: `wan_${event.interface_name}_${event.status}`,
+            sent_at: new Date().toISOString()
+          })
+        }
+      }
+    }
+
     return json({ success: true })
   } catch (e) {
     return json({ error: (e as Error).message }, 500)
