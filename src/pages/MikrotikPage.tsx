@@ -24,20 +24,23 @@ export default function MikrotikPage() {
   const { plans } = usePlans();
   const { wanLogs, wanHistory, loading: loadingWan } = useMikrotikLogs();
   const [syncing, setSyncing] = useState(false);
+  const [live, setLive] = useState(true);
 
-  const checkStatus = async () => {
-    setLoading(true);
+  const checkStatus = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("mikrotik-status");
       if (error) throw error;
       setStatus(data);
-      if (data?.online) toast.success(data.message || "Mikrotik online");
-      else toast.error(data?.message || "Mikrotik offline");
+      if (!silent) {
+        if (data?.online) toast.success(data.message || "Mikrotik online");
+        else toast.error(data?.message || "Mikrotik offline");
+      }
     } catch (err: any) {
       setStatus({ online: false, message: err?.message || "Erro ao verificar Mikrotik" });
-      toast.error("Erro ao verificar Mikrotik");
+      if (!silent) toast.error("Erro ao verificar Mikrotik");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -58,6 +61,14 @@ export default function MikrotikPage() {
   useEffect(() => {
     checkStatus();
   }, []);
+
+  // Amostragem em tempo real: cada chamada coleta os contadores das WANs e grava em wan_logs
+  useEffect(() => {
+    if (!live) return;
+    const id = setInterval(() => checkStatus(true), 10000);
+    return () => clearInterval(id);
+  }, [live]);
+
 
   const downloadMikrotikScript = () => {
     setExporting(true);
