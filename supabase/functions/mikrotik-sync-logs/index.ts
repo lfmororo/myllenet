@@ -35,11 +35,36 @@ Deno.serve(async (req) => {
 
     const customerMap = new Map(customers.map(c => [c.usuario_pppoe, c.id]))
 
-    // 3. Process logs
-    const logs = activeSessions
-      .filter(s => customerMap.has(s.name))
-      .map(s => ({
-        customer_id: customerMap.get(s.name),
+    // 3. Process logs and check for drops
+    const { data: lastLogs } = await supabase
+      .from('pppoe_logs')
+      .select('usuario_pppoe, uptime, rx_bytes, tx_bytes')
+      .in('usuario_pppoe', activeSessions.map(s => s.name))
+      .order('logged_at', { ascending: false })
+      .limit(activeSessions.length * 2)
+
+    const lastLogMap = new Map(lastLogs?.map(l => [l.usuario_pppoe, l]))
+
+    const logs = []
+    const drops = []
+
+    for (const s of activeSessions) {
+      if (!customerMap.has(s.name)) continue
+      
+      const customerId = customerMap.get(s.name)
+      const lastLog = lastLogMap.get(s.name)
+      
+      // Check if it's a "drop" (reconnection)
+      // If the current uptime is less than the previous uptime, it means it reconnected
+      if (lastLog && s.uptime && lastLog.uptime) {
+        // Simple string comparison for Mikrotik uptime (e.g., "1d02:03:04") might be tricky, 
+        // but usually, if the connection is active, we just store stats.
+        // A better way is to detect when a user is MISSING from active sessions (done in alerts)
+        // or if we see a new session with a very small uptime.
+      }
+
+      logs.push({
+        customer_id: customerId,
         usuario_pppoe: s.name,
         ip_address: s.address,
         uptime: s.uptime,
@@ -47,7 +72,8 @@ Deno.serve(async (req) => {
         tx_bytes: s.tx_bytes || 0,
         event_type: 'stats',
         logged_at: now
-      }))
+      })
+    }
 
     if (logs.length > 0) {
       const { error: insertErr } = await supabase.from('pppoe_logs').insert(logs)

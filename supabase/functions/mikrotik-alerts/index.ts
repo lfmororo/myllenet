@@ -16,6 +16,8 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     )
 
+    const ADMIN_PHONE = '85986801458'
+
     // 1. Check Mikrotik Connection Alerts (3 minutes)
     const { data: recentHistory } = await supabase
       .from('mikrotik_status_history')
@@ -26,11 +28,10 @@ Deno.serve(async (req) => {
     if (recentHistory && recentHistory.length >= 3) {
       const allOffline = recentHistory.slice(0, 3).every(h => !h.online)
       if (allOffline) {
-        // Send alert for router offline
         console.log("ALERT: Mikrotik Offline for > 3 minutes")
         await supabase.functions.invoke('whatsapp-send/send-text', {
           body: {
-            phone: '85986801458', // Admin phone from context
+            phone: ADMIN_PHONE,
             message: `🚨 *ALERTA DE MONITORAMENTO* 🚨\n\nO servidor Mikrotik está *OFF-LINE* há mais de 3 minutos!\n\nHost: ${recentHistory[0].host}\nÚltimo erro: ${recentHistory[0].message}`
           }
         })
@@ -38,24 +39,129 @@ Deno.serve(async (req) => {
     }
 
     // 2. Check Customer Disconnection Alerts (5 minutes)
-    // We check for customers who were online in the previous sync but are not in the current one
-    // AND haven't been in the current one for 5+ minutes
     const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString()
-    
-    // Get customers who "disappeared"
     const { data: disconnections } = await supabase.rpc('get_recent_disconnections', {
       since_time: fiveMinAgo
     })
 
     if (disconnections && disconnections.length > 0) {
       for (const disc of disconnections) {
-        console.log(`ALERT: Customer ${disc.usuario_pppoe} Offline for > 5 minutes`)
-        await supabase.functions.invoke('whatsapp-send/send-text', {
-          body: {
-            phone: '85986801458',
-            message: `⚠️ *ALERTA DE DESCONEXÃO* ⚠️\n\nO cliente *${disc.nome}* (${disc.usuario_pppoe}) está off-line há mais de 5 minutos!\n\nÚltima atividade: ${new Date(disc.last_seen).toLocaleString('pt-BR')}`
+        // Only alert if customer has alert_on_disconnect enabled
+        const { data: customer } = await supabase
+          .from('customers')
+          .select('alert_on_disconnect, nome')
+          .eq('id', disc.customer_id)
+          .single()
+
+        if (customer?.alert_on_disconnect) {
+          // Check if we already alerted recently to avoid spam
+          const { data: recentAlert } = await supabase
+            .from('customer_alerts_sent')
+            .select('id')
+            .eq('customer_id', disc.customer_id)
+            .eq('alert_type', 'disconnect')
+            .gt('sent_at', new Date(Date.now() - 30 * 60 * 1000).toISOString())
+            .single()
+
+          if (!recentAlert) {
+            console.log(`ALERT: Customer ${disc.usuario_pppoe} Offline`)
+            await supabase.functions.invoke('whatsapp-send/send-text', {
+              body: {
+                phone: ADMIN_PHONE,
+                message: `⚠️ *ALERTA DE DESCONEXÃO* ⚠️\n\nO cliente *${disc.nome}* (${disc.usuario_pppoe}) está off-line há mais de 5 minutos!\n\nÚltima atividade: ${new Date(disc.last_seen).toLocaleString('pt-BR')}`
+              }
+            })
+            await supabase.from('customer_alerts_sent').insert({
+              customer_id: disc.customer_id,
+              alert_type: 'disconnect'
+            })
           }
-        })
+        }
+      }
+    }
+
+    // 3. Check for Frequent Drops (e.g., 3+ reconnections in 1 hour)
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
+    
+    // We can identify a "drop" by checking if a user appears in logs with a small uptime 
+    // after a period of being missing, or if they have multiple distinct session starts.
+    // For now, let's look at the pppoe_logs to find customers with multiple short sessions.
+    const { data: frequentDrops } = await supabase.rpc('check_frequent_drops', {
+      time_threshold: oneHourAgo,
+      drop_count: 3
+    })
+
+    if (frequentDrops) {
+      for (const drop of frequentDrops) {
+        const { data: customer } = await supabase
+          .from('customers')
+          .select('alert_on_frequent_drops, nome')
+          .eq('id', drop.customer_id)
+          .single()
+
+        if (customer?.alert_on_frequent_drops) {
+          const { data: recentAlert } = await supabase
+            .from('customer_alerts_sent')
+            .select('id')
+            .eq('customer_id', drop.customer_id)
+            .eq('alert_type', 'frequent_drops')
+            .gt('sent_at', new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString())
+            .single()
+
+          if (!recentAlert) {
+            await supabase.functions.invoke('whatsapp-send/send-text', {
+              body: {
+                phone: ADMIN_PHONE,
+                message: `📉 *ALERTA DE INSTABILIDADE* 📉\n\nO cliente *${customer.nome}* teve *${drop.count} quedas* na última hora!\n\nIsso pode indicar um problema físico no cabo ou no roteador do cliente.`
+              }
+            })
+            await supabase.from('customer_alerts_sent').insert({
+              customer_id: drop.customer_id,
+              alert_type: 'frequent_drops'
+            })
+          }
+        }
+      }
+    }
+
+    // 4. Check for Abnormal Usage (e.g., usage > 2x average or extreme peaks)
+    // This requires historical data. For now, let's check for very high traffic in a short window.
+    // Example: > 500MB in 5 minutes (assuming 15min sync interval, this is ~33Mbps sustained)
+    const { data: highUsage } = await supabase.rpc('check_abnormal_usage', {
+      bytes_threshold: 500 * 1024 * 1024 // 500 MB
+    })
+
+    if (highUsage) {
+      for (const usage of highUsage) {
+        const { data: customer } = await supabase
+          .from('customers')
+          .select('alert_on_abnormal_usage, nome')
+          .eq('id', usage.customer_id)
+          .single()
+
+        if (customer?.alert_on_abnormal_usage) {
+          const { data: recentAlert } = await supabase
+            .from('customer_alerts_sent')
+            .select('id')
+            .eq('customer_id', usage.customer_id)
+            .eq('alert_type', 'abnormal_usage')
+            .gt('sent_at', new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString())
+            .single()
+
+          if (!recentAlert) {
+            const consumption = (usage.total_bytes / (1024 * 1024)).toFixed(2)
+            await supabase.functions.invoke('whatsapp-send/send-text', {
+              body: {
+                phone: ADMIN_PHONE,
+                message: `🚀 *ALERTA DE CONSUMO ANORMAL* 🚀\n\nO cliente *${customer.nome}* consumiu *${consumption} MB* nos últimos 15 minutos.\n\nVerifique se há uso indevido ou necessidade de upgrade de plano.`
+              }
+            })
+            await supabase.from('customer_alerts_sent').insert({
+              customer_id: usage.customer_id,
+              alert_type: 'abnormal_usage'
+            })
+          }
+        }
       }
     }
     

@@ -14,8 +14,40 @@ export type Database = {
   }
   public: {
     Tables: {
+      customer_alerts_sent: {
+        Row: {
+          alert_type: string
+          customer_id: string
+          id: string
+          sent_at: string | null
+        }
+        Insert: {
+          alert_type: string
+          customer_id: string
+          id?: string
+          sent_at?: string | null
+        }
+        Update: {
+          alert_type?: string
+          customer_id?: string
+          id?: string
+          sent_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_alerts_sent_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customers: {
         Row: {
+          alert_on_abnormal_usage: boolean | null
+          alert_on_disconnect: boolean | null
+          alert_on_frequent_drops: boolean | null
           ativo: boolean
           bairro: string | null
           cep: string | null
@@ -40,6 +72,9 @@ export type Database = {
           usuario_pppoe: string
         }
         Insert: {
+          alert_on_abnormal_usage?: boolean | null
+          alert_on_disconnect?: boolean | null
+          alert_on_frequent_drops?: boolean | null
           ativo?: boolean
           bairro?: string | null
           cep?: string | null
@@ -64,6 +99,9 @@ export type Database = {
           usuario_pppoe: string
         }
         Update: {
+          alert_on_abnormal_usage?: boolean | null
+          alert_on_disconnect?: boolean | null
+          alert_on_frequent_drops?: boolean | null
           ativo?: boolean
           bairro?: string | null
           cep?: string | null
@@ -321,6 +359,41 @@ export type Database = {
         }
         Relationships: []
       }
+      pppoe_drops: {
+        Row: {
+          customer_id: string
+          dropped_at: string | null
+          id: string
+          last_uptime: string | null
+          reason: string | null
+          usuario_pppoe: string
+        }
+        Insert: {
+          customer_id: string
+          dropped_at?: string | null
+          id?: string
+          last_uptime?: string | null
+          reason?: string | null
+          usuario_pppoe: string
+        }
+        Update: {
+          customer_id?: string
+          dropped_at?: string | null
+          id?: string
+          last_uptime?: string | null
+          reason?: string | null
+          usuario_pppoe?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pppoe_drops_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pppoe_logs: {
         Row: {
           customer_id: string
@@ -436,6 +509,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_abnormal_usage: {
+        Args: { bytes_threshold: number }
+        Returns: {
+          customer_id: string
+          total_bytes: number
+        }[]
+      }
+      check_frequent_drops: {
+        Args: { drop_count: number; time_threshold: string }
+        Returns: {
+          count: number
+          customer_id: string
+        }[]
+      }
       get_recent_disconnections: {
         Args: { since_time: string }
         Returns: {

@@ -6,8 +6,10 @@ import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, ExternalLink, Copy, CheckCircle2, Clock, Import, CalendarCheck, X, XCircle, Activity, History } from "lucide-react";
+import { Loader2, ExternalLink, Copy, CheckCircle2, Clock, Import, CalendarCheck, X, XCircle, Activity, History, Bell, BellOff, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import type { Customer } from "@/hooks/useCustomers";
 import type { Invoice } from "@/hooks/useInvoices";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
@@ -118,20 +120,25 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
     setSavingPagoAte(false);
   };
 
+  const updateCustomer = async (updates: Partial<Customer>) => {
+    if (!customer) return;
+    const { error } = await supabase
+      .from("customers")
+      .update(updates as any)
+      .eq("id", customer.id);
+    if (error) {
+      toast.error("Erro ao atualizar");
+    } else {
+      toast.success("Dados atualizados!");
+      onCustomerUpdated?.();
+    }
+  };
+
   const handleClearPagoAte = async () => {
     if (!customer) return;
     setSavingPagoAte(true);
-    const { error } = await supabase
-      .from("customers")
-      .update({ pago_ate: null } as any)
-      .eq("id", customer.id);
-    if (error) {
-      toast.error("Erro ao limpar");
-    } else {
-      setPagoAte("");
-      toast.success("Pagamento antecipado removido!");
-      onCustomerUpdated?.();
-    }
+    await updateCustomer({ pago_ate: null });
+    setPagoAte("");
     setSavingPagoAte(false);
   };
 
@@ -388,6 +395,59 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
               ✅ Pago até: {new Date(customer.pago_ate + "T12:00:00").toLocaleDateString("pt-BR", { month: "long", year: "numeric" })}
             </p>
           )}
+        </div>
+
+        <Separator />
+
+        {/* Configurações de Alertas */}
+        <div className="rounded-lg border bg-muted/30 p-4 space-y-4">
+          <h3 className="text-sm font-semibold flex items-center gap-2">
+            <Bell className="h-4 w-4 text-primary" />
+            Alertas de Monitoramento (WhatsApp)
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="alert-disconnect" className="text-xs font-medium cursor-pointer">Desconexão (&gt;5min)</Label>
+                <Switch 
+                  id="alert-disconnect"
+                  checked={customer.alert_on_disconnect} 
+                  onCheckedChange={(val) => updateCustomer({ alert_on_disconnect: val })}
+                />
+              </div>
+              <p className="text-[10px] text-muted-foreground leading-tight">
+                Avisa quando o cliente fica off-line por mais de 5 minutos.
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="alert-drops" className="text-xs font-medium cursor-pointer">Quedas Frequentes</Label>
+                <Switch 
+                  id="alert-drops"
+                  checked={customer.alert_on_frequent_drops} 
+                  onCheckedChange={(val) => updateCustomer({ alert_on_frequent_drops: val })}
+                />
+              </div>
+              <p className="text-[10px] text-muted-foreground leading-tight">
+                Avisa se houver 3 ou mais reconexões em 1 hora (instabilidade).
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="alert-usage" className="text-xs font-medium cursor-pointer">Consumo Anormal</Label>
+                <Switch 
+                  id="alert-usage"
+                  checked={customer.alert_on_abnormal_usage} 
+                  onCheckedChange={(val) => updateCustomer({ alert_on_abnormal_usage: val })}
+                />
+              </div>
+              <p className="text-[10px] text-muted-foreground leading-tight">
+                Avisa se o consumo exceder 500MB em 15 minutos (uso extremo).
+              </p>
+            </div>
+          </div>
         </div>
 
         <Separator />
