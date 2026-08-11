@@ -34,7 +34,7 @@ export default function MikrotikPage() {
       if (data?.online) toast.success(data.message || "Mikrotik online");
       else toast.error(data?.message || "Mikrotik offline");
     } catch (err: any) {
-      setStatus({ online: false, message: err?.message || "Erro ao verificar Mikrotik" });
+      setStatus({ online: false, message: "Host alcançável, mas a API REST não respondeu. Veja o tutorial para habilitar (/ip service enable www) e liberar a porta no firewall." });
       toast.error("Erro ao verificar Mikrotik");
     } finally {
       setLoading(false);
