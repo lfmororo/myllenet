@@ -108,8 +108,40 @@ Deno.serve(async (req) => {
         if (currentDisabled !== isBlocked) {
           await restCall(base, `/ppp/secret/${currentSecret['.id']}`, auth, 'PATCH', secretData)
           changed = true;
+      }
+    }
+
+    // 4. Send pending block alerts
+    const { data: pendingAlerts } = await supabase
+      .from('block_alerts_sent' as any)
+      .select('*, customers(nome, telefone)')
+      .is('processed' as any, null);
+
+    if (pendingAlerts && pendingAlerts.length > 0) {
+      for (const alert of pendingAlerts) {
+        const customer = alert.customers;
+        if (customer?.telefone) {
+          const message = alert.new_status === 'blocked' 
+            ? `⚠️ *Aviso de Bloqueio:* Olá ${customer.nome}, identificamos uma fatura com mais de 15 dias de atraso e seu sinal foi suspenso automaticamente. Regularize para restabelecer a conexão.`
+            : `✅ *Sinal Liberado:* Olá ${customer.nome}, seu pagamento foi identificado e seu sinal já foi liberado no sistema. Obrigado!`;
+          
+          try {
+            await supabase.functions.invoke('whatsapp-send', {
+              body: {
+                phone: customer.telefone,
+                message,
+                customer_id: alert.customer_id,
+                customer_name: customer.nome,
+                type: 'block_alert'
+              }
+            });
+            await supabase.from('block_alerts_sent' as any).update({ processed: true } as any).eq('id', alert.id);
+          } catch (e) {
+            console.error('Error sending block alert WhatsApp:', e);
+          }
         }
       }
+    }
       
       // If status changed on Mikrotik (or just ensuring sync), and it's a block event, kick session
       if (isBlocked && changed) {
