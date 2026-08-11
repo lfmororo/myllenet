@@ -59,6 +59,7 @@ export default function CustomerTable({ customers, onEdit, onDelete, onToggleAct
               <TableHead className="font-semibold">Usuário PPPoE</TableHead>
               <TableHead className="font-semibold">Senha PPPoE</TableHead>
               {customerIdsWithInvoice && <TableHead className="font-semibold text-center">Boleto</TableHead>}
+              <TableHead className="font-semibold text-center">Status Bloqueio</TableHead>
               <TableHead className="font-semibold text-center">Status</TableHead>
               <TableHead className="font-semibold text-right">Ações</TableHead>
             </TableRow>
