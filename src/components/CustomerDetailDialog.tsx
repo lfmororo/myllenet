@@ -74,11 +74,33 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
       fetchInvoices();
       fetchLogs();
       setPagoAte(customer.pago_ate || "");
+
+      // Escutar mudanças em tempo real na tabela de logs para este cliente
+      const channel = supabase
+        .channel(`pppoe_logs_${customer.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'pppoe_logs',
+            filter: `customer_id=eq.${customer.id}`
+          },
+          (payload) => {
+            setLogs((prev) => [payload.new, ...prev].slice(0, 100));
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
     } else {
       setInvoices([]);
       setPagoAte("");
+      setLogs([]);
     }
-  }, [open, customer, fetchInvoices]);
+  }, [open, customer, fetchInvoices, fetchLogs]);
 
   const handleSavePagoAte = async () => {
     if (!customer) return;
