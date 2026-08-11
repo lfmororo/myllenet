@@ -209,7 +209,7 @@ export default function MikrotikPage() {
                 <Tooltip />
                 <Legend />
                 {Object.keys(wanLogs[0] || {}).filter(k => k !== 'time').map((iface, index) => (
-                  <Line key={iface} type="monotone" dataKey={iface} name={iface} stroke={`hsl(var(--primary))`} strokeWidth={2} dot={false} />
+                  <Line key={iface} type="monotone" dataKey={iface} name={iface} stroke={["hsl(var(--primary))", "hsl(var(--accent))", "hsl(var(--warning))", "hsl(var(--destructive))"][index % 4]} strokeWidth={2} dot={false} />
                 ))}
               </LineChart>
             </ResponsiveContainer>
