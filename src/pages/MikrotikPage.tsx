@@ -164,7 +164,7 @@ export default function MikrotikPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-6 md:grid-cols-4">
         <Card className={`border-l-4 ${status?.online ? "border-l-success" : "border-l-destructive"}`}>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">Status do IP Externo</CardTitle>
