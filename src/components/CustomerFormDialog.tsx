@@ -110,6 +110,35 @@ export default function CustomerFormDialog({ open, onOpenChange, customer, onSav
     if (success) onOpenChange(false);
   };
 
+  const handleSaveAndSend = async () => {
+    if (!customer || !onUpdate) return;
+    if (cpfClean.length !== 11 || !isValidCPF(cpfClean)) {
+      toast.error("CPF inválido. Verifique os dígitos.");
+      return;
+    }
+    setSendingMikrotik(true);
+    try {
+      const phoneDigits = form.telefone ? form.telefone.replace(/\D/g, "") : "";
+      const ok = await onUpdate(customer.id, { ...form, cpf: cpfClean, telefone: phoneDigits || null });
+      if (!ok) return;
+      const { data, error } = await supabase.functions.invoke("mikrotik-customer", {
+        body: { customer_id: customer.id, action: "sync" },
+      });
+      if (error) throw error;
+      if (data?.success) {
+        toast.success(data.message || "Enviado ao Mikrotik");
+        onOpenChange(false);
+      } else {
+        toast.error(data?.error || "Falha ao enviar ao Mikrotik");
+      }
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao comunicar com o Mikrotik");
+    } finally {
+      setSendingMikrotik(false);
+    }
+  };
+
+
   const activePlans = plans.filter(p => p.ativo);
 
   return (
