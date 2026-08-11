@@ -251,8 +251,19 @@ export default function CustomersPage() {
         </div>
       </div>
 
-      <div className="flex items-center gap-4 text-sm text-muted-foreground">
-        <span>{displayedCustomers.length} cliente{displayedCustomers.length !== 1 ? "s" : ""}{filterNoBoleto ? " sem boleto" : " cadastrado" + (displayedCustomers.length !== 1 ? "s" : "")}</span>
+      <div className="flex flex-wrap items-center gap-4 text-sm">
+        <span className="text-muted-foreground">{displayedCustomers.length} cliente{displayedCustomers.length !== 1 ? "s" : ""}{filterNoBoleto ? " sem boleto" : " cadastrado" + (displayedCustomers.length !== 1 ? "s" : "")}</span>
+        <div className="h-4 w-px bg-border hidden sm:block" />
+        <div className="flex items-center gap-3">
+          <span className="flex items-center gap-1.5 font-medium text-green-600 dark:text-green-500">
+            <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+            {customers.filter(c => onlineUsers.includes(c.usuario_pppoe)).length} On-line
+          </span>
+          <span className="flex items-center gap-1.5 font-medium text-muted-foreground">
+            <div className="h-2 w-2 rounded-full bg-gray-300" />
+            {customers.filter(c => c.ativo && !onlineUsers.includes(c.usuario_pppoe)).length} Off-line
+          </span>
+        </div>
       </div>
 
       {loading ? (
