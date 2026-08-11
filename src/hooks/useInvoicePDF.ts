@@ -142,27 +142,29 @@ export function useInvoicePDF() {
       currentY += 20;
 
       // 4. Financial Highlight Box
-      const boxWidth = 60;
+      const boxWidth = 65;
       const boxX = pageWidth - 20 - boxWidth;
       
       doc.setFillColor(bgColor[0], bgColor[1], bgColor[2]);
-      doc.rect(boxX, currentY, boxWidth, 25, "F");
+      doc.rect(boxX, currentY, boxWidth, 28, "F");
       doc.setDrawColor(accentColor[0], accentColor[1], accentColor[2]);
-      doc.setLineWidth(0.5);
-      doc.line(boxX + boxWidth, currentY, boxX + boxWidth, currentY + 25);
+      doc.setLineWidth(1);
+      doc.line(boxX + boxWidth, currentY, boxX + boxWidth, currentY + 28);
 
       doc.setTextColor(lightTextColor[0], lightTextColor[1], lightTextColor[2]);
-      doc.setFontSize(8);
-      doc.text("VALOR TOTAL", boxX + 5, currentY + 8);
-      doc.text("VENCIMENTO", boxX + 5, currentY + 18);
+      doc.setFontSize(7.5);
+      doc.setFont("helvetica", "bold");
+      doc.text("TOTAL A PAGAR", boxX + 5, currentY + 9);
+      doc.text("VENCIMENTO", boxX + 5, currentY + 20);
 
       doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-      doc.setFontSize(12);
+      doc.setFontSize(14);
       doc.setFont("helvetica", "bold");
-      doc.text(totalValue, boxX + boxWidth - 5, currentY + 8, { align: "right" });
+      doc.text(totalValue, boxX + boxWidth - 5, currentY + 11, { align: "right" });
       
       const dueDate = new Date(invoice.vencimento + "T12:00:00").toLocaleDateString("pt-BR");
-      doc.text(dueDate, boxX + boxWidth - 5, currentY + 18, { align: "right" });
+      doc.setFontSize(11);
+      doc.text(dueDate, boxX + boxWidth - 5, currentY + 22, { align: "right" });
 
       currentY += 40;
 
