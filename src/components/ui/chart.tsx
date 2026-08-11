@@ -100,7 +100,7 @@ const ChartTooltipContent = React.forwardRef<
       labelKey?: string;
     }
 >(
-  (props, ref) => {
+  (props: any, ref) => {
     const {
       active,
       payload,
