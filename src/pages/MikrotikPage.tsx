@@ -190,8 +190,16 @@ export default function MikrotikPage() {
                     {w.running ? <Wifi className="h-3 w-3 text-success" /> : <WifiOff className="h-3 w-3 text-destructive" />}
                     {w.name}
                   </span>
-                  <span className="text-muted-foreground">
-                    {((w.rx_bps + w.tx_bps) / 1_000_000).toFixed(1)} Mbps
+                  <span className="flex items-center gap-2 text-muted-foreground">
+                    <span className="flex items-center gap-0.5 text-primary">
+                      <ArrowDownCircle className="h-3 w-3" />
+                      {((w.rx_bps ?? 0) / 1_000_000).toFixed(1)}
+                    </span>
+                    <span className="flex items-center gap-0.5 text-accent">
+                      <ArrowUpCircle className="h-3 w-3" />
+                      {((w.tx_bps ?? 0) / 1_000_000).toFixed(1)}
+                    </span>
+                    <span>Mbps</span>
                   </span>
                 </div>
               ))}
@@ -199,6 +207,7 @@ export default function MikrotikPage() {
                 <p className="text-xs text-muted-foreground">Nenhuma interface WAN detectada</p>
               )}
             </div>
+
           </CardContent>
         </Card>
       </div>
