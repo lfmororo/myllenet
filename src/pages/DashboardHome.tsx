@@ -12,8 +12,20 @@ export default function DashboardHome() {
   const { allInvoices } = useInvoices();
   const { plans } = usePlans();
 
-  // Integração Mikrotik pendente de configuração — sem chamada ao roteador legado
-  const [routerStatus] = useState<"loading" | "online" | "offline">("offline");
+  const [routerStatus, setRouterStatus] = useState<"loading" | "online" | "offline">("loading");
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke("mikrotik-status");
+        if (!cancelled) setRouterStatus(!error && data?.online ? "online" : "offline");
+      } catch {
+        if (!cancelled) setRouterStatus("offline");
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const stats = useMemo(() => {
     const activeCustomers = customers.filter(c => c.ativo).length;
