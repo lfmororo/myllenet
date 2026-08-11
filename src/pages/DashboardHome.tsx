@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { useCustomers } from "@/hooks/useCustomers";
 import { useInvoices } from "@/hooks/useInvoices";
 import { usePlans } from "@/hooks/usePlans";
