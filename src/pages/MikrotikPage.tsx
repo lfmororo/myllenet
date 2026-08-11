@@ -217,8 +217,9 @@ export default function MikrotikPage() {
           <div>
             <CardTitle className="text-base">Monitoramento de Tráfego WAN</CardTitle>
             <CardDescription>
-              Download (↓) e Upload (↑) por interface em Mbps — {live ? "atualizando a cada 10s" : "atualização pausada"}
+              Linha cheia = Download (↓) · linha tracejada = Upload (↑) · valores em Mb/s — {live ? "atualizando a cada 10s" : "atualização pausada"}
             </CardDescription>
+
 
           </div>
           <Activity className="h-4 w-4 text-muted-foreground" />
