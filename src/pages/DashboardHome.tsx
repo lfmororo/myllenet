@@ -155,6 +155,28 @@ export default function DashboardHome() {
             <p className="text-xs text-muted-foreground">Monitoramento Mikrotik</p>
           </CardContent>
         </Card>
+        {/* PPPoE Online */}
+        <Card className="border-l-4 border-l-accent">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Clientes On-line</CardTitle>
+            <div className="rounded-lg bg-accent/10 p-2">
+              {routerStatus === "loading" ? (
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              ) : (
+                <Router className="h-4 w-4 text-accent" />
+              )}
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {routerStatus === "loading" ? "..." : onlineUsers !== null ? onlineUsers : "—"}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {onlineUsers !== null ? "Autenticados no PPPoE" : "Habilite a API REST no Mikrotik"}
+            </p>
+          </CardContent>
+        </Card>
+
         <Card className="border-l-4 border-l-primary">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Clientes Ativos</CardTitle>
