@@ -163,7 +163,7 @@ Deno.serve(async (req) => {
       const nome = customer.nome.split(" ")[0];
       const message = `Olá ${nome}! 🌐
 
-⚠️ *AVISO IMPORTANTE da Myllenet*
+⚠️ *AVISO IMPORTANTE da Mororo.Tech*
 
 Sua fatura está com *${DAYS_OVERDUE_THRESHOLD} dias de atraso*:
 
@@ -175,7 +175,7 @@ Sua fatura está com *${DAYS_OVERDUE_THRESHOLD} dias de atraso*:
 
 Regularize agora para evitar a suspensão do serviço!
 
-_Equipe Myllenet_`;
+_Equipe Mororo.Tech_`;
 
       try {
         const fullMessage = message + BOT_DISCLAIMER;
