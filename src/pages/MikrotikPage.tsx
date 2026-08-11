@@ -313,62 +313,54 @@ export default function MikrotikPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <BookOpen className="h-5 w-5 text-primary" />
-            Guia: Criação de Hotspot com Autenticação Personalizada no MikroTik
+            Guia: Otimização e Monitoramento Mikrotik
           </CardTitle>
-          <CardDescription>Configuração avançada para interfaces LAN</CardDescription>
+          <CardDescription>Estratégias para performance e estabilidade</CardDescription>
         </CardHeader>
         <CardContent className="prose prose-sm dark:prose-invert max-w-none">
           <div className="space-y-4 text-sm leading-relaxed">
-            <p><strong>Objetivo:</strong> Configurar um hotspot no MikroTik que direcione usuários conectados à interface LAN (com IPs locais) para uma página de autenticação personalizada, enquanto usuários conectados via PPPoE não sejam afetados por esta configuração.</p>
+            <p><strong>Objetivo:</strong> Otimizar a conexão com o Mikrotik e aprimorar os sistemas de monitoramento.</p>
 
             <h4 className="text-base font-semibold border-b pb-1">Funcionalidades</h4>
-            <ul className="list-disc pl-5 space-y-1">
-              <li><strong>Detecção de Conexão:</strong> Identificar clientes que estão conectados à rede local (LAN) e não através de uma conexão PPPoE.</li>
-              <li><strong>Redirecionamento para Hotspot:</strong> Encaminhar automaticamente os clientes detectados para a página de autenticação do hotspot.</li>
-              <li><strong>Página de Autenticação Personalizada:</strong> Implementar uma página de login customizada para o hotspot.</li>
-              <li><strong>Autenticação:</strong> Permitir a autenticação dos usuários através da página personalizada.</li>
-              <li><strong>Exclusão de PPPoE:</strong> Garantir que clientes autenticados via PPPoE não passem pelo processo de autenticação do hotspot.</li>
-            </ul>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <h5 className="font-bold flex items-center gap-2 mb-2">
+                  <Router className="h-4 w-4 text-primary" /> Conexão Mikrotik
+                </h5>
+                <ul className="list-disc pl-5 space-y-1">
+                  <li>Identificar e resolver gargalos na conexão atual.</li>
+                  <li>Implementar configurações de rede mais eficientes (ex: QoS, balanceamento de carga).</li>
+                  <li>Garantir estabilidade e baixa latência.</li>
+                </ul>
+              </div>
+              <div>
+                <h5 className="font-bold flex items-center gap-2 mb-2">
+                  <Activity className="h-4 w-4 text-primary" /> Monitoramento
+                </h5>
+                <ul className="list-disc pl-5 space-y-1">
+                  <li>Configurar ferramentas de monitoramento para coletar dados relevantes (uso de CPU, memória, tráfego de rede, status de interfaces).</li>
+                  <li>Estabelecer alertas para condições anormais.</li>
+                  <li>Criar dashboards visuais para fácil acompanhamento.</li>
+                </ul>
+              </div>
+            </div>
 
             <h4 className="text-base font-semibold border-b pb-1">Requisitos Técnicos</h4>
             <ul className="list-disc pl-5 space-y-1">
-              <li>Acesso administrativo ao MikroTik RouterOS.</li>
-              <li>Conhecimento básico de configuração de redes, DHCP, NAT e Hotspot no MikroTik.</li>
-              <li>Arquivos da página de autenticação personalizada (HTML, CSS, JavaScript, imagens).</li>
+              <li>Acesso administrativo ao Mikrotik.</li>
+              <li>Conhecimento em protocolos de rede (TCP/IP, SNMP).</li>
+              <li>Familiaridade com ferramentas de monitoramento (ex: Zabbix, Nagios, Prometheus, Grafana).</li>
             </ul>
 
             <h4 className="text-base font-semibold border-b pb-1">Passos Necessários</h4>
             <ol className="list-decimal pl-5 space-y-2">
-              <li><strong>Configurar a Interface LAN:</strong> Garantir que a interface LAN esteja configurada com um servidor DHCP para atribuição de IPs aos clientes.</li>
-              <li><strong>Criar o Perfil do Hotspot:</strong> Definir um perfil de hotspot com as configurações básicas.</li>
-              <li><strong>Configurar o Servidor Hotspot:</strong>
-                <ul className="list-circle pl-5 mt-1">
-                  <li>Associar o servidor hotspot à interface LAN.</li>
-                  <li>Definir o nome do domínio do hotspot.</li>
-                  <li>Configurar o servidor DNS.</li>
-                </ul>
-              </li>
-              <li><strong>Implementar a Página de Autenticação Personalizada:</strong>
-                <ul className="list-circle pl-5 mt-1">
-                  <li>Fazer upload dos arquivos da página personalizada para o servidor web do MikroTik (geralmente na pasta <code>flash/hotspot</code>).</li>
-                  <li>Configurar o servidor hotspot para usar os arquivos da página personalizada.</li>
-                </ul>
-              </li>
-              <li><strong>Criar Perfis de Usuário e Contas (Opcional):</strong> Se necessário, criar perfis de usuário com diferentes limites de banda ou tempo de acesso e contas de teste.</li>
-              <li><strong>Configurar Regras de Firewall/NAT:</strong>
-                <ul className="list-circle pl-5 mt-1">
-                  <li>Garantir que o tráfego dos clientes não autenticados na LAN seja redirecionado para o servidor hotspot.</li>
-                  <li>Criar regras para permitir o acesso à página de autenticação antes da autenticação.</li>
-                  <li>Criar regras para permitir o acesso a sites essenciais (como servidores DNS, NTP) antes da autenticação.</li>
-                </ul>
-              </li>
-              <li><strong>Testar a Configuração:</strong>
-                <ul className="list-circle pl-5 mt-1">
-                  <li>Conectar um dispositivo à LAN sem autenticação PPPoE e verificar o redirecionamento para a página personalizada.</li>
-                  <li>Realizar a autenticação e verificar o acesso à internet.</li>
-                  <li>Conectar um dispositivo via PPPoE e verificar se ele não é afetado pelo hotspot.</li>
-                </ul>
-              </li>
+              <li>Analisar a configuração atual do Mikrotik.</li>
+              <li>Realizar testes de conectividade e performance.</li>
+              <li>Implementar as otimizações de rede.</li>
+              <li>Selecionar e configurar as ferramentas de monitoramento.</li>
+              <li>Definir métricas e criar alertas.</li>
+              <li>Desenvolver dashboards.</li>
+              <li>Testar e validar as melhorias.</li>
             </ol>
           </div>
         </CardContent>
