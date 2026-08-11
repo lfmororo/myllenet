@@ -548,6 +548,36 @@ export type Database = {
         }
         Relationships: []
       }
+      wan_logs: {
+        Row: {
+          created_at: string
+          id: string
+          interface_name: string
+          rx_bps: number
+          rx_bytes: number | null
+          tx_bps: number
+          tx_bytes: number | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          interface_name: string
+          rx_bps?: number
+          rx_bytes?: number | null
+          tx_bps?: number
+          tx_bytes?: number | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          interface_name?: string
+          rx_bps?: number
+          rx_bytes?: number | null
+          tx_bps?: number
+          tx_bytes?: number | null
+        }
+        Relationships: []
+      }
       wan_status_history: {
         Row: {
           created_at: string | null

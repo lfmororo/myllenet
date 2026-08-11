@@ -34,7 +34,7 @@ export default function MikrotikPage() {
       if (data?.online) toast.success(data.message || "Mikrotik online");
       else toast.error(data?.message || "Mikrotik offline");
     } catch (err: any) {
-      setStatus({ online: false, message: "Host alcançável, mas a API REST não respondeu. Veja o tutorial para habilitar (/ip service enable www) e liberar a porta no firewall." });
+      setStatus({ online: false, message: err?.message || "Erro ao verificar Mikrotik" });
       toast.error("Erro ao verificar Mikrotik");
     } finally {
       setLoading(false);
@@ -158,14 +158,30 @@ export default function MikrotikPage() {
         </Card>
         <Card className="border-l-4 border-l-warning">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Situação das WANs</CardTitle>
+            <CardTitle className="text-sm font-medium">WANs Ativas</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-2">
               <Activity className="h-5 w-5 text-warning" />
               <span className="text-2xl font-bold">
-                Offline
+                {loading ? "..." : `${(status?.wans ?? []).filter((w: any) => w.running).length}/${(status?.wans ?? []).length || 0}`}
               </span>
+            </div>
+            <div className="mt-2 space-y-1">
+              {(status?.wans ?? []).map((w: any) => (
+                <div key={w.name} className="flex items-center justify-between text-xs">
+                  <span className="flex items-center gap-1">
+                    {w.running ? <Wifi className="h-3 w-3 text-success" /> : <WifiOff className="h-3 w-3 text-destructive" />}
+                    {w.name}
+                  </span>
+                  <span className="text-muted-foreground">
+                    {((w.rx_bps + w.tx_bps) / 1_000_000).toFixed(1)} Mbps
+                  </span>
+                </div>
+              ))}
+              {(!status?.wans || status.wans.length === 0) && (
+                <p className="text-xs text-muted-foreground">Nenhuma interface WAN detectada</p>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -193,7 +209,7 @@ export default function MikrotikPage() {
                 <Tooltip />
                 <Legend />
                 {Object.keys(wanLogs[0] || {}).filter(k => k !== 'time').map((iface, index) => (
-                  <Line key={iface} type="monotone" dataKey={iface} name={iface} stroke={`hsl(var(--primary))`} strokeWidth={2} dot={false} />
+                  <Line key={iface} type="monotone" dataKey={iface} name={iface} stroke={["hsl(var(--primary))", "hsl(var(--accent))", "hsl(var(--warning))", "hsl(var(--destructive))"][index % 4]} strokeWidth={2} dot={false} />
                 ))}
               </LineChart>
             </ResponsiveContainer>
