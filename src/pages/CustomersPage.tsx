@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useCustomers } from "@/hooks/useCustomers";
 import { useInvoices } from "@/hooks/useInvoices";
@@ -34,21 +34,22 @@ export default function CustomersPage() {
   const [connectionFilter, setConnectionFilter] = useState<string>("all");
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
 
-  useEffect(() => {
-    const fetchStatus = async () => {
-      try {
-        const { data, error } = await supabase.functions.invoke("mikrotik-status");
-        if (!error && data?.activeList) {
-          setOnlineUsers(data.activeList.map((u: any) => u.name));
-        }
-      } catch (err) {
-        console.error("Error fetching Mikrotik status:", err);
+  const fetchStatus = useCallback(async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke("mikrotik-status");
+      if (!error && data?.activeList) {
+        setOnlineUsers(data.activeList.map((u: any) => u.name));
       }
-    };
+    } catch (err) {
+      console.error("Error fetching Mikrotik status:", err);
+    }
+  }, []);
+
+  useEffect(() => {
     fetchStatus();
     const interval = setInterval(fetchStatus, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [fetchStatus]);
 
   const customerIdsWithInvoiceThisMonth = useMemo(() => {
     const now = new Date();
@@ -216,6 +217,19 @@ export default function CustomersPage() {
           </Select>
         </div>
         <div className="flex gap-2 w-full sm:w-auto">
+          <Button 
+            variant="outline" 
+            size="icon" 
+            onClick={() => {
+              fetchStatus();
+              refetchCustomers();
+              toast.info("Atualizando dados...");
+            }}
+            className="shrink-0"
+            title="Atualizar agora"
+          >
+            <Loader2 className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+          </Button>
           <Button variant="outline" onClick={exportCSV} className="flex-1 sm:flex-none">
             <Download className="mr-2 h-4 w-4" /> Exportar CSV
           </Button>
