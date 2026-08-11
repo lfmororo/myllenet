@@ -40,18 +40,18 @@ Deno.serve(async (req) => {
       return json({ success: false, error: 'Parâmetros inválidos (customer_id, action)' }, 400)
     }
 
-    // Authenticate the caller and require admin role
-    const authHeader = req.headers.get('Authorization') || ''
-    const anonClient = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
-      global: { headers: { Authorization: authHeader } },
-    })
-    const { data: userData } = await anonClient.auth.getUser()
-    const user = userData?.user
-    if (!user) return json({ success: false, error: 'Não autenticado' }, 401)
-
     const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
+
+    // Authenticate the caller (validate the JWT with the service client) and require admin role
+    const token = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '')
+    if (!token) return json({ success: false, error: 'Não autenticado' }, 401)
+    const { data: userData, error: authError } = await supabase.auth.getUser(token)
+    const user = userData?.user
+    if (authError || !user) return json({ success: false, error: 'Não autenticado' }, 401)
+
     const { data: isAdmin } = await supabase.rpc('has_role', { _user_id: user.id, _role: 'admin' })
     if (!isAdmin) return json({ success: false, error: 'Acesso restrito a administradores' }, 403)
+
 
     const { data: settings } = await supabase
       .from('settings')
