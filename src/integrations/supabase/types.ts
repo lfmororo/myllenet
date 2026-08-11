@@ -509,6 +509,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_abnormal_usage: {
+        Args: { bytes_threshold: number }
+        Returns: {
+          customer_id: string
+          total_bytes: number
+        }[]
+      }
+      check_frequent_drops: {
+        Args: { drop_count: number; time_threshold: string }
+        Returns: {
+          count: number
+          customer_id: string
+        }[]
+      }
       get_recent_disconnections: {
         Args: { since_time: string }
         Returns: {
