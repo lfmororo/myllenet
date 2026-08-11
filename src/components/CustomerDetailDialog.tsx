@@ -43,6 +43,29 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
   const [loadingBlockHistory, setLoadingBlockHistory] = useState(false);
   const [hasMoreLogs, setHasMoreLogs] = useState(true);
   const [unlocking, setUnlocking] = useState(false);
+  const [mikrotikAction, setMikrotikAction] = useState<string | null>(null);
+
+  const runMikrotikAction = async (action: "sync" | "enable" | "disable" | "remove") => {
+    if (!customer) return;
+    setMikrotikAction(action);
+    try {
+      const { data, error } = await supabase.functions.invoke("mikrotik-customer", {
+        body: { customer_id: customer.id, action },
+      });
+      if (error) throw error;
+      if (data?.success) {
+        toast.success(data.message || "Ação executada no Mikrotik");
+        onCustomerUpdated?.();
+      } else {
+        toast.error(data?.error || "Falha ao executar ação no Mikrotik");
+      }
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao comunicar com o Mikrotik");
+    } finally {
+      setMikrotikAction(null);
+    }
+  };
+
 
   const fetchLogs = useCallback(async (isLoadMore = false) => {
     if (!customer) return;
