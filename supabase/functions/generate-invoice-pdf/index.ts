@@ -101,7 +101,7 @@ Deno.serve(async (req) => {
     const { data: settings } = await supabase
       .from("settings")
       .select("key, value")
-      .in("key", ["pix_key", "pix_name", "pix_city"]);
+      .in("key", ["pix_key", "pix_name", "pix_city", "company_cnpj", "company_phone"]);
 
     const pixSettings = Object.fromEntries(settings?.map(s => [s.key, s.value]) || []);
     const pixPayload = generatePixPayload(
