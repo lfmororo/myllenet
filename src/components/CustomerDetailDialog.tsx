@@ -314,23 +314,37 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
                 <History className="h-4 w-4 text-primary" />
                 Histórico de Conexões
               </h3>
-              <div className="space-y-2 max-h-[150px] overflow-y-auto pr-2 custom-scrollbar">
-                {loadingLogs ? (
-                  <div className="flex justify-center py-4"><Loader2 className="h-4 w-4 animate-spin" /></div>
-                ) : logs.length > 0 ? (
-                  logs.filter(l => l.event_type === 'connected' || l.event_type === 'disconnected' || (l.event_type === 'stats' && l.uptime)).slice(0, 10).map((log, idx) => (
-                    <div key={idx} className="flex items-center justify-between text-[11px] border-b border-muted py-1.5 last:border-0">
-                      <div className="flex flex-col">
-                        <span className="font-medium text-muted-foreground">
-                          {new Date(log.logged_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                        <span className="text-[10px] text-green-600">Online: {log.uptime}</span>
+              <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                {logs.length > 0 ? (
+                  <>
+                    {logs.filter(l => l.event_type === 'connected' || l.event_type === 'disconnected' || (l.event_type === 'stats' && l.uptime)).map((log, idx) => (
+                      <div key={idx} className="flex items-center justify-between text-[11px] border-b border-muted py-1.5 last:border-0">
+                        <div className="flex flex-col">
+                          <span className="font-medium text-muted-foreground">
+                            {new Date(log.logged_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                          <span className="text-[10px] text-green-600">Online: {log.uptime}</span>
+                        </div>
+                        <Badge variant="outline" className="text-[9px] h-4 px-1">
+                          {log.ip_address}
+                        </Badge>
                       </div>
-                      <Badge variant="outline" className="text-[9px] h-4 px-1">
-                        {log.ip_address}
-                      </Badge>
-                    </div>
-                  ))
+                    ))}
+                    {hasMoreLogs && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="w-full text-[10px] h-8 mt-2" 
+                        onClick={() => fetchLogs(true)}
+                        disabled={loadingLogs}
+                      >
+                        {loadingLogs ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                        Carregar mais histórico
+                      </Button>
+                    )}
+                  </>
+                ) : loadingLogs ? (
+                  <div className="flex justify-center py-4"><Loader2 className="h-4 w-4 animate-spin" /></div>
                 ) : (
                   <div className="text-xs text-muted-foreground italic py-2">Sem histórico disponível.</div>
                 )}
