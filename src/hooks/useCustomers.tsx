@@ -26,6 +26,7 @@ export interface Customer {
   alert_on_disconnect: boolean;
   alert_on_frequent_drops: boolean;
   alert_on_abnormal_usage: boolean;
+  block_status: "active" | "blocked";
   created_at: string;
   updated_at: string;
 }
