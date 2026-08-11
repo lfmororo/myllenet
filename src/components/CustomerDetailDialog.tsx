@@ -474,7 +474,7 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
               </div>
               <Switch
                 checked={customer.alert_on_block_change}
-                onCheckedChange={(val) => updateCustomer({ alert_on_block_change: val } as any)}
+                onCheckedChange={(val) => updateCustomer({ alert_on_block_change: val })}
               />
             </div>
           </div>
