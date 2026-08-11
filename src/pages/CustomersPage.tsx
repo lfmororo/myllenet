@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { useCustomers } from "@/hooks/useCustomers";
 import { useInvoices } from "@/hooks/useInvoices";
 import { usePlans } from "@/hooks/usePlans";
@@ -30,6 +31,23 @@ export default function CustomersPage() {
   const [notifyNoBoletoOpen, setNotifyNoBoletoOpen] = useState(false);
   const [bulkGenerating, setBulkGenerating] = useState(false);
   const [customerActiveFilter, setCustomerActiveFilter] = useState<string>("active");
+  const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
+
+  useEffect(() => {
+    const fetchStatus = async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke("mikrotik-status");
+        if (!error && data?.activeList) {
+          setOnlineUsers(data.activeList.map((u: any) => u.name));
+        }
+      } catch (err) {
+        console.error("Error fetching Mikrotik status:", err);
+      }
+    };
+    fetchStatus();
+    const interval = setInterval(fetchStatus, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   const customerIdsWithInvoiceThisMonth = useMemo(() => {
     const now = new Date();
@@ -229,7 +247,7 @@ export default function CustomersPage() {
       {loading ? (
         <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
       ) : (
-        <CustomerTable customers={displayedCustomers} onEdit={handleEdit} onDelete={setDeletingCustomer} onToggleActive={toggleCustomerActive} onDetail={setDetailCustomer} customerIdsWithInvoice={customerIdsWithInvoiceThisMonth} plans={plans} />
+        <CustomerTable customers={displayedCustomers} onEdit={handleEdit} onDelete={setDeletingCustomer} onToggleActive={toggleCustomerActive} onDetail={setDetailCustomer} customerIdsWithInvoice={customerIdsWithInvoiceThisMonth} plans={plans} onlineList={onlineUsers} />
       )}
 
       <CustomerFormDialog open={formOpen} onOpenChange={setFormOpen} customer={editingCustomer} onSave={addCustomer} onUpdate={updateCustomer} plans={plans} />
