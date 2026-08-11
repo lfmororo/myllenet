@@ -170,19 +170,21 @@ export function useInvoicePDF() {
 
       // 5. Payment Area (PIX Focus)
       doc.setDrawColor(226, 232, 240);
+      doc.setLineWidth(0.2);
       doc.line(20, currentY, pageWidth - 20, currentY);
       
       currentY += 10;
-      doc.setFontSize(14);
+      doc.setFontSize(13);
       doc.setTextColor(accentColor[0], accentColor[1], accentColor[2]);
+      doc.setFont("helvetica", "bold");
       doc.text("PAGAMENTO VIA PIX", 20, currentY);
       
-      doc.setFontSize(10);
-      doc.setTextColor(textColor[0], textColor[1], textColor[2]);
+      doc.setFontSize(9);
+      doc.setTextColor(lightTextColor[0], lightTextColor[1], lightTextColor[2]);
       doc.setFont("helvetica", "normal");
-      doc.text("Liberação imediata da conexão após o pagamento.", 20, currentY + 7);
+      doc.text("Pague com PIX e tenha liberação imediata da sua conexão.", 20, currentY + 6);
 
-      currentY += 15;
+      currentY += 12;
       
       // QR Code Box
       try {
