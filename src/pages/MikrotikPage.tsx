@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Download, Loader2, RefreshCw, Router, Wifi, WifiOff, FileCode } from "lucide-react";
+import { Download, Loader2, RefreshCw, Router, Wifi, WifiOff, FileCode, BookOpen } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useCustomers } from "@/hooks/useCustomers";
 import { usePlans } from "@/hooks/usePlans";
