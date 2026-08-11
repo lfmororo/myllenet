@@ -802,6 +802,48 @@ export default function Settings() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+        <TabsContent value="pix" className="mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Configurações PIX Local</CardTitle>
+              <CardDescription>
+                Configure os dados para geração do QR Code PIX nas faturas.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>Chave PIX</Label>
+                <Input value={pixKey} onChange={(e) => setPixKey(e.target.value)} placeholder="CNPJ, E-mail, Celular ou Chave Aleatória" />
+              </div>
+              <div className="space-y-2">
+                <Label>Nome do Beneficiário</Label>
+                <Input value={pixName} onChange={(e) => setPixName(e.target.value)} placeholder="Nome ou Razão Social" />
+              </div>
+              <div className="space-y-2">
+                <Label>Cidade</Label>
+                <Input value={pixCity} onChange={(e) => setPixCity(e.target.value)} placeholder="Cidade do beneficiário" />
+              </div>
+              <Button 
+                onClick={async () => {
+                  setSavingPix(true);
+                  try {
+                    await upsertSetting("pix_key", pixKey);
+                    await upsertSetting("pix_name", pixName);
+                    await upsertSetting("pix_city", pixCity);
+                    toast.success("Configurações PIX salvas!");
+                  } catch (err: any) {
+                    toast.error("Erro ao salvar: " + err.message);
+                  }
+                  setSavingPix(false);
+                }}
+                disabled={savingPix}
+              >
+                {savingPix && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Salvar Configurações PIX
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
       </div>
     </div>
   );
