@@ -4,17 +4,20 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, ExternalLink, Copy, CheckCircle2, Clock, Import, CalendarCheck, X, XCircle } from "lucide-react";
+import { Loader2, ExternalLink, Copy, CheckCircle2, Clock, Import, CalendarCheck, X, XCircle, Activity, History } from "lucide-react";
 import { toast } from "sonner";
 import type { Customer } from "@/hooks/useCustomers";
 import type { Invoice } from "@/hooks/useInvoices";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 
 interface MikrotikSession {
   name: string;
   address?: string;
   uptime?: string;
+  rx_bytes?: number;
+  tx_bytes?: number;
 }
 
 interface Props {
@@ -31,6 +34,22 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
   const [checkingEfi, setCheckingEfi] = useState(false);
   const [pagoAte, setPagoAte] = useState("");
   const [savingPagoAte, setSavingPagoAte] = useState(false);
+  const [logs, setLogs] = useState<any[]>([]);
+  const [loadingLogs, setLoadingLogs] = useState(false);
+
+  const fetchLogs = useCallback(async () => {
+    if (!customer) return;
+    setLoadingLogs(true);
+    const { data, error } = await supabase
+      .from("pppoe_logs")
+      .select("*")
+      .eq("customer_id", customer.id)
+      .order("logged_at", { ascending: false })
+      .limit(100);
+    
+    if (!error) setLogs(data || []);
+    setLoadingLogs(false);
+  }, [customer]);
 
   const fetchInvoices = useCallback(() => {
     if (!customer) return;
@@ -53,6 +72,7 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
   useEffect(() => {
     if (open && customer) {
       fetchInvoices();
+      fetchLogs();
       setPagoAte(customer.pago_ate || "");
     } else {
       setInvoices([]);
@@ -204,6 +224,77 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
                 </div>
               )}
             </div>
+
+            {/* Consumo de Banda (Chart) */}
+            <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+              <h3 className="text-sm font-semibold flex items-center gap-2">
+                <Activity className="h-4 w-4 text-primary" />
+                Consumo de Banda (24h)
+              </h3>
+              
+              <div className="h-[150px] w-full mt-2">
+                {logs.length > 5 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={[...logs].reverse().slice(-24)}>
+                      <defs>
+                        <linearGradient id="colorRx" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#0d9488" stopOpacity={0.3}/>
+                          <stop offset="95%" stopColor="#0d9488" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                      <XAxis 
+                        dataKey="logged_at" 
+                        hide 
+                      />
+                      <YAxis 
+                        tick={{fontSize: 10}} 
+                        tickFormatter={(val) => `${(val / (1024*1024)).toFixed(0)}MB`}
+                      />
+                      <Tooltip 
+                        labelFormatter={(label: any) => new Date(label).toLocaleString('pt-BR')}
+                        formatter={(val: number) => [`${(val / (1024*1024)).toFixed(2)} MB`, 'Download']}
+                      />
+                      <Area type="monotone" dataKey="rx_bytes" stroke="#0d9488" fillOpacity={1} fill="url(#colorRx)" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-full flex items-center justify-center text-xs text-muted-foreground italic">
+                    Dados insuficientes para gerar gráfico.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Histórico de Conexões */}
+            <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+              <h3 className="text-sm font-semibold flex items-center gap-2">
+                <History className="h-4 w-4 text-primary" />
+                Histórico de Conexões
+              </h3>
+              <div className="space-y-2 max-h-[150px] overflow-y-auto pr-2 custom-scrollbar">
+                {loadingLogs ? (
+                  <div className="flex justify-center py-4"><Loader2 className="h-4 w-4 animate-spin" /></div>
+                ) : logs.length > 0 ? (
+                  logs.filter(l => l.event_type === 'connected' || l.event_type === 'disconnected' || (l.event_type === 'stats' && l.uptime)).slice(0, 10).map((log, idx) => (
+                    <div key={idx} className="flex items-center justify-between text-[11px] border-b border-muted py-1.5 last:border-0">
+                      <div className="flex flex-col">
+                        <span className="font-medium text-muted-foreground">
+                          {new Date(log.logged_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                        <span className="text-[10px] text-green-600">Online: {log.uptime}</span>
+                      </div>
+                      <Badge variant="outline" className="text-[9px] h-4 px-1">
+                        {log.ip_address}
+                      </Badge>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-xs text-muted-foreground italic py-2">Sem histórico disponível.</div>
+                )}
+              </div>
+            </div>
+
 
             <div className="grid grid-cols-1 gap-2 text-sm">
               <div><span className="text-muted-foreground">CPF:</span> <span className="font-mono">{formatCPF(customer.cpf)}</span></div>

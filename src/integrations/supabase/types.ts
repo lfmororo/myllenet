@@ -297,6 +297,50 @@ export type Database = {
         }
         Relationships: []
       }
+      pppoe_logs: {
+        Row: {
+          customer_id: string
+          event_type: string
+          id: string
+          ip_address: string | null
+          logged_at: string | null
+          rx_bytes: number | null
+          tx_bytes: number | null
+          uptime: string | null
+          usuario_pppoe: string
+        }
+        Insert: {
+          customer_id: string
+          event_type: string
+          id?: string
+          ip_address?: string | null
+          logged_at?: string | null
+          rx_bytes?: number | null
+          tx_bytes?: number | null
+          uptime?: string | null
+          usuario_pppoe: string
+        }
+        Update: {
+          customer_id?: string
+          event_type?: string
+          id?: string
+          ip_address?: string | null
+          logged_at?: string | null
+          rx_bytes?: number | null
+          tx_bytes?: number | null
+          uptime?: string | null
+          usuario_pppoe?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pppoe_logs_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string

@@ -125,19 +125,28 @@ Deno.serve(async (req) => {
         restPort = winner.port
         uptime = r.uptime ?? null
         version = r.version ?? null
-        const [idty, active] = await Promise.all([
+        const [idty, active, resource] = await Promise.all([
           restCall(winner.base, '/system/identity', auth, 4000),
           restCall(winner.base, '/ppp/active', auth, 5000),
+          restCall(winner.base, '/interface', auth, 5000),
         ])
         identity = (idty.data as Record<string, string> | null)?.name ?? null
+        
+        const interfaces = Array.isArray(resource.data) ? resource.data as any[] : []
+
         if (Array.isArray(active.data)) {
           const list = active.data as Record<string, string>[]
           activeUsers = list.length
-          activeList = list.slice(0, 200).map((a) => ({
-            name: a.name,
-            address: a.address,
-            uptime: a.uptime,
-          }))
+          activeList = list.slice(0, 200).map((a) => {
+            const iface = interfaces.find(i => i.name === `<pppoe-${a.name}>` || i.name.includes(a.name))
+            return {
+              name: a.name,
+              address: a.address,
+              uptime: a.uptime,
+              rx_bytes: iface ? parseInt(iface['rx-byte'] || '0', 10) : 0,
+              tx_bytes: iface ? parseInt(iface['tx-byte'] || '0', 10) : 0,
+            }
+          })
         }
       }
     }
