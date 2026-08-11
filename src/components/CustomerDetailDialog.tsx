@@ -120,20 +120,25 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
     setSavingPagoAte(false);
   };
 
+  const updateCustomer = async (updates: Partial<Customer>) => {
+    if (!customer) return;
+    const { error } = await supabase
+      .from("customers")
+      .update(updates as any)
+      .eq("id", customer.id);
+    if (error) {
+      toast.error("Erro ao atualizar");
+    } else {
+      toast.success("Dados atualizados!");
+      onCustomerUpdated?.();
+    }
+  };
+
   const handleClearPagoAte = async () => {
     if (!customer) return;
     setSavingPagoAte(true);
-    const { error } = await supabase
-      .from("customers")
-      .update({ pago_ate: null } as any)
-      .eq("id", customer.id);
-    if (error) {
-      toast.error("Erro ao limpar");
-    } else {
-      setPagoAte("");
-      toast.success("Pagamento antecipado removido!");
-      onCustomerUpdated?.();
-    }
+    await updateCustomer({ pago_ate: null });
+    setPagoAte("");
     setSavingPagoAte(false);
   };
 
