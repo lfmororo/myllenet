@@ -38,20 +38,33 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
   const [savingPagoAte, setSavingPagoAte] = useState(false);
   const [logs, setLogs] = useState<any[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
+  const [hasMoreLogs, setHasMoreLogs] = useState(true);
 
-  const fetchLogs = useCallback(async () => {
+  const fetchLogs = useCallback(async (isLoadMore = false) => {
     if (!customer) return;
+    if (isLoadMore && !hasMoreLogs) return;
+    
     setLoadingLogs(true);
+    const from = isLoadMore ? logs.length : 0;
+    const to = from + 49;
+
     const { data, error } = await supabase
       .from("pppoe_logs")
       .select("*")
       .eq("customer_id", customer.id)
       .order("logged_at", { ascending: false })
-      .limit(100);
+      .range(from, to);
     
-    if (!error) setLogs(data || []);
+    if (!error && data) {
+      if (isLoadMore) {
+        setLogs(prev => [...prev, ...data]);
+      } else {
+        setLogs(data);
+      }
+      setHasMoreLogs(data.length === 50);
+    }
     setLoadingLogs(false);
-  }, [customer]);
+  }, [customer, logs.length, hasMoreLogs]);
 
   const fetchInvoices = useCallback(() => {
     if (!customer) return;
