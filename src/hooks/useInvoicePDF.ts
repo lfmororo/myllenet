@@ -96,7 +96,10 @@ export function useInvoicePDF() {
 
       // PIX
       doc.setFontSize(12);
+      doc.setTextColor(0);
+      doc.setFont("helvetica", "bold");
       doc.text("PAGAMENTO VIA PIX", 20, startY + 65);
+      
       doc.setFontSize(9);
       doc.setFont("helvetica", "normal");
       doc.text(`Chave PIX: ${pix.key || "Não configurada"}`, 20, startY + 72);
@@ -106,8 +109,19 @@ export function useInvoicePDF() {
       doc.text("PIX Copia e Cola:", 20, startY + 85);
       doc.setFont("helvetica", "normal");
       doc.setFontSize(7);
-      const splitPayload = doc.splitTextToSize(pix.payload, pageWidth - 40);
+      const splitPayload = doc.splitTextToSize(pix.payload, pageWidth - 90);
       doc.text(splitPayload, 20, startY + 90);
+
+      // QR Code
+      try {
+        const qrCodeDataUrl = await QRCode.toDataURL(pix.payload, { margin: 1, width: 200 });
+        doc.addImage(qrCodeDataUrl, "PNG", pageWidth - 65, startY + 60, 45, 45);
+        doc.setFontSize(8);
+        doc.text("Escaneie para pagar", pageWidth - 42.5, startY + 108, { align: "center" });
+      } catch (e) {
+        console.error("Error generating QR Code", e);
+      }
+
 
       // Footer
       doc.setFontSize(8);
