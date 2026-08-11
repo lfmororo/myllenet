@@ -160,7 +160,7 @@ export default function Settings() {
     const { data } = await supabase
       .from("settings")
       .select("key, value")
-      .in("key", ["efi_client_id", "efi_client_secret", "efi_certificate_path", "uazapi_token", "mikrotik_host", "mikrotik_username", "mikrotik_password", "mikrotik_api_port"]);
+      .in("key", ["efi_client_id", "efi_client_secret", "efi_certificate_path", "uazapi_token", "mikrotik_host", "mikrotik_username", "mikrotik_password", "mikrotik_api_port", "mikrotik_rest_port"]);
 
     if (data) {
       for (const row of data) {
@@ -172,8 +172,10 @@ export default function Settings() {
         if (row.key === "mikrotik_username") setMikrotikUser(row.value || "");
         if (row.key === "mikrotik_password") setMikrotikPass(row.value || "");
         if (row.key === "mikrotik_api_port") setMikrotikApiPort(row.value || "8728");
+        if (row.key === "mikrotik_rest_port") setMikrotikRestPort(row.value || "80");
       }
     }
+
     setLoadingSettings(false);
   };
 
