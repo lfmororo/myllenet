@@ -376,6 +376,52 @@ add chain=input protocol=tcp dst-port=80 action=accept comment="API REST Myllene
 
 
 
+      <div className="grid gap-6 md:grid-cols-2">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <div>
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <History className="h-4 w-4 text-primary" />
+                Histórico de Oscilações WAN
+              </CardTitle>
+              <CardDescription>Eventos de queda e reestabelecimento</CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
+              {wanHistory.length > 0 ? (
+                wanHistory.map((event, i) => (
+                  <div key={event.id || i} className="flex items-start gap-3 p-3 rounded-lg border bg-muted/30">
+                    {event.status === 'up' ? (
+                      <ArrowUpCircle className="h-5 w-5 text-success shrink-0 mt-0.5" />
+                    ) : (
+                      <ArrowDownCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+                    )}
+                    <div className="flex-1 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-sm">{event.interface_name}</span>
+                        <span className="text-[10px] text-muted-foreground">
+                          {format(new Date(event.created_at), "dd/MM HH:mm:ss", { locale: ptBR })}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        Status: <span className={event.status === 'up' ? "text-success font-medium" : "text-destructive font-medium"}>
+                          {event.status === 'up' ? "ONLINE" : "OFFLINE"}
+                        </span>
+                        {event.reason && ` • ${event.reason}`}
+                      </p>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="flex flex-col items-center justify-center py-8 text-muted-foreground italic">
+                  <p className="text-sm text-center">Nenhum evento de oscilação registrado.</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
         <Card className="p-8 space-y-4">
           <div className="flex items-center gap-3">
             <div className="bg-primary/10 p-3 rounded-lg">
@@ -412,6 +458,7 @@ add chain=input protocol=tcp dst-port=80 action=accept comment="API REST Myllene
           </div>
         </Card>
       </div>
+
     </div>
   );
 }
