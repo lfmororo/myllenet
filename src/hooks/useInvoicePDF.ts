@@ -24,11 +24,17 @@ export function useInvoicePDF() {
 
       // Logo and Header
       try {
+        const logoUrl = new URL("/src/assets/logo.png", window.location.origin).href;
         const img = new Image();
-        img.src = "/src/assets/logo.png";
+        img.src = logoUrl;
         await new Promise((resolve, reject) => {
           img.onload = resolve;
-          img.onerror = reject;
+          img.onerror = () => {
+            // Try relative path as fallback
+            img.src = "src/assets/logo.png";
+            img.onload = resolve;
+            img.onerror = reject;
+          };
         });
         doc.addImage(img, "PNG", 20, 10, 20, 20);
       } catch (e) {
