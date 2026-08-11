@@ -1,26 +1,48 @@
 import { corsHeaders } from 'https://esm.sh/@supabase/supabase-js@2/cors'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 
-async function restCall(base: string, path: string, auth: string, method = 'GET', body?: any) {
+const START = Date.now()
+const DEADLINE_MS = 100_000 // stay well under the 150s idle limit
+const CONCURRENCY = 10
+
+const timeLeft = () => DEADLINE_MS - (Date.now() - START)
+
+async function restCall(base: string, path: string, auth: string, method = 'GET', body?: any, timeoutMs = 6000) {
   const ac = new AbortController()
-  const t = setTimeout(() => ac.abort(), 8000)
+  const t = setTimeout(() => ac.abort(), timeoutMs)
   try {
     const res = await fetch(`${base}/rest${path}`, {
       method,
-      headers: { 
-        Authorization: `Basic ${auth}`, 
+      headers: {
+        Authorization: `Basic ${auth}`,
         'Content-Type': 'application/json',
-        Connection: 'close' 
+        Connection: 'close',
       },
       body: body ? JSON.stringify(body) : undefined,
       signal: ac.signal,
     })
     return { ok: res.ok, status: res.status, data: await res.json().catch(() => null) }
   } catch (e) {
-    return { ok: false, status: 0, error: (e as Error).message }
+    return { ok: false, status: 0, data: null, error: (e as Error).message }
   } finally {
     clearTimeout(t)
   }
+}
+
+async function runPool<T>(items: T[], worker: (item: T) => Promise<void>) {
+  let i = 0
+  const runners = Array.from({ length: Math.min(CONCURRENCY, items.length) }, async () => {
+    while (i < items.length) {
+      if (timeLeft() < 8000) return
+      const item = items[i++]
+      try {
+        await worker(item)
+      } catch (_e) {
+        // keep going; one bad item must not abort the sync
+      }
+    }
+  })
+  await Promise.all(runners)
 }
 
 Deno.serve(async (req) => {
@@ -32,134 +54,168 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     )
 
-    // 1. Get Mikrotik config
     const { data: settings } = await supabase
       .from('settings')
       .select('key,value')
       .in('key', ['mikrotik_host', 'mikrotik_username', 'mikrotik_password', 'mikrotik_rest_port', 'blocking_days'])
 
     const cfg: any = {}
-    settings?.forEach(s => cfg[s.key] = s.value)
-    
+    settings?.forEach((s) => (cfg[s.key] = s.value))
+
     const host = cfg.mikrotik_host
+    if (!host) {
+      return new Response(JSON.stringify({ success: false, error: 'Mikrotik host não configurado' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
     const user = cfg.mikrotik_username || 'admin'
     const pass = cfg.mikrotik_password || ''
     const port = cfg.mikrotik_rest_port || '80'
     const auth = btoa(`${user}:${pass}`)
     const base = `http://${host}:${port}`
 
-    // 2. Sync Profiles (Plans)
-    const { data: plans } = await supabase.from('plans').select('*')
-    for (const plan of plans || []) {
-      const matches = plan.nome.match(/\d+/)
-      const speed = matches ? matches[0] : '10'
-      const limit = `${speed}M/${speed}M`
-      
-      // Check if profile exists
-      const check = await restCall(base, `/ppp/profile?name=${encodeURIComponent(plan.nome)}`, auth)
-      const exists = Array.isArray(check.data) && check.data.length > 0
+    // Fast reachability probe: bail out immediately if the REST API is down,
+    // instead of burning 6s per customer call.
+    const probe = await restCall(base, '/system/resource', auth, 'GET', undefined, 5000)
+    if (!probe.ok) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'API REST do Mikrotik não respondeu. Habilite com /ip service enable www e libere a porta no firewall.',
+          status: probe.status,
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      )
+    }
 
-      if (!exists) {
+    const stats = { profiles: 0, secrets: 0, updated: 0, kicked: 0, alerts: 0, skipped: 0 }
+
+    // 1. Fetch existing router state once (instead of one query per item)
+    const [profilesRes, secretsRes, activeRes] = await Promise.all([
+      restCall(base, '/ppp/profile', auth),
+      restCall(base, '/ppp/secret', auth, 'GET', undefined, 15000),
+      restCall(base, '/ppp/active', auth, 'GET', undefined, 15000),
+    ])
+
+    const profileMap = new Map<string, any>()
+    if (Array.isArray(profilesRes.data)) profilesRes.data.forEach((p: any) => profileMap.set(p.name, p))
+    const secretMap = new Map<string, any>()
+    if (Array.isArray(secretsRes.data)) secretsRes.data.forEach((s: any) => secretMap.set(s.name, s))
+    const activeMap = new Map<string, any>()
+    if (Array.isArray(activeRes.data)) activeRes.data.forEach((a: any) => activeMap.set(a.name, a))
+
+    // 2. Sync profiles (plans)
+    const { data: plans } = await supabase.from('plans').select('*')
+    await runPool(plans || [], async (plan: any) => {
+      const speed = plan.nome?.match(/\d+/)?.[0] || '10'
+      const limit = `${speed}M/${speed}M`
+      const existing = profileMap.get(plan.nome)
+      if (!existing) {
         await restCall(base, '/ppp/profile', auth, 'PUT', {
           name: plan.nome,
           'local-address': '10.0.0.1',
-          'rate-limit': limit
+          'rate-limit': limit,
         })
-      } else {
-        await restCall(base, `/ppp/profile/${check.data[0]['.id']}`, auth, 'PATCH', {
-          'rate-limit': limit
-        })
+        stats.profiles++
+      } else if (existing['rate-limit'] !== limit) {
+        await restCall(base, `/ppp/profile/${existing['.id']}`, auth, 'PATCH', { 'rate-limit': limit })
+        stats.profiles++
       }
-    }
+    })
 
-    // 3. Sync Customers (Secrets) & Handle Blocking
+    // 3. Sync customers (secrets) and handle blocking
     const { data: customers } = await supabase
       .from('customers')
       .select('*, plans(nome)')
       .not('usuario_pppoe', 'is', null)
 
-    for (const customer of customers || []) {
+    await runPool(customers || [], async (customer: any) => {
       const planName = customer.plans?.nome || 'default'
       const isBlocked = customer.block_status === 'blocked' || !customer.ativo
-      const oldBlockStatus = customer.block_status;
 
-      // Check if block status changed since last sync (optional, but we can detect it here if we track it)
-      // For now, we will trust the database block_status and handle alerts if it changes.
-      
       const secretData = {
         name: customer.usuario_pppoe,
         password: customer.senha_pppoe,
         service: 'pppoe',
         profile: planName,
         disabled: isBlocked ? 'true' : 'false',
-        comment: `ID: ${customer.id} | Status: ${customer.block_status}`
+        comment: `ID: ${customer.id} | Status: ${customer.block_status}`,
       }
 
-      const check = await restCall(base, `/ppp/secret?name=${encodeURIComponent(customer.usuario_pppoe)}`, auth)
-      const exists = Array.isArray(check.data) && check.data.length > 0
-      
-      let changed = false;
-      if (!exists) {
+      const existing = secretMap.get(customer.usuario_pppoe)
+      let changed = false
+
+      if (!existing) {
         await restCall(base, '/ppp/secret', auth, 'PUT', secretData)
-        changed = true;
+        stats.secrets++
+        changed = true
       } else {
-        const currentSecret = check.data[0];
-        const currentDisabled = currentSecret.disabled === 'true';
-        if (currentDisabled !== isBlocked) {
-          await restCall(base, `/ppp/secret/${currentSecret['.id']}`, auth, 'PATCH', secretData)
-          changed = true;
-      }
-    }
-
-    // 4. Send pending block alerts
-    const { data: pendingAlerts } = await supabase
-      .from('block_alerts_sent' as any)
-      .select('*, customers(nome, telefone)')
-      .is('processed' as any, null);
-
-    if (pendingAlerts && pendingAlerts.length > 0) {
-      for (const alert of pendingAlerts) {
-        const customer = alert.customers;
-        if (customer?.telefone) {
-          const blockingDays = cfg.blocking_days || '15';
-          const message = alert.new_status === 'blocked' 
-            ? `⚠️ *Aviso de Bloqueio:* Olá ${customer.nome}, identificamos uma fatura com mais de ${blockingDays} dias de atraso e seu sinal foi suspenso automaticamente. Regularize para restabelecer a conexão.`
-            : `✅ *Sinal Liberado:* Olá ${customer.nome}, seu pagamento foi identificado e seu sinal já foi liberado no sistema. Obrigado!`;
-          
-          try {
-            await supabase.functions.invoke('whatsapp-send', {
-              body: {
-                phone: customer.telefone,
-                message,
-                customer_id: alert.customer_id,
-                customer_name: customer.nome,
-                type: 'block_alert'
-              }
-            });
-            await supabase.from('block_alerts_sent' as any).update({ processed: true } as any).eq('id', alert.id);
-          } catch (e) {
-            console.error('Error sending block alert WhatsApp:', e);
-          }
+        const currentDisabled = existing.disabled === 'true'
+        const profileDiff = existing.profile !== planName
+        const passDiff = customer.senha_pppoe && existing.password !== customer.senha_pppoe
+        if (currentDisabled !== isBlocked || profileDiff || passDiff) {
+          await restCall(base, `/ppp/secret/${existing['.id']}`, auth, 'PATCH', secretData)
+          stats.updated++
+          changed = true
         }
       }
-    }
-      
-      // If status changed on Mikrotik (or just ensuring sync), and it's a block event, kick session
+
+      // Kick live session when the customer was just blocked
       if (isBlocked && changed) {
-        const active = await restCall(base, `/ppp/active?name=${encodeURIComponent(customer.usuario_pppoe)}`, auth)
-        if (Array.isArray(active.data) && active.data.length > 0) {
-          await restCall(base, `/ppp/active/${active.data[0]['.id']}`, auth, 'DELETE')
+        const session = activeMap.get(customer.usuario_pppoe)
+        if (session) {
+          await restCall(base, `/ppp/active/${session['.id']}`, auth, 'DELETE')
+          stats.kicked++
+        }
+      }
+    })
+
+    // 4. Send pending block alerts (independent of the router loop)
+    if (timeLeft() > 15000) {
+      const { data: pendingAlerts } = await supabase
+        .from('block_alerts_sent' as any)
+        .select('*, customers(nome, telefone)')
+        .is('processed' as any, null)
+        .limit(30)
+
+      for (const alert of (pendingAlerts as any[]) || []) {
+        if (timeLeft() < 8000) break
+        const customer = alert.customers
+        if (!customer?.telefone) continue
+        const blockingDays = cfg.blocking_days || '15'
+        const message =
+          alert.new_status === 'blocked'
+            ? `⚠️ *Aviso de Bloqueio:* Olá ${customer.nome}, identificamos uma fatura com mais de ${blockingDays} dias de atraso e seu sinal foi suspenso automaticamente. Regularize para restabelecer a conexão.`
+            : `✅ *Sinal Liberado:* Olá ${customer.nome}, seu pagamento foi identificado e seu sinal já foi liberado no sistema. Obrigado!`
+
+        try {
+          await supabase.functions.invoke('whatsapp-send', {
+            body: {
+              phone: customer.telefone,
+              message,
+              customer_id: alert.customer_id,
+              customer_name: customer.nome,
+              type: 'block_alert',
+            },
+          })
+          await supabase.from('block_alerts_sent' as any).update({ processed: true } as any).eq('id', alert.id)
+          stats.alerts++
+        } catch (e) {
+          console.error('Error sending block alert WhatsApp:', e)
         }
       }
     }
 
-    return new Response(JSON.stringify({ success: true }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    const partial = timeLeft() < 8000
+    return new Response(JSON.stringify({ success: true, partial, elapsed_ms: Date.now() - START, ...stats }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (e) {
-    return new Response(JSON.stringify({ error: (e as Error).message }), {
+    return new Response(JSON.stringify({ success: false, error: (e as Error).message }), {
       status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }
 })
