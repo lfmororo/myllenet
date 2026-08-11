@@ -81,9 +81,11 @@ Deno.serve(async (req) => {
     for (const customer of customers || []) {
       const planName = customer.plans?.nome || 'default'
       const isBlocked = customer.block_status === 'blocked' || !customer.ativo
+      const oldBlockStatus = customer.block_status;
+
+      // Check if block status changed since last sync (optional, but we can detect it here if we track it)
+      // For now, we will trust the database block_status and handle alerts if it changes.
       
-      // In Mikrotik, we can "block" by changing the profile to a 'bloqueado' profile 
-      // or simply disabling the secret. Disabling is more direct for "no signal".
       const secretData = {
         name: customer.usuario_pppoe,
         password: customer.senha_pppoe,
@@ -95,15 +97,22 @@ Deno.serve(async (req) => {
 
       const check = await restCall(base, `/ppp/secret?name=${encodeURIComponent(customer.usuario_pppoe)}`, auth)
       const exists = Array.isArray(check.data) && check.data.length > 0
-
+      
+      let changed = false;
       if (!exists) {
         await restCall(base, '/ppp/secret', auth, 'PUT', secretData)
+        changed = true;
       } else {
-        await restCall(base, `/ppp/secret/${check.data[0]['.id']}`, auth, 'PATCH', secretData)
+        const currentSecret = check.data[0];
+        const currentDisabled = currentSecret.disabled === 'true';
+        if (currentDisabled !== isBlocked) {
+          await restCall(base, `/ppp/secret/${currentSecret['.id']}`, auth, 'PATCH', secretData)
+          changed = true;
+        }
       }
       
-      // If customer was just blocked, kick their active session
-      if (isBlocked) {
+      // If status changed on Mikrotik (or just ensuring sync), and it's a block event, kick session
+      if (isBlocked && changed) {
         const active = await restCall(base, `/ppp/active?name=${encodeURIComponent(customer.usuario_pppoe)}`, auth)
         if (Array.isArray(active.data) && active.data.length > 0) {
           await restCall(base, `/ppp/active/${active.data[0]['.id']}`, auth, 'DELETE')
