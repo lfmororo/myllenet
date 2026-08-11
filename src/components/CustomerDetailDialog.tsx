@@ -399,6 +399,59 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
 
         <Separator />
 
+        {/* Configurações de Alertas */}
+        <div className="rounded-lg border bg-muted/30 p-4 space-y-4">
+          <h3 className="text-sm font-semibold flex items-center gap-2">
+            <Bell className="h-4 w-4 text-primary" />
+            Alertas de Monitoramento (WhatsApp)
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="alert-disconnect" className="text-xs font-medium cursor-pointer">Desconexão (>5min)</Label>
+                <Switch 
+                  id="alert-disconnect"
+                  checked={customer.alert_on_disconnect} 
+                  onCheckedChange={(val) => updateCustomer({ alert_on_disconnect: val })}
+                />
+              </div>
+              <p className="text-[10px] text-muted-foreground leading-tight">
+                Avisa quando o cliente fica off-line por mais de 5 minutos.
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="alert-drops" className="text-xs font-medium cursor-pointer">Quedas Frequentes</Label>
+                <Switch 
+                  id="alert-drops"
+                  checked={customer.alert_on_frequent_drops} 
+                  onCheckedChange={(val) => updateCustomer({ alert_on_frequent_drops: val })}
+                />
+              </div>
+              <p className="text-[10px] text-muted-foreground leading-tight">
+                Avisa se houver 3 ou mais reconexões em 1 hora (instabilidade).
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="alert-usage" className="text-xs font-medium cursor-pointer">Consumo Anormal</Label>
+                <Switch 
+                  id="alert-usage"
+                  checked={customer.alert_on_abnormal_usage} 
+                  onCheckedChange={(val) => updateCustomer({ alert_on_abnormal_usage: val })}
+                />
+              </div>
+              <p className="text-[10px] text-muted-foreground leading-tight">
+                Avisa se o consumo exceder 500MB em 15 minutos (uso extremo).
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <Separator />
+
         {/* Summary */}
         <div className="flex gap-4 text-sm">
           <div className="flex items-center gap-1.5">
