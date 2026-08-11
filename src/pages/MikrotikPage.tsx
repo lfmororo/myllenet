@@ -212,7 +212,70 @@ export default function MikrotikPage() {
             </div>
           </CardContent>
         </Card>
+        <Card className="border-l-4 border-l-warning">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Situação das WANs</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-2">
+              <Activity className="h-5 w-5 text-warning" />
+              <span className="text-2xl font-bold">
+                {status?.online ? (wanLogs.length > 0 ? "Ativa" : "Offline") : "Offline"}
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              {wanLogs.length > 0 ? `${Object.keys(wanLogs[wanLogs.length-1]).filter(k => k !== 'time').length} interfaces monitoradas` : "Sem tráfego detectado"}
+            </p>
+          </CardContent>
+        </Card>
       </div>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <div>
+            <CardTitle className="text-base">Monitoramento de Tráfego WAN</CardTitle>
+            <CardDescription>Consumo em tempo real (Download + Upload) por interface</CardDescription>
+          </div>
+          <Activity className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          {loadingWan ? (
+            <div className="flex h-[300px] items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : wanLogs.length > 0 ? (
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={wanLogs}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" vertical={false} />
+                <XAxis dataKey="time" className="text-xs" minTickGap={30} />
+                <YAxis className="text-xs" tickFormatter={(v) => `${v.toFixed(1)}M`} />
+                <Tooltip
+                  formatter={(value: number) => [`${value.toFixed(2)} Mbps`, ""]}
+                  contentStyle={{ borderRadius: "8px", border: "1px solid hsl(var(--border))", background: "hsl(var(--card))" }}
+                />
+                <Legend />
+                {Object.keys(wanLogs[0] || {}).filter(k => k !== 'time').map((iface, index) => (
+                  <Line
+                    key={iface}
+                    type="monotone"
+                    dataKey={iface}
+                    name={iface}
+                    stroke={`hsl(var(--primary))`}
+                    strokeWidth={2}
+                    dot={false}
+                    activeDot={{ r: 4 }}
+                  />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex h-[300px] items-center justify-center text-muted-foreground">
+              Nenhum dado de WAN encontrado. Certifique-se de que o Mikrotik está online e as interfaces WAN possuem "WAN" no nome ou comentário.
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
 
       <div className="grid gap-6 md:grid-cols-2">
         <Card className="flex flex-col items-center justify-center text-center p-8 space-y-4">
