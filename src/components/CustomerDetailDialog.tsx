@@ -6,7 +6,7 @@ import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, ExternalLink, Copy, CheckCircle2, Clock, Import, CalendarCheck, X, XCircle, Activity, History, Bell, BellOff, AlertTriangle, ShieldCheck, ShieldAlert, Lock, Unlock } from "lucide-react";
+import { Loader2, ExternalLink, Copy, CheckCircle2, Clock, Import, CalendarCheck, X, XCircle, Activity, History, Bell, BellOff, AlertTriangle, ShieldCheck, ShieldAlert, Lock, Unlock, UploadCloud, Power, PowerOff, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -43,6 +43,29 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
   const [loadingBlockHistory, setLoadingBlockHistory] = useState(false);
   const [hasMoreLogs, setHasMoreLogs] = useState(true);
   const [unlocking, setUnlocking] = useState(false);
+  const [mikrotikAction, setMikrotikAction] = useState<string | null>(null);
+
+  const runMikrotikAction = async (action: "sync" | "enable" | "disable" | "remove") => {
+    if (!customer) return;
+    setMikrotikAction(action);
+    try {
+      const { data, error } = await supabase.functions.invoke("mikrotik-customer", {
+        body: { customer_id: customer.id, action },
+      });
+      if (error) throw error;
+      if (data?.success) {
+        toast.success(data.message || "Ação executada no Mikrotik");
+        onCustomerUpdated?.();
+      } else {
+        toast.error(data?.error || "Falha ao executar ação no Mikrotik");
+      }
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao comunicar com o Mikrotik");
+    } finally {
+      setMikrotikAction(null);
+    }
+  };
+
 
   const fetchLogs = useCallback(async (isLoadMore = false) => {
     if (!customer) return;
@@ -349,7 +372,60 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
                   O cliente não possui uma sessão PPPoE ativa no momento.
                 </div>
               )}
+
+              {/* Ações no Mikrotik */}
+              <Separator />
+              <div className="space-y-2">
+                <p className="text-[11px] font-semibold uppercase text-muted-foreground tracking-wide">
+                  Enviar para o Mikrotik
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    variant="default"
+                    className="h-7 text-xs"
+                    disabled={!!mikrotikAction}
+                    onClick={() => runMikrotikAction("sync")}
+                  >
+                    {mikrotikAction === "sync" ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <UploadCloud className="h-3 w-3 mr-1" />}
+                    Cadastrar / Atualizar
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs border-green-500 text-green-600 hover:bg-green-50"
+                    disabled={!!mikrotikAction}
+                    onClick={() => runMikrotikAction("enable")}
+                  >
+                    {mikrotikAction === "enable" ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Power className="h-3 w-3 mr-1" />}
+                    Ativar
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs border-destructive text-destructive hover:bg-destructive/10"
+                    disabled={!!mikrotikAction}
+                    onClick={() => runMikrotikAction("disable")}
+                  >
+                    {mikrotikAction === "disable" ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <PowerOff className="h-3 w-3 mr-1" />}
+                    Desativar
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 text-xs text-muted-foreground"
+                    disabled={!!mikrotikAction}
+                    onClick={() => {
+                      if (confirm("Remover o usuário PPPoE deste cliente do Mikrotik?")) runMikrotikAction("remove");
+                    }}
+                  >
+                    {mikrotikAction === "remove" ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Trash2 className="h-3 w-3 mr-1" />}
+                    Remover
+                  </Button>
+                </div>
+              </div>
             </div>
+
 
             {/* Consumo de Banda (Chart) */}
             <div className="rounded-lg border bg-muted/30 p-4 space-y-3">

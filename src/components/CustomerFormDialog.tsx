@@ -4,7 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, AlertCircle } from "lucide-react";
+import { Loader2, AlertCircle, UploadCloud } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import type { Customer, CustomerInput } from "@/hooks/useCustomers";
@@ -65,6 +67,8 @@ export default function CustomerFormDialog({ open, onOpenChange, customer, onSav
     dia_vencimento: 10, plan_id: null, desconto_especial_centavos: 0, cortesia: false,
   });
   const [saving, setSaving] = useState(false);
+  const [sendingMikrotik, setSendingMikrotik] = useState(false);
+
 
   useEffect(() => {
     if (customer) {
@@ -107,6 +111,35 @@ export default function CustomerFormDialog({ open, onOpenChange, customer, onSav
     setSaving(false);
     if (success) onOpenChange(false);
   };
+
+  const handleSaveAndSend = async () => {
+    if (!customer || !onUpdate) return;
+    if (cpfClean.length !== 11 || !isValidCPF(cpfClean)) {
+      toast.error("CPF inválido. Verifique os dígitos.");
+      return;
+    }
+    setSendingMikrotik(true);
+    try {
+      const phoneDigits = form.telefone ? form.telefone.replace(/\D/g, "") : "";
+      const ok = await onUpdate(customer.id, { ...form, cpf: cpfClean, telefone: phoneDigits || null });
+      if (!ok) return;
+      const { data, error } = await supabase.functions.invoke("mikrotik-customer", {
+        body: { customer_id: customer.id, action: "sync" },
+      });
+      if (error) throw error;
+      if (data?.success) {
+        toast.success(data.message || "Enviado ao Mikrotik");
+        onOpenChange(false);
+      } else {
+        toast.error(data?.error || "Falha ao enviar ao Mikrotik");
+      }
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao comunicar com o Mikrotik");
+    } finally {
+      setSendingMikrotik(false);
+    }
+  };
+
 
   const activePlans = plans.filter(p => p.ativo);
 
@@ -253,13 +286,20 @@ export default function CustomerFormDialog({ open, onOpenChange, customer, onSav
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="flex-col gap-2 sm:flex-row">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-            <Button type="submit" disabled={saving}>
+            {customer && (
+              <Button type="button" variant="secondary" disabled={saving || sendingMikrotik} onClick={handleSaveAndSend}>
+                {sendingMikrotik ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-2 h-4 w-4" />}
+                Salvar e enviar ao Mikrotik
+              </Button>
+            )}
+            <Button type="submit" disabled={saving || sendingMikrotik}>
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {customer ? "Salvar" : "Cadastrar"}
             </Button>
           </DialogFooter>
+
         </form>
       </DialogContent>
     </Dialog>
