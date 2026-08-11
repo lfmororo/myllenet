@@ -844,7 +844,7 @@ export default function Settings() {
             </CardContent>
           </Card>
         </TabsContent>
-      </div>
+      </Tabs>
     </div>
   );
 }
