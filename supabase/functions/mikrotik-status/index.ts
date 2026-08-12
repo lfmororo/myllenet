@@ -21,13 +21,33 @@ async function restCall(base: string, path: string, auth: string, timeoutMs = 80
   const t = setTimeout(() => ac.abort(), timeoutMs)
   try {
     const res = await fetch(`${base}/rest${path}`, {
-      headers: { Authorization: `Basic ${auth}`, Connection: 'close' },
+      method: 'GET',
+      headers: { 
+        'Authorization': `Basic ${auth}`, 
+        'Connection': 'close',
+        'Accept': 'application/json'
+      },
       signal: ac.signal,
     })
-    if (!res.ok) return { ok: false, status: res.status, data: null as unknown }
-    return { ok: true, status: res.status, data: await res.json() }
+    
+    if (res.status === 401) return { ok: false, status: 401, data: null }
+    if (!res.ok) {
+      // Tentar ler o erro se possível
+      const text = await res.text().catch(() => "");
+      console.error(`REST Error [${res.status}] at ${path}: ${text}`);
+      return { ok: false, status: res.status, data: null }
+    }
+    
+    const data = await res.json().catch(err => {
+      console.error(`JSON Parse Error at ${path}:`, err);
+      return null;
+    });
+    
+    return { ok: true, status: res.status, data }
   } catch (e) {
-    return { ok: false, status: 0, data: null as unknown, error: (e as Error).message }
+    const isAbort = (e as Error).name === 'AbortError';
+    if (!isAbort) console.error(`Fetch Error at ${path}:`, (e as Error).message);
+    return { ok: false, status: 0, data: null, error: (e as Error).message }
   } finally {
     clearTimeout(t)
   }
