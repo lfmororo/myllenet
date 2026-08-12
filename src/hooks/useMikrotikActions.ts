@@ -33,7 +33,9 @@ export function useMikrotikActions() {
       }
 
       toast.success(result.message || "Ação realizada no Mikrotik com sucesso");
+      window.location.reload();
       return true;
+
     } catch (error: any) {
       toast.error(error.message);
       return false;
