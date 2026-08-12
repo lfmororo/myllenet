@@ -1111,7 +1111,7 @@ async function bulkCheckPayments(req: Request) {
     .in("status", ["pending", "waiting", "overdue"])
     .not("efi_charge_id", "is", null)
     .order('vencimento', { ascending: false })
-    .limit(30);
+    .limit(10); // Reduzido de 30 para 10 para evitar timeouts
 
   if (error) {
     return new Response(JSON.stringify({ error: "Erro ao buscar faturas" }), {
