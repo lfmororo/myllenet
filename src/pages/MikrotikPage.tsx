@@ -307,16 +307,16 @@ export default function MikrotikPage() {
               <div className="flex items-center justify-between text-xs">
                 <span>CPU:</span>
                 <span className={`font-bold ${status?.cpuLoad > 80 ? "text-destructive" : status?.cpuLoad > 50 ? "text-warning" : "text-success"}`}>
-                  {status?.cpuLoad !== null ? `${status.cpuLoad}%` : "—"}
+                  {status?.cpuLoad !== undefined && status?.cpuLoad !== null ? `${status.cpuLoad}%` : "—"}
                 </span>
               </div>
               <div className="flex items-center justify-between text-xs">
                 <span>RAM:</span>
                 <span className="text-muted-foreground">
-                  {status?.freeMemory ? `${(status.freeMemory / 1024 / 1024).toFixed(0)}MB libres` : "—"}
+                  {status?.freeMemory ? `${(status.freeMemory / 1024 / 1024).toFixed(0)}MB livres` : "—"}
                 </span>
               </div>
-              {status?.temperature !== null && (
+              {status?.temperature !== undefined && status?.temperature !== null && (
                 <div className="flex items-center justify-between text-xs">
                   <span>Temp:</span>
                   <span className={`font-bold ${status.temperature > 65 ? "text-destructive" : status.temperature > 50 ? "text-warning" : "text-primary"}`}>
