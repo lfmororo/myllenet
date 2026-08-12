@@ -126,17 +126,16 @@ Deno.serve(async (req) => {
 
     const openRest = restPorts.filter((p) => openMap.get(p))
     if (openRest.length) {
-      const attempts = await Promise.all(
-        openRest.map(async (p) => {
-          const base = `${schemeFor(p)}://${host}:${p}`
-          const res = await restCall(base, '/system/resource', auth, 4000)
-          if (res.ok || res.status === 401) return { port: p, base, res }
-          // try the alternate scheme once
-          const altBase = `${schemeFor(p) === 'http' ? 'https' : 'http'}://${host}:${p}`
-          const alt = await restCall(altBase, '/system/resource', auth, 4000)
-          return { port: p, base: altBase, res: alt }
-        }),
-      )
+      const attempts = [];
+      for (const p of openRest) {
+        const base = `${schemeFor(p)}://${host}:${p}`;
+        // Testar uma porta de cada vez para evitar sobrecarga no switch/firewall do Mikrotik
+        const res = await restCall(base, '/system/resource', auth, 3000);
+        if (res.ok || res.status === 401) {
+          attempts.push({ port: p, base, res });
+          if (res.ok) break; // Sucesso na primeira porta, não precisa testar outras
+        }
+      }
 
       for (const a of attempts) {
         if (a.res.status) lastStatus = a.res.status
