@@ -156,7 +156,7 @@ Deno.serve(async (req) => {
               .select('interface_name, rx_bytes, tx_bytes, created_at')
               .in('interface_name', wanInterfaces.map(i => i.name))
               .order('created_at', { ascending: false })
-              .limit(wanInterfaces.length * 3)
+              .limit(wanInterfaces.length * 10)
 
             const now = Date.now()
             // Sanity limit: nenhuma WAN doméstica passa de 1 Gbps
