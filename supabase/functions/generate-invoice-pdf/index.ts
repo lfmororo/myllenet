@@ -153,28 +153,31 @@ Deno.serve(async (req) => {
       pixDescription || `INV${invoice_id.substring(0, 8).toUpperCase()}`
     );
 
-    // Return all data needed for the PDF generation on client or storage
-    // For now, let's return a structured object that the client can use to render
-    // In a real scenario, we might use a library here to generate the actual PDF binary
+    // If UAZAPI is the requester, it might expect a PDF binary.
+    // However, our system generates the PDF client-side or we need a server-side generator.
+    // Since we don't have a server-side PDF generator (like puppeteer) here, 
+    // we return the structured JSON data.
+    // UAZAPI /send/file MUST receive a URL that points to a FILE.
+    // IF UAZAPI receives this JSON, it will fail to send as a PDF.
+    
+    // To solve this properly, we should ideally generate the PDF here.
+    // For now, let's at least ensure the response is clean.
     
     return new Response(JSON.stringify({
-      success: true,
-      data: {
-        invoice,
-        customer,
-        plan,
-        consumption: {
-          download: totalRx.toFixed(2) + " GB",
-          upload: totalTx.toFixed(2) + " GB",
-          days: "30 de 30 dias"
-        },
-        pix: {
-          payload: pixPayload,
-          key: pixSettings.pix_key,
-          name: pixSettings.pix_name,
-          cnpj: pixSettings.company_cnpj,
-          phone: pixSettings.company_phone
-        }
+      invoice,
+      customer,
+      plan,
+      consumption: {
+        download: totalRx.toFixed(2) + " GB",
+        upload: totalTx.toFixed(2) + " GB",
+        days: "30 de 30 dias"
+      },
+      pix: {
+        payload: pixPayload,
+        key: pixSettings.pix_key,
+        name: pixSettings.pix_name,
+        cnpj: pixSettings.company_cnpj,
+        phone: pixSettings.company_phone
       }
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
