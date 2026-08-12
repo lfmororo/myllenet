@@ -224,7 +224,7 @@ Deno.serve(async (req) => {
       }, {})
 
       for (const [iface, stats] of Object.entries(averages)) {
-        const avgMbps = (stats.sum / stats.count) / 1_000_000
+        const avgMbps = Math.min(2000, (stats.sum / stats.count) / 1_000_000)
         
         if (avgMbps < speedThresholdMbps) {
           const { data: alerted } = await supabase

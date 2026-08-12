@@ -133,7 +133,12 @@ Deno.serve(async (req) => {
             if (matches) reportedDuration = Math.max(1, parseInt(matches[1]));
           }
           
-          mbps = Math.round(((rx_bytes * 8) / (reportedDuration * 1000 * 1000)) * 100) / 100
+          // Formula: (Bytes * 8 bits/byte) / (seconds * 1,000,000 bits/Mbit)
+          const rawMbps = (rx_bytes * 8) / (reportedDuration * 1000 * 1000)
+          
+          // Sanity check: Mikrotik 'tool fetch' occasionally returns corrupt/cached summaries
+          // If speed is > 2000 Mbps on a standard WAN, it's likely a calculation or reporting error
+          mbps = rawMbps > 2000 ? 0 : Math.round(rawMbps * 100) / 100
           status = mbps > 0 ? 'Success' : 'Success (No Traffic)'
         } else {
           const errText = await resFetch.text()

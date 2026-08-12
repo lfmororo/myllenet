@@ -34,16 +34,17 @@ export const useMikrotikLogs = () => {
         
         if (!grouped[time]) grouped[time] = { time, fullDate: dateObj };
         
-        // Limite de sanidade: descarta picos irreais (>1 Gbps) vindos de contadores resetados
-        const clamp = (mbps: number) => (!isFinite(mbps) || mbps < 0 || mbps > 1000 ? 0 : mbps);
+        // Limite de sanidade: descarta picos irreais (>2 Gbps) vindos de contadores resetados ou erro de relatório
+        const clamp = (mbps: number) => (!isFinite(mbps) || mbps < 0 || mbps > 2000 ? 0 : mbps);
 
         const rx_bps = Number(log.rx_bps || 0);
         const rx_bytes = Number(log.rx_bytes || 0);
         let calculatedDownload = rx_bps / 1_000_000;
         
-        // Se rx_bps está zerado, mas temos rx_bytes, é provavelmente um log de speedtest
-        if (calculatedDownload <= 0 && rx_bytes > 0) {
-          // A função mikrotik-speedtest usa 3s como padrão agora
+        // Se rx_bps está zerado ou muito baixo, mas temos rx_bytes, verificamos se é um log de speedtest
+        // Logs de speedtest salvam o total baixado em rx_bytes
+        if ((calculatedDownload <= 0.1) && rx_bytes > 0) {
+          // A função mikrotik-speedtest usa 3s como padrão
           calculatedDownload = (rx_bytes * 8) / (3 * 1000 * 1000);
         }
         

@@ -230,8 +230,8 @@ Deno.serve(async (req) => {
                   const dTx = txBytes - Number(prev.tx_bytes ?? 0)
                   if (dRx >= 0) rxBps = Math.round((dRx * 8) / secs)
                   if (dTx >= 0) txBps = Math.round((dTx * 8) / secs)
-                  if (rxBps > MAX_BPS) rxBps = 0
-                  if (txBps > MAX_BPS) txBps = 0
+                  if (rxBps > 2000_000_000) rxBps = 0
+                  if (txBps > 2000_000_000) txBps = 0
                 }
                 return {
                   interface_name: i.name,
