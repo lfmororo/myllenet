@@ -238,7 +238,11 @@ export default function InvoiceTable({ invoices, onCheckPayment, onCancel, onMar
                                 className="h-8 w-8 text-teal-600 hover:text-teal-700 hover:bg-teal-50"
                                 title="Desbloquear no Mikrotik"
                                 disabled={mikrotikLoading === (inv as any).customers.id}
-                                onClick={() => syncMikrotik((inv as any).customers.id, 'enable')}
+                                onClick={() => {
+                                  if (window.confirm(`Deseja realmente DESBLOQUEAR o cliente ${(inv as any).customers.nome}?`)) {
+                                    syncMikrotik((inv as any).customers.id, 'enable');
+                                  }
+                                }}
                               >
                                 {mikrotikLoading === (inv as any).customers.id ? (
                                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -253,7 +257,11 @@ export default function InvoiceTable({ invoices, onCheckPayment, onCancel, onMar
                                 className="h-8 w-8 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
                                 title="Bloquear no Mikrotik"
                                 disabled={mikrotikLoading === (inv as any).customers.id}
-                                onClick={() => syncMikrotik((inv as any).customers.id, 'disable')}
+                                onClick={() => {
+                                  if (window.confirm(`Deseja realmente BLOQUEAR o cliente ${(inv as any).customers.nome}?`)) {
+                                    syncMikrotik((inv as any).customers.id, 'disable');
+                                  }
+                                }}
                               >
                                 {mikrotikLoading === (inv as any).customers.id ? (
                                   <Loader2 className="h-4 w-4 animate-spin" />

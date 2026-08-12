@@ -166,7 +166,11 @@ export default function CustomerTable({
                               className="h-8 w-8 text-teal-600 hover:text-teal-700 hover:bg-teal-50"
                               title="Desbloquear no Mikrotik"
                               disabled={mikrotikLoading === c.id}
-                              onClick={() => syncMikrotik(c.id, 'enable')}
+                              onClick={() => {
+                                if (window.confirm(`Deseja realmente DESBLOQUEAR o cliente ${c.nome}?`)) {
+                                  syncMikrotik(c.id, 'enable');
+                                }
+                              }}
                             >
                               {mikrotikLoading === c.id ? (
                                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -181,7 +185,11 @@ export default function CustomerTable({
                               className="h-8 w-8 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
                               title="Bloquear no Mikrotik"
                               disabled={mikrotikLoading === c.id}
-                              onClick={() => syncMikrotik(c.id, 'disable')}
+                              onClick={() => {
+                                if (window.confirm(`Deseja realmente BLOQUEAR o cliente ${c.nome}?`)) {
+                                  syncMikrotik(c.id, 'disable');
+                                }
+                              }}
                             >
                               {mikrotikLoading === c.id ? (
                                 <Loader2 className="h-4 w-4 animate-spin" />
