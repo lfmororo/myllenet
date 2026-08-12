@@ -29,8 +29,8 @@ async function verifyAdmin(authHeader: string | null) {
     return "service_role";
   }
 
-  const supabaseAdmin = getSupabaseAdmin();
-  const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+  const adminClient = getSupabaseAdmin();
+  const { data: { user }, error } = await adminClient.auth.getUser(token);
   if (error || !user) throw new Error("Unauthorized");
 
   const userId = user.id;
