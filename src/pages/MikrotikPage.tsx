@@ -479,15 +479,17 @@ export default function MikrotikPage() {
                       name={key.replace(' ↓', '')} 
                       fill={colors[i % colors.length]} 
                       radius={[4, 4, 0, 0]}
-                      onClick={(data) => {
+                      onClick={(data: any) => {
+                        const payload = data.payload || data;
                         const wanName = key.replace(' ↓', '');
                         setDrillDownData({
-                          hour: data.hour,
+                          hour: payload.hour,
                           wan: wanName,
-                          download: data[key],
-                          upload: data[`${wanName} ↑`]
+                          download: payload[key],
+                          upload: payload[`${wanName} ↑`]
                         });
                       }}
+
                       cursor="pointer"
                     />
                   ));
