@@ -125,7 +125,7 @@ Deno.serve(async (req) => {
           // Calculate speed based on actual duration reported by Mikrotik if available
           const reportedDurationStr = lastSnapshot.duration || '10s'
           // Extract seconds from duration (e.g., "10s", "0s", "1m2s")
-          let reportedDuration = 10;
+          let reportedDuration = 3;
           if (reportedDurationStr.includes('s')) {
             const matches = reportedDurationStr.match(/(\d+)s/);
             if (matches) reportedDuration = Math.max(1, parseInt(matches[1]));
