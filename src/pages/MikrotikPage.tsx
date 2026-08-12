@@ -284,6 +284,17 @@ export default function MikrotikPage() {
             {status?.message && (
               <p className="text-xs text-muted-foreground mt-2">{status.message}</p>
             )}
+            {status?.updateAvailable && (
+              <div className="mt-3 p-2 bg-warning/10 border border-warning/20 rounded-md">
+                <p className="text-[10px] font-bold text-warning flex items-center gap-1">
+                  <ArrowUpCircle className="h-3 w-3" />
+                  Atualização Disponível: {status.latestVersion}
+                </p>
+                <p className="text-[9px] text-muted-foreground mt-1">
+                  Firmware atual: {status.version}
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
         <Card className="border-l-4 border-l-primary">

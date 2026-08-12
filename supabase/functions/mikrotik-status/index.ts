@@ -169,11 +169,12 @@ Deno.serve(async (req) => {
           freeMemory = r['free-memory'] !== undefined ? Number(r['free-memory']) : null
           totalMemory = r['total-memory'] !== undefined ? Number(r['total-memory']) : null
 
-          const [idty, active, resource, health] = await Promise.all([
+          const [idty, active, resource, health, updates] = await Promise.all([
             restCall(winner.base, '/system/identity', auth, 4000),
             restCall(winner.base, '/ppp/active', auth, 5000),
             restCall(winner.base, '/interface', auth, 5000),
             restCall(winner.base, '/system/health', auth, 4000),
+            restCall(winner.base, '/system/package/update', auth, 4000),
           ])
           identity = (idty.data as Record<string, string> | null)?.name ?? null
           
@@ -310,7 +311,17 @@ Deno.serve(async (req) => {
               }
             })
           }
-        }
+          }
+          
+          let updateAvailable = false
+          let latestVersion = null
+          if (updates.ok && updates.data) {
+            const u = updates.data as Record<string, any>
+            if (u.status === 'New version is available' || (u['latest-version'] && u['latest-version'] !== version)) {
+              updateAvailable = true
+              latestVersion = u['latest-version']
+            }
+          }
       }
     }
 
@@ -340,6 +351,8 @@ Deno.serve(async (req) => {
       activeUsers,
       activeList,
       wans,
+      updateAvailable,
+      latestVersion,
       message,
     }
 
