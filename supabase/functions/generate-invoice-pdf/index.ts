@@ -61,8 +61,15 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const body = await req.json();
-    const invoice_id = body.invoice_id;
+    let invoice_id = null;
+    if (req.method === "POST") {
+      const body = await req.json();
+      invoice_id = body.invoice_id;
+    } else {
+      const url = new URL(req.url);
+      invoice_id = url.searchParams.get("invoice_id");
+    }
+    
     if (!invoice_id) throw new Error("invoice_id is required");
 
     const supabase = getSupabaseAdmin();
