@@ -34,6 +34,9 @@ export const useMikrotikLogs = () => {
         
         if (!grouped[time]) grouped[time] = { time, fullDate: dateObj };
         
+        // Limite de sanidade: descarta picos irreais (>1 Gbps) vindos de contadores resetados
+        const clamp = (mbps: number) => (!isFinite(mbps) || mbps < 0 || mbps > 1000 ? 0 : mbps);
+
         const rx_bps = Number(log.rx_bps || 0);
         const rx_bytes = Number(log.rx_bytes || 0);
         let calculatedDownload = rx_bps / 1_000_000;
@@ -45,8 +48,8 @@ export const useMikrotikLogs = () => {
         }
         
         const iface = log.interface_name;
-        grouped[time][`${iface} ↓`] = calculatedDownload;
-        grouped[time][`${iface} ↑`] = Number(log.tx_bps || 0) / 1_000_000;
+        grouped[time][`${iface} ↓`] = clamp(calculatedDownload);
+        grouped[time][`${iface} ↑`] = clamp(Number(log.tx_bps || 0) / 1_000_000);
       });
       
       // Ordenar por data e pegar os últimos 60 pontos
