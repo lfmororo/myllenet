@@ -1006,10 +1006,9 @@ async function bulkCheckPayments(req: Request) {
       } catch (e) {
         console.error(`reconcile by cpf ${cpf} failed:`, e);
       }
-      // Small delay between customers to avoid rate limits
       await new Promise(r => setTimeout(r, 200));
     }
-    }
+
 
     // ===== PASS 1.5: Deep Reconciliation for Overdue Orphans =====
     try {
