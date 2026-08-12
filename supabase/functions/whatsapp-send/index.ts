@@ -68,8 +68,14 @@ async function getUazapiToken(): Promise<string> {
 
 async function uazapiRequest(endpoint: string, body: unknown) {
   const token = await getUazapiToken();
-
-  const response = await fetch(`${UAZAPI_BASE_URL}${endpoint}`, {
+  const url = `${UAZAPI_BASE_URL}${endpoint}`;
+  
+  // UAZAPI /send/file accepts POST but some endpoints or configurations might be picky.
+  // The user received a 405 Method Not Allowed. 
+  // Let's verify if we should use another method or if the URL is slightly different.
+  // Standard UAZAPI for files is usually POST.
+  
+  const response = await fetch(url, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -79,7 +85,7 @@ async function uazapiRequest(endpoint: string, body: unknown) {
   });
 
   const responseText = await response.text();
-  console.log("UAZAPI response:", response.status, responseText.slice(0, 500));
+  console.log(`UAZAPI [${endpoint}] response:`, response.status, responseText.slice(0, 500));
 
   let data;
   try { data = JSON.parse(responseText); } catch { data = { raw: responseText }; }
@@ -341,11 +347,12 @@ async function sendInvoiceNotification(req: Request) {
       console.log(`[PDF] Requesting UAZAPI to send PDF from URL: ${pdfUrl}`);
       
       try {
-        const fileResult = await uazapiRequest("/send/file", {
+        const fileResult = await uazapiRequest("/send/media", {
           number: formattedPhone,
           url: pdfUrl,
           caption: `Fatura Mororo.Tech - ${invoice.descricao}`,
-          name: fileName
+          fileName: fileName,
+          type: "document"
         });
         console.log("[PDF] UAZAPI response:", fileResult);
       } catch (fileErr) {
