@@ -319,8 +319,9 @@ async function sendInvoiceNotification(req: Request) {
       break;
     }
     case "lembrete_vencimento":
-      message = `Olá ${customer.nome}! 🌐\n\n⏰ Lembrete: sua fatura da *Mororo.Tech* vence em breve!\n\n📋 ${invoice.descricao}\n💰 Valor: ${valor}\n📅 Vencimento: ${vencimento}`;
-      if (invoice.efi_link) message += `\n\n🔗 Boleto: ${invoice.efi_link}`;
+      const reminderPdfLink = `${Deno.env.get("SUPABASE_URL")}/functions/v1/generate-invoice-pdf?invoice_id=${invoice_id}`;
+      message = `Olá ${customer.nome}! 🌐\n\n⏰ Lembrete: sua fatura da *Mororo.Tech* vence em breve!\n\n📋 ${invoice.descricao}\n💰 Valor: ${valor}\n📅 Vencimento: ${vencimento}\n\n📄 *Fatura PDF:* ${reminderPdfLink}`;
+      if (invoice.efi_link) message += `\n\n🔗 *Link Alternativo:* ${invoice.efi_link}`;
       message += "\n\nEvite a suspensão do serviço. Pague em dia! 😊";
       break;
     case "pagamento_confirmado":
