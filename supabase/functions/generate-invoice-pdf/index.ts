@@ -117,12 +117,16 @@ Deno.serve(async (req) => {
       .in("key", ["pix_key", "pix_name", "pix_city", "company_cnpj", "company_phone"]);
 
     const pixSettings = Object.fromEntries(settings?.map(s => [s.key, s.value]) || []);
+    const refMonth = new Date(invoice.mes_referencia).toLocaleDateString('pt-BR', { month: '2-digit', year: '2-digit' });
+    const shortName = sanitize(customer.nome || "").split(' ')[0].substring(0, 10);
+    const pixDescription = `${shortName}${refMonth.replace('/', '')}`;
+
     const pixPayload = generatePixPayload(
       pixSettings.pix_key || "00000000000",
       pixSettings.pix_name || "Mororo Tech",
       pixSettings.pix_city || "Ipu",
       invoice.valor_centavos / 100,
-      `INV${invoice_id.substring(0, 8).toUpperCase()}`
+      pixDescription || `INV${invoice_id.substring(0, 8).toUpperCase()}`
     );
 
     // Return all data needed for the PDF generation on client or storage
