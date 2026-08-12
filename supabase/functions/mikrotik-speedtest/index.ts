@@ -120,7 +120,7 @@ Deno.serve(async (req) => {
 
     // Insert into wan_logs
     await supabase.from('wan_logs').insert(results.map(r => ({
-      interface_name: r.interface_name,
+      interface_name: r.interface_name, rx_bps: Math.round(r.mbps * 1000000),
       rx_bytes: r.rx_bytes,
       tx_bytes: r.tx_bytes,
       created_at: r.created_at
