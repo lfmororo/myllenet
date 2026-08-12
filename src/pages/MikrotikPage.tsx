@@ -234,10 +234,18 @@ export default function MikrotikPage() {
             <Activity className={`h-4 w-4 mr-2 ${live ? "animate-pulse" : ""}`} />
             {live ? "Tempo real: ON" : "Tempo real: OFF"}
           </Button>
-          <Button onClick={() => checkStatus()} disabled={loading || syncing}>
-
-            {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Router className="h-4 w-4 mr-2" />}
-            Verificar Status
+          <Button 
+            onClick={() => {
+              checkStatus();
+              supabase.functions.invoke("mikrotik-speedtest").then(({ data, error }) => {
+                if (error) toast.error("Erro ao realizar speedtest");
+                else toast.success("Speedtest realizado e relatório enviado!");
+              });
+            }} 
+            disabled={loading || syncing}
+          >
+            {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Activity className="h-4 w-4 mr-2" />}
+            Realizar Speedtest & Report
           </Button>
         </div>
       </div>
