@@ -32,6 +32,9 @@ export default function MikrotikPage() {
   const [speedThreshold, setSpeedThreshold] = useState("10");
   const [alertInterval, setAlertInterval] = useState("30");
   const [updatingSettings, setUpdatingSettings] = useState(false);
+  const [historyPage, setHistoryPage] = useState(1);
+  const historyItemsPerPage = 10;
+
 
 
 
