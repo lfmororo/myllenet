@@ -190,7 +190,6 @@ export default function MikrotikPage() {
 
 
   // Calculate hourly aggregation for speedtest results
-  // Note: We use raw wan_logs here, but in a real scenario we'd query specifically for the speedtest records
   const hourlyData = filteredLogs.reduce((acc: any[], log: any) => {
     const hour = log.time.split(':')[0] + ':00';
     let existing = acc.find(a => a.hour === hour);
@@ -199,7 +198,7 @@ export default function MikrotikPage() {
       acc.push(existing);
     }
     
-    // Sum/Avg values for the hour
+    // Sum values for the hour
     Object.keys(log).forEach(key => {
       if (key !== 'time' && key !== 'fullDate') {
         existing[key] = (existing[key] || 0) + log[key];
@@ -211,11 +210,29 @@ export default function MikrotikPage() {
     const result = { hour: item.hour };
     Object.keys(item).forEach(key => {
       if (key !== 'hour' && !key.endsWith('_count')) {
-        result[key] = item[key] / item[`${key}_count`];
+        // Only average if we have counts
+        const count = item[`${key}_count`];
+        result[key] = count > 0 ? item[key] / count : 0;
       }
     });
     return result;
   });
+
+  const allEntries = wanLogs.flatMap(log => {
+    const interfaces = Object.keys(log).filter(k => k !== 'time' && k !== 'fullDate' && k.endsWith('↓'));
+    return interfaces.map(ifaceKey => {
+      const name = ifaceKey.replace(' ↓', '');
+      const download = log[ifaceKey];
+      const upload = log[`${name} ↑`];
+      return {
+        time: log.time,
+        fullDate: log.fullDate,
+        interface: name,
+        download,
+        upload
+      };
+    });
+  }).sort((a, b) => (b.fullDate?.getTime() || 0) - (a.fullDate?.getTime() || 0));
 
   return (
     <div className="space-y-6">
