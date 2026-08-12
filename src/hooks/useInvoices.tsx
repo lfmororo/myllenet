@@ -41,7 +41,7 @@ export function useInvoices() {
     setLoading(true);
     const { data, error } = await supabase
       .from("invoices")
-      .select("*, customers(nome, cpf, usuario_pppoe)")
+      .select("*, customers(nome, cpf, usuario_pppoe, block_status)")
       .order("vencimento", { ascending: true });
 
     if (error) {
