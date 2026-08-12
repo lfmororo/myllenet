@@ -160,7 +160,9 @@ Deno.serve(async (req) => {
     // Send WhatsApp Report to Admin
     const ADMIN_PHONE = '85986801458'
     let message = `🚀 *SPEED TEST MIKROTIK (MORORO.TECH)* 🚀\n\n`
-    message += `📅 Data: ${new Date().toLocaleString('pt-BR')}\n\n`
+    const now = new Date();
+    const formattedDate = now.toLocaleDateString('pt-BR') + ', ' + now.toLocaleTimeString('pt-BR');
+    message += `📅 Data: ${formattedDate}\n\n`
     
     for (const res of results) {
       message += `🌐 *Interface: ${res.interface_name}*\n`
