@@ -28,6 +28,8 @@ export default function MikrotikPage() {
   const [live, setLive] = useState(true);
   const [dateRange, setDateRange] = useState("today"); // today, 7d, 30d
   const [selectedWan, setSelectedWan] = useState("all");
+  const [drillDownData, setDrillDownData] = useState<any>(null);
+
 
 
   const checkStatus = async (silent = false) => {
@@ -477,6 +479,16 @@ export default function MikrotikPage() {
                       name={key.replace(' ↓', '')} 
                       fill={colors[i % colors.length]} 
                       radius={[4, 4, 0, 0]}
+                      onClick={(data) => {
+                        const wanName = key.replace(' ↓', '');
+                        setDrillDownData({
+                          hour: data.hour,
+                          wan: wanName,
+                          download: data[key],
+                          upload: data[`${wanName} ↑`]
+                        });
+                      }}
+                      cursor="pointer"
                     />
                   ));
                 })()}
@@ -485,6 +497,56 @@ export default function MikrotikPage() {
           ) : (
             <p className="text-center py-12 text-muted-foreground">Dados insuficientes para gerar o gráfico horário.</p>
           )}
+
+          {drillDownData && (
+            <Dialog open={!!drillDownData} onOpenChange={() => setDrillDownData(null)}>
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <Activity className="h-5 w-5 text-primary" />
+                    Detalhes do Tráfego
+                  </DialogTitle>
+                  <DialogDescription>
+                    Métricas detalhadas para a interface <strong>{drillDownData.wan}</strong> às <strong>{drillDownData.hour}</strong>
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-primary/10 rounded-full">
+                        <ArrowDownCircle className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Download Médio</p>
+                        <p className="text-xl font-bold">{drillDownData.download?.toFixed(2)} Mb/s</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-accent/10 rounded-full">
+                        <ArrowUpCircle className="h-5 w-5 text-accent" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Upload Médio</p>
+                        <p className="text-xl font-bold">{drillDownData.upload?.toFixed(2)} Mb/s</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="p-4 border rounded-lg space-y-2">
+                    <h4 className="text-sm font-semibold flex items-center gap-2">
+                      <Info className="h-4 w-4 text-muted-foreground" />
+                      Informações Adicionais
+                    </h4>
+                    <p className="text-xs text-muted-foreground">
+                      Estes valores representam a média aritmética de todas as amostras coletadas entre {drillDownData.hour} e {parseInt(drillDownData.hour) + 1}:00.
+                    </p>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+          )}
+
         </CardContent>
       </Card>
 
