@@ -1265,6 +1265,8 @@ Deno.serve(async (req) => {
         return await importFromEfi(req);
       case "cancel":
         return await cancelCharge(req);
+      case "settle":
+        return await settleCharge(req);
       case "check-customer":
         return await checkCustomerCharges(req);
       case "test": {
