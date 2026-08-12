@@ -92,6 +92,10 @@ Deno.serve(async (req) => {
     let identity: string | null = null
     let uptime: string | null = null
     let version: string | null = null
+    let cpuLoad: number | null = null
+    let freeMemory: number | null = null
+    let totalMemory: number | null = null
+    let temperature: number | null = null
     let activeUsers: number | null = null
     let activeList: { name: string; address?: string; uptime?: string; rx_bytes?: number; tx_bytes?: number }[] = []
     let wans: { name: string; running: boolean; disabled: boolean; rx_bps: number; tx_bps: number; type?: string }[] = []
@@ -121,17 +125,29 @@ Deno.serve(async (req) => {
 
       const winner = attempts.find((a) => a.res.ok && a.res.data)
       if (winner) {
-        const r = winner.res.data as Record<string, string>
+        const r = winner.res.data as Record<string, any>
         restOk = true
         restPort = winner.port
         uptime = r.uptime ?? null
         version = r.version ?? null
-        const [idty, active, resource] = await Promise.all([
+        cpuLoad = r['cpu-load'] !== undefined ? Number(r['cpu-load']) : null
+        freeMemory = r['free-memory'] !== undefined ? Number(r['free-memory']) : null
+        totalMemory = r['total-memory'] !== undefined ? Number(r['total-memory']) : null
+
+        const [idty, active, resource, health] = await Promise.all([
           restCall(winner.base, '/system/identity', auth, 4000),
           restCall(winner.base, '/ppp/active', auth, 5000),
           restCall(winner.base, '/interface', auth, 5000),
+          restCall(winner.base, '/system/health', auth, 4000),
         ])
         identity = (idty.data as Record<string, string> | null)?.name ?? null
+        
+        if (Array.isArray(health.data)) {
+          const temp = (health.data as any[]).find(h => h.name === 'temperature')
+          if (temp) temperature = Number(temp.value)
+        } else if (health.data && (health.data as any).temperature !== undefined) {
+          temperature = Number((health.data as any).temperature)
+        }
         
         const interfaces = Array.isArray(resource.data) ? resource.data as any[] : []
 
@@ -205,6 +221,10 @@ Deno.serve(async (req) => {
                 tx_bps: r.tx_bps,
                 rx_bytes: r.rx_bytes,
                 tx_bytes: r.tx_bytes,
+                cpu_load: cpuLoad,
+                free_memory: freeMemory,
+                total_memory: totalMemory,
+                temperature: temperature,
                 created_at: new Date().toISOString()
               })))
             }
@@ -290,6 +310,10 @@ Deno.serve(async (req) => {
       identity,
       version,
       uptime,
+      cpuLoad,
+      freeMemory,
+      totalMemory,
+      temperature,
       activeUsers,
       activeList,
       wans,

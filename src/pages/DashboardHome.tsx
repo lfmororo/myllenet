@@ -15,6 +15,7 @@ export default function DashboardHome() {
 
   const [routerStatus, setRouterStatus] = useState<"loading" | "online" | "offline">("loading");
   const [onlineUsers, setOnlineUsers] = useState<number | null>(null);
+  const [hwInfo, setHwInfo] = useState<{ cpu: number | null, temp: number | null }>({ cpu: null, temp: null });
   const [wanLogs, setWanLogs] = useState<any[]>([]);
   const [loadingWan, setLoadingWan] = useState(true);
 
@@ -72,6 +73,10 @@ export default function DashboardHome() {
         if (cancelled) return;
         setRouterStatus(!error && data?.online ? "online" : "offline");
         setOnlineUsers(typeof data?.activeUsers === "number" ? data.activeUsers : null);
+        setHwInfo({ 
+          cpu: typeof data?.cpuLoad === "number" ? data.cpuLoad : null, 
+          temp: typeof data?.temperature === "number" ? data.temperature : null 
+        });
       } catch {
         if (!cancelled) {
           setRouterStatus("offline");
@@ -200,7 +205,19 @@ export default function DashboardHome() {
             <div className={`text-2xl font-bold ${routerStatus === "online" ? "text-success" : routerStatus === "offline" ? "text-destructive" : "text-muted-foreground"}`}>
               {routerStatus === "loading" ? "Verificando..." : routerStatus === "online" ? "Online" : "Offline"}
             </div>
-            <p className="text-xs text-muted-foreground">Monitoramento Mikrotik</p>
+            <div className="flex gap-2 mt-1">
+              {hwInfo.cpu !== null && (
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${hwInfo.cpu > 80 ? "bg-destructive/10 text-destructive" : hwInfo.cpu > 50 ? "bg-warning/10 text-warning" : "bg-success/10 text-success"}`}>
+                  CPU: {hwInfo.cpu}%
+                </span>
+              )}
+              {hwInfo.temp !== null && (
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${hwInfo.temp > 65 ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary"}`}>
+                  {hwInfo.temp}°C
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">Monitoramento Mikrotik</p>
           </CardContent>
         </Card>
         {/* PPPoE Online */}

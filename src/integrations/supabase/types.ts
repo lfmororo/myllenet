@@ -592,29 +592,41 @@ export type Database = {
       }
       wan_logs: {
         Row: {
+          cpu_load: number | null
           created_at: string
+          free_memory: number | null
           id: string
           interface_name: string
           rx_bps: number
           rx_bytes: number | null
+          temperature: number | null
+          total_memory: number | null
           tx_bps: number
           tx_bytes: number | null
         }
         Insert: {
+          cpu_load?: number | null
           created_at?: string
+          free_memory?: number | null
           id?: string
           interface_name: string
           rx_bps?: number
           rx_bytes?: number | null
+          temperature?: number | null
+          total_memory?: number | null
           tx_bps?: number
           tx_bytes?: number | null
         }
         Update: {
+          cpu_load?: number | null
           created_at?: string
+          free_memory?: number | null
           id?: string
           interface_name?: string
           rx_bps?: number
           rx_bytes?: number | null
+          temperature?: number | null
+          total_memory?: number | null
           tx_bps?: number
           tx_bytes?: number | null
         }
