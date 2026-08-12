@@ -315,7 +315,7 @@ Deno.serve(async (req) => {
     let message: string
     if (restOk) message = `Conectado via API REST (porta ${restPort})`
     else if (authFailed) message = 'API REST respondeu, mas usuário/senha foram rejeitados (401)'
-    else if (reachable) message = 'Host alcançável, mas a API REST não respondeu. Certifique-se de que o serviço REST está habilitado (/ip service enable www) e a porta está liberada no firewall.'
+    else if (reachable) message = 'Host alcançável, mas a API REST não respondeu. Certifique-se de que o serviço REST está habilitado (/ip service enable www) e a porta está liberada no firewall (/ip firewall filter add chain=input action=accept protocol=tcp dst-port=80,443,8728 comment="Allow Mikrotik API").'
     else message = 'Não foi possível alcançar o Mikrotik neste IP/portas'
 
     const responseData = {
