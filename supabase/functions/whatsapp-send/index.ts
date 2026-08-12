@@ -334,38 +334,27 @@ async function sendInvoiceNotification(req: Request) {
 
     // If it's a billing notification, send the PDF attachment
     if (["boleto_gerado", "lembrete_vencimento", "cobranca_atrasada"].includes(notifType)) {
-      // NOTE: We MUST use a public URL or a base64 string. 
-      // Since UAZAPI might have trouble fetching from a Supabase Function GET directly due to auth or headers,
-      // let's try to pass the data directly or ensure the URL is fully qualified and accessible.
       const pdfUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/generate-invoice-pdf?invoice_id=${invoice_id}`;
       const fileName = `Fatura_${invoice.descricao.replace(/\s+/g, '_')}.pdf`;
       
-      console.log(`[PDF] Triggering UAZAPI /send/file for invoice ${invoice_id}`);
-      console.log(`[PDF] URL: ${pdfUrl}`);
+      console.log(`[PDF] Requesting UAZAPI to send PDF from URL: ${pdfUrl}`);
       
       try {
-        // According to UAZAPI docs, /send/file accepts a URL.
-        // We ensure it's a GET request that returns JSON currently, but UAZAPI usually expects a direct file binary.
-        // WAIT: Our generate-invoice-pdf returns JSON, not binary! UAZAPI /send/file needs a direct file link.
-        // I need to change generate-invoice-pdf to return the binary if it wants to be sent as a file,
-        // OR I fetch the JSON here and send it. But Deno can't easily run the React-based jsPDF logic.
-        
-        // Alternative: Use a dedicated "public" view if we had one, but let's try to fix the flow.
         const fileResult = await uazapiRequest("/send/file", {
           number: formattedPhone,
           url: pdfUrl,
-          caption: `Fatura ${invoice.descricao}`,
+          caption: `Fatura Mororo.Tech - ${invoice.descricao}`,
           name: fileName
         });
-        console.log("[PDF] UAZAPI accepted the file request:", fileResult);
+        console.log("[PDF] UAZAPI response:", fileResult);
       } catch (fileErr) {
-        console.error("[PDF] UAZAPI file request failed:", fileErr);
+        console.error("[PDF] Error attaching PDF:", fileErr);
         await logNotification({
           customer_id: invoice.customer_id,
           customer_name: customer.nome,
           phone: customer.telefone,
           type: `${notifType}_pdf_fail`,
-          message: `Erro ao enviar anexo PDF: ${fileErr.message}`,
+          message: `Erro no anexo PDF: ${fileErr.message}`,
           status: "failed",
           error_message: fileErr.message,
         });
