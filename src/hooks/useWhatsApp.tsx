@@ -8,8 +8,8 @@ export function useWhatsApp() {
   const [sending, setSending] = useState<string | null>(null);
 
   const getAuthHeaders = async () => {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const token = sessionData?.session?.access_token;
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
     if (!token) {
       toast.error("Sessão expirada");
       return null;
