@@ -1045,7 +1045,7 @@ async function bulkCheckPayments(req: Request) {
             let hasMore = true;
             while (hasMore) {
               const resp = await efiRequest(
-                `/v1/charges?customer_document=${cpf}&begin_date=${bdDeep}&end_date=${edDeep}&limit=${limit}&offset=${offset}`,
+                `/v1/charges?charge_type=billet&customer_document=${cpf}&begin_date=${bdDeep}&end_date=${edDeep}&limit=${limit}&offset=${offset}`,
                 "GET", undefined, "bulk_check_deep"
               );
               const page = resp.data || resp || [];
