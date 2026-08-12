@@ -54,10 +54,10 @@ function AppSidebar() {
   return (
     <Sidebar collapsible="offcanvas" className="border-r border-sidebar-border">
       {/* Logo area */}
-      <div className="flex items-center gap-3 px-5 py-5 border-b border-sidebar-border">
-        <img src={logoImg} alt="Mororo.Tech" className="h-10 w-10 rounded-xl object-contain drop-shadow-lg" />
+      <div className="flex items-center gap-3 px-5 py-5 border-b border-sidebar-border overflow-hidden">
+        <img src={logoImg} alt="Mororo.Tech" className="h-10 w-auto max-w-[120px] object-contain drop-shadow-sm" />
         <div className="overflow-hidden">
-          <h1 className="text-base font-bold leading-tight truncate tracking-wide text-sidebar-primary">Mororo.Tech</h1>
+          
           <p className="text-[11px] text-sidebar-foreground/60 truncate">{user?.email}</p>
         </div>
       </div>
@@ -110,7 +110,7 @@ export default function AppLayout() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-3">
-          <img src={logoImg} alt="Mororo.Tech" className="h-14 w-14 rounded-xl object-contain animate-pulse" />
+          <img src={logoImg} alt="Mororo.Tech" className="h-14 w-auto max-w-[150px] object-contain animate-pulse" />
           <Loader2 className="h-6 w-6 animate-spin text-primary" />
         </div>
       </div>

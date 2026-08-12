@@ -35,7 +35,8 @@ export function useInvoicePDF() {
       doc.setFillColor(accentColor[0], accentColor[1], accentColor[2]);
       doc.rect(0, 0, pageWidth, 5, "F");
 
-      doc.setFillColor(bgColor[0], bgColor[1], bgColor[2]);
+      // Background matching for header transparency
+      doc.setFillColor(255, 255, 255); // White background
       doc.rect(0, 5, pageWidth, 50, "F");
 
       // Logo
@@ -52,9 +53,9 @@ export function useInvoicePDF() {
         });
         
         if (img.complete && img.naturalWidth > 0) {
-          const imgWidth = 50;
+          const imgWidth = 65; // Slightly larger for the new logo
           const imgHeight = (img.naturalHeight * imgWidth) / img.naturalWidth;
-          doc.addImage(img, "PNG", 20, 15, imgWidth, imgHeight);
+          doc.addImage(img, "PNG", 18, 15, imgWidth, imgHeight);
         }
       } catch (e) { console.error(e); }
 
@@ -85,7 +86,7 @@ export function useInvoicePDF() {
       doc.setFontSize(10);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-      doc.text("Mororo.Tech - Soluções em TI", 20, currentY);
+      doc.text("Mororo.Tech - Tecnologia e Desenvolvimento", 20, currentY);
       
       doc.setFont("helvetica", "normal");
       doc.setTextColor(textColor[0], textColor[1], textColor[2]);
