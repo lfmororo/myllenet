@@ -52,6 +52,7 @@ export default function Settings() {
 
   const [savingMikrotik, setSavingMikrotik] = useState(false);
   const [generatingReport, setGeneratingReport] = useState(false);
+  const { generatePDF: downloadPDF, generating: generatingPDF } = useDiagnosticPDF();
   const [reportDates, setReportDates] = useState({
     start: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     end: new Date().toISOString().split('T')[0]
