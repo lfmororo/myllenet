@@ -5,7 +5,6 @@ import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Pencil, Trash2, Eye, EyeOff, FileSearch, FileText, AlertCircle, Gift, ShieldAlert, ShieldCheck, Loader2 } from "lucide-react";
 import { useState } from "react";
-import { Loader2 } from "lucide-react";
 import type { Customer } from "@/hooks/useCustomers";
 import type { Plan } from "@/hooks/usePlans";
 
