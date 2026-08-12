@@ -282,14 +282,7 @@ export default function MikrotikPage() {
               </span>
             </div>
             {status?.message && (
-              <div className="mt-2">
-                <p className="text-xs text-muted-foreground leading-relaxed italic">{status.message}</p>
-                {!status.online && status.message.includes("/ip firewall") && (
-                  <div className="mt-2 p-2 bg-muted rounded border border-dashed text-[10px] font-mono break-all select-all cursor-copy" title="Clique para copiar">
-                    /ip firewall filter add chain=input action=accept protocol=tcp dst-port=80,443,8728 comment="Allow Mikrotik API"
-                  </div>
-                )}
-              </div>
+              <p className="text-xs text-muted-foreground mt-2">{status.message}</p>
             )}
           </CardContent>
         </Card>
