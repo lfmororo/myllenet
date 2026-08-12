@@ -653,14 +653,26 @@ export default function Settings() {
                   </div>
                 ) : (
                   <div className="space-y-5">
-                    <div className="space-y-2">
-                      <Label htmlFor="mikrotik_host">IP/Host Mikrotik</Label>
-                      <Input
-                        id="mikrotik_host"
-                        value={mikrotikHost}
-                        onChange={(e) => setMikrotikHost(e.target.value)}
-                        placeholder="IP Externo ou DNS"
-                      />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="mikrotik_host">IP/Host Mikrotik (Preferencial)</Label>
+                        <Input
+                          id="mikrotik_host"
+                          value={mikrotikHost}
+                          onChange={(e) => setMikrotikHost(e.target.value)}
+                          placeholder="IP Externo ou DNS"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="mikrotik_host_secondary">IP/Host Mikrotik (Secundário)</Label>
+                        <Input
+                          id="mikrotik_host_secondary"
+                          value={mikrotikHostSecondary}
+                          onChange={(e) => setMikrotikHostSecondary(e.target.value)}
+                          placeholder="IP Externo ou DNS (Opcional)"
+                        />
+                      </div>
                     </div>
 
                     <div className="space-y-2">
