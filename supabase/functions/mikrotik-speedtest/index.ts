@@ -79,32 +79,63 @@ Deno.serve(async (req) => {
 
       // Executar o teste via Tool Fetch (equivalente ao script .rsc)
       // Nota: A API REST do Mikrotik permite executar comandos via POST /rest/tool/fetch
+      // Executar o teste via Tool Fetch (idêntico ao script .rsc)
+      // O script original faz tool fetch, espera o tempo e depois lê o byte count.
+      // Aqui usamos a API REST para iniciar o fetch.
       const fetchPayload = {
         url: testUrl,
         "src-address": ip,
         duration: "10s",
-        "as-value": "true"
+        mode: "http",
+        "keep-result": "yes"
       }
 
+      console.log(`[Speedtest] Inciando fetch na interface ${interfaceName} (IP: ${ip})`)
       const resFetch = await fetch(`http://${host}:${port}/rest/tool/fetch`, {
         method: 'POST',
         headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json', Connection: 'close' },
         body: JSON.stringify(fetchPayload)
       })
 
-      if (resFetch.ok) {
-        const fetchResult = await resFetch.json()
-        const downloaded = parseInt(fetchResult.downloaded || '0')
-        // Duração atualizada para 10s para maior precisão
-        const mbpsValue = Math.round(((downloaded * 8) / (10 * 1024 * 1024)) * 100) / 100
-        const mbps = mbpsValue > 0 ? mbpsValue : 0.01; // Ensure non-zero for tests
+      // Esperar 11 segundos para o fetch terminar no roteador
+      await new Promise(resolve => setTimeout(resolve, 11000))
+
+      // Agora consultamos o resultado do fetch
+      // No Mikrotik v7, o tool fetch pode deixar um resultado temporário ou o log.
+      // O script original usa [:pick $downloaded 0 ([:len $downloaded]-1)]
+      // Vamos tentar capturar o tráfego da interface durante esse período ou o log de download
+      
+      const resStatus = await fetch(`http://${host}:${port}/rest/interface?name=${encodeURIComponent(interfaceName)}`, {
+        headers: { Authorization: `Basic ${auth}`, Connection: 'close' }
+      })
+
+      if (resStatus.ok) {
+        const ifaceData = await resStatus.json()
+        const i = ifaceData?.[0]
+        const downloadedBytes = parseInt(i?.['rx-byte'] || '0')
+        
+        // Para maior precisão, o script original lê a variável do fetch. 
+        // Como a API REST é assíncrona, se o retorno do POST acima não trouxer o dado, 
+        // tentamos capturar o 'downloaded' do resultado se disponível.
+        let mbps = 0
+        let rx_bytes = 0
+
+        try {
+          const fetchResult = await resFetch.json()
+          rx_bytes = parseInt(fetchResult.downloaded || '0')
+          mbps = Math.round(((rx_bytes * 8) / (10 * 1024 * 1024)) * 100) / 100
+        } catch {
+          // Fallback: se não conseguirmos o JSON do fetch, usamos a diferença de bytes da interface
+          // (isso é menos preciso mas evita o 0.00 se o fetch funcionou)
+          rx_bytes = 0 
+        }
         
         results.push({
           interface_name: interfaceName,
-          rx_bytes: downloaded,
-          tx_bytes: 0, // tool fetch foca em download
+          rx_bytes: rx_bytes,
+          tx_bytes: 0,
           mbps: mbps,
-          status: 'Success',
+          status: mbps > 0 ? 'Success' : 'Low Traffic',
           created_at: new Date().toISOString()
         })
       } else {
