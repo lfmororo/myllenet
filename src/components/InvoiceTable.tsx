@@ -2,7 +2,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { RefreshCw, ExternalLink, Copy, XCircle, Loader2, MessageCircle, CheckCircle2, Send, FileText } from "lucide-react";
+import { RefreshCw, ExternalLink, Copy, XCircle, Loader2, MessageCircle, CheckCircle2, Send, FileText, ShieldAlert, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import type { Invoice } from "@/hooks/useInvoices";
