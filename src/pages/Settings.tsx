@@ -845,18 +845,34 @@ export default function Settings() {
                   </ul>
                 </div>
 
-                <Button 
-                  onClick={handleDownloadDiagnosticReport}
-                  disabled={generatingReport}
-                  className="w-full"
-                >
-                  {generatingReport ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <FileDown className="mr-2 h-4 w-4" />
-                  )}
-                  Baixar Relatório de Diagnóstico (.JSON)
-                </Button>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <Button 
+                    onClick={() => handleDownloadDiagnosticReport('json')}
+                    disabled={generatingReport || generatingPDF}
+                    variant="outline"
+                    className="flex-1"
+                  >
+                    {generatingReport && !generatingPDF ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <FileDown className="mr-2 h-4 w-4" />
+                    )}
+                    Baixar JSON
+                  </Button>
+
+                  <Button 
+                    onClick={() => handleDownloadDiagnosticReport('pdf')}
+                    disabled={generatingReport || generatingPDF}
+                    className="flex-1"
+                  >
+                    {generatingPDF ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <FileDown className="mr-2 h-4 w-4" />
+                    )}
+                    Baixar PDF
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
