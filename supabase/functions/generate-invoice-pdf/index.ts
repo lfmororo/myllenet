@@ -80,10 +80,11 @@ Deno.serve(async (req) => {
     const { data: settings } = await supabase
       .from("settings")
       .select("key, value")
-      .in("key", ["pix_key", "pix_name", "pix_city", "company_cnpj", "company_phone"]);
+      .in("key", ["pix_key", "pix_name", "pix_city", "company_cnpj", "company_phone", "company_address"]);
 
     const pixSettings = Object.fromEntries(settings?.map(s => [s.key, s.value]) || []);
-    const refMonth = new Date(invoice.mes_referencia).toLocaleDateString('pt-BR', { month: '2-digit', year: '2-digit' });
+    const refDate = new Date(invoice.vencimento + "T12:00:00");
+    const refMonth = refDate.toLocaleDateString('pt-BR', { month: '2-digit', year: '2-digit' });
     const shortName = sanitize(customer.nome || "").split(' ')[0].substring(0, 10);
     const pixDescription = `${shortName}${refMonth.replace('/', '')}`;
 
@@ -98,26 +99,98 @@ Deno.serve(async (req) => {
     // PDF Generation
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
     const primaryColor = [15, 23, 42];
     const accentColor = [13, 148, 136];
     const textColor = [30, 41, 59];
+    const lightTextColor = [71, 85, 105];
 
+    // Header Accent
     doc.setFillColor(accentColor[0], accentColor[1], accentColor[2]);
     doc.rect(0, 0, pageWidth, 5, "F");
 
+    // Title
     doc.setFontSize(22);
     doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.setFont("helvetica", "bold");
     doc.text("FATURA", pageWidth - 20, 26, { align: "right" });
 
-    doc.setFontSize(10);
-    doc.text(customer.nome, 20, 60);
-    doc.text(`CPF: ${customer.cpf}`, 20, 66);
-    doc.text(`Vencimento: ${new Date(invoice.vencimento + "T12:00:00").toLocaleDateString("pt-BR")}`, 20, 72);
-    doc.text(`Valor: ${(invoice.valor_centavos / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`, 20, 78);
+    doc.setFontSize(9);
+    doc.setTextColor(lightTextColor[0], lightTextColor[1], lightTextColor[2]);
+    doc.text(`#${invoice_id.substring(0, 8).toUpperCase()}`, pageWidth - 20, 32, { align: "right" });
 
+    let currentY = 55;
+
+    // Company Info
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.text(pixSettings.pix_name || "Mororo.Tech", 20, currentY);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(textColor[0], textColor[1], textColor[2]);
+    doc.text(`CNPJ: ${pixSettings.company_cnpj || "00.000.000/0000-00"}`, 20, currentY + 6);
+    doc.text(pixSettings.company_address || "Ipu - Ceará", 20, currentY + 12);
+    doc.text(`Contato: ${pixSettings.company_phone || "(85) 98680-1458"}`, 20, currentY + 18);
+
+    // Customer Info
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.text("DADOS DO CLIENTE", 120, currentY);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(textColor[0], textColor[1], textColor[2]);
+    doc.text(customer.nome, 120, currentY + 6);
+    doc.text(`CPF/CNPJ: ${customer.cpf}`, 120, currentY + 12);
+    doc.text(`${customer.rua || ""}, ${customer.numero || ""}`, 120, currentY + 18);
+    doc.text(`${customer.bairro || ""} - ${customer.cidade || ""}`, 120, currentY + 24);
+
+    currentY += 40;
+
+    // Service Summary
+    doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.rect(20, currentY, pageWidth - 40, 10, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(9);
+    doc.text("DESCRIÇÃO", 25, currentY + 7);
+    doc.text("VENCIMENTO", 100, currentY + 7);
+    doc.text("VALOR", pageWidth - 25, currentY + 7, { align: "right" });
+
+    currentY += 18;
+    doc.setTextColor(textColor[0], textColor[1], textColor[2]);
+    doc.text(invoice.descricao, 25, currentY);
+    doc.text(new Date(invoice.vencimento + "T12:00:00").toLocaleDateString("pt-BR"), 100, currentY);
+    doc.text((invoice.valor_centavos / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }), pageWidth - 25, currentY, { align: "right" });
+
+    currentY += 20;
+
+    // PIX Area
+    doc.setFontSize(12);
+    doc.setTextColor(accentColor[0], accentColor[1], accentColor[2]);
+    doc.setFont("helvetica", "bold");
+    doc.text("PAGAMENTO VIA PIX", 20, currentY);
+    
+    currentY += 10;
     const qrCodeDataUrl = await QRCode.toDataURL(pixPayload, { margin: 1 });
-    doc.addImage(qrCodeDataUrl, "PNG", 20, 90, 50, 50);
-    doc.text("Pague com PIX para liberação imediata", 20, 145);
+    doc.addImage(qrCodeDataUrl, "PNG", 20, currentY, 50, 50);
+
+    doc.setFontSize(9);
+    doc.setTextColor(textColor[0], textColor[1], textColor[2]);
+    doc.setFont("helvetica", "bold");
+    doc.text("PIX COPIA E COLA:", 80, currentY + 5);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7);
+    const splitPayload = doc.splitTextToSize(pixPayload, pageWidth - 100);
+    doc.text(splitPayload, 80, currentY + 12);
+
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    doc.text("CHAVE PIX:", 80, currentY + 35);
+    doc.setFont("helvetica", "normal");
+    doc.text(pixSettings.pix_key || "N/A", 110, currentY + 35);
+
+    currentY += 70;
+    doc.setFontSize(8);
+    doc.setTextColor(lightTextColor[0], lightTextColor[1], lightTextColor[2]);
+    doc.text("Escaneie o QR Code ou use o Copia e Cola para pagamento imediato.", 20, currentY);
 
     const pdfOutput = doc.output("arraybuffer");
 
