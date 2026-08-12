@@ -251,7 +251,13 @@ Deno.serve(async (req) => {
           const list = active.data as Record<string, string>[]
           activeUsers = list.length
           activeList = list.slice(0, 200).map((a) => {
-            const iface = interfaces.find(i => i.name === `<pppoe-${a.name}>` || i.name.includes(a.name))
+            // No Mikrotik RouterOS v7 via REST, a interface dinâmica do PPPoE costuma ter o nome do usuário
+            // ou um padrão como <pppoe-usuario>. Tentamos encontrar a interface correspondente para pegar o tráfego.
+            const iface = interfaces.find(i => 
+              i.name === a.name || 
+              i.name === `<pppoe-${a.name}>` || 
+              (i.type === 'pppoe-in' && i.name.includes(a.name))
+            )
             return {
               name: a.name,
               address: a.address,
