@@ -60,7 +60,7 @@ async function logEfiApiCall(
   context: string | null
 ) {
   try {
-    await supabase.from("efi_api_logs").insert({
+    const { error } = await supabase.from("efi_api_logs").insert({
       method,
       endpoint,
       status_code: statusCode,
@@ -70,6 +70,7 @@ async function logEfiApiCall(
       duration_ms: durationMs,
       context,
     });
+    if (error) console.error("Error inserting into efi_api_logs:", error);
   } catch (e) {
     console.error("Failed to log EFI API call:", e);
   }
@@ -145,12 +146,16 @@ async function verifyAdmin(authHeader: string | null) {
   if (!authHeader?.startsWith("Bearer ")) {
     throw new Error("Unauthorized");
   }
-  const supabase = getSupabaseClient(authHeader);
+  const adminClient = getSupabaseAdmin();
   const token = authHeader.replace("Bearer ", "");
-  const { data, error } = await supabase.auth.getClaims(token);
-  if (error || !data?.claims) throw new Error("Unauthorized");
+  const { data: { user }, error } = await adminClient.auth.getUser(token);
   
-  const userId = data.claims.sub as string;
+  if (error || !user) {
+    console.error("Auth error:", error);
+    throw new Error("Unauthorized");
+  }
+  
+  const userId = user.id;
   
   // Check admin role using service role
   const admin = getSupabaseAdmin();
@@ -428,7 +433,7 @@ async function checkPayment(req: Request) {
         .eq("id", invoiceId);
 
       // Send notification if newly paid
-      if (newStatus === "paid") {
+      if (newStatus === "paid" && invoice.status !== "paid") {
         await sendPaymentNotification(supabase, invoiceId);
       }
     }
@@ -850,8 +855,20 @@ async function sendPaymentNotification(supabase: any, invoiceId: string) {
   }
 }
 
-async function bulkCheckPayments(_req: Request) {
-  // Public endpoint: only refreshes payment status via EFI. No sensitive data exposed.
+async function bulkCheckPayments(req: Request) {
+  const authHeader = req.headers.get("Authorization");
+  // Check if it's a cron job (via service role key) or a logged-in admin
+  if (authHeader) {
+    try {
+      await verifyAdmin(authHeader);
+    } catch (e) {
+      // If it's not an admin, check if it's the service role key (cron)
+      const token = authHeader.replace("Bearer ", "");
+      if (token !== Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")) {
+        throw e;
+      }
+    }
+  }
 
   const supabase = getSupabaseAdmin();
 
@@ -916,9 +933,11 @@ async function bulkCheckPayments(_req: Request) {
           const billet = match.payment?.banking_billet || {};
           let newStatus = inv.status;
           let paidAt: string | null = inv.paid_at;
-          if (match.status === "paid" || match.status === "settled" || match.status === "link" || match.status === "active") {
+          if (match.status === "paid" || match.status === "settled") {
             newStatus = "paid"; 
-            paidAt = match.paid_at || (["link", "active"].includes(match.status) ? null : new Date().toISOString());
+            paidAt = match.paid_at || new Date().toISOString();
+          } else if (match.status === "link" || match.status === "active") {
+            newStatus = "pending";
           } else if (match.status === "canceled" || match.status === "refunded") {
             newStatus = "cancelled";
           } else if (match.status === "expired" || match.status === "unpaid") {
@@ -1006,9 +1025,11 @@ async function bulkCheckPayments(_req: Request) {
                 let newStatus = inv.status;
                 let paidAt: string | null = inv.paid_at;
                 
-                if (match.status === "paid" || match.status === "settled" || match.status === "link" || match.status === "active") {
+                if (match.status === "paid" || match.status === "settled") {
                   newStatus = "paid"; 
-                  paidAt = match.paid_at || (["link", "active"].includes(match.status) ? null : new Date().toISOString());
+                  paidAt = match.paid_at || new Date().toISOString();
+                } else if (match.status === "link" || match.status === "active") {
+                  newStatus = "pending";
                 } else if (match.status === "canceled" || match.status === "refunded") {
                   newStatus = "cancelled";
                 }
@@ -1070,9 +1091,12 @@ async function bulkCheckPayments(_req: Request) {
       let newStatus = inv.status;
       let paidAt = inv.paid_at;
 
-      if (efiStatus === "paid" || efiStatus === "settled" || efiStatus === "link" || efiStatus === "active") {
+      if (efiStatus === "paid" || efiStatus === "settled") {
         newStatus = "paid";
-        paidAt = paidAt || (["link", "active"].includes(efiStatus) ? null : new Date().toISOString());
+        paidAt = paidAt || new Date().toISOString();
+      } else if (efiStatus === "link" || efiStatus === "active") {
+        // Just link/active, not necessarily paid yet
+        newStatus = "pending";
       } else if (efiStatus === "canceled" || efiStatus === "refunded") {
         newStatus = "cancelled";
       } else if (efiStatus === "expired" || efiStatus === "unpaid") {
@@ -1137,8 +1161,16 @@ Deno.serve(async (req) => {
         return await createBoleto(req);
       case "check":
         return await checkPayment(req);
-      case "bulk-check":
+      case "bulk-check": {
+        const authHeader = req.headers.get("Authorization");
+        if (!authHeader) {
+          return new Response(JSON.stringify({ error: "Missing authorization header" }), {
+            status: 401,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
         return await bulkCheckPayments(req);
+      }
       case "import":
         return await importFromEfi(req);
       case "cancel":
