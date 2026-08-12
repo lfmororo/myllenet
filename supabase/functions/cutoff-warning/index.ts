@@ -161,6 +161,7 @@ Deno.serve(async (req) => {
       }
 
       const nome = customer.nome.split(" ")[0];
+      const invoiceUrl = `https://myllenet.lovable.app/fatura/${inv.id}`;
       const message = `Olá ${nome}! 🌐
 
 ⚠️ *AVISO IMPORTANTE da Mororo.Tech*
@@ -171,7 +172,9 @@ Sua fatura está com *${DAYS_OVERDUE_THRESHOLD} dias de atraso*:
 💰 Valor: ${formatCurrency(inv.valor_centavos)}
 📅 Vencimento: ${formatDate(inv.vencimento)}
 
-🚨 *Seu sinal será cortado em ${DAYS_UNTIL_CUTOFF} dias* caso o pagamento não seja regularizado.${inv.efi_link ? `\n\n🔗 Boleto: ${inv.efi_link}` : ""}${inv.efi_pix_copiacola ? `\n\n📱 PIX Copia e Cola:\n${inv.efi_pix_copiacola}` : ""}
+🔗 *Link da Fatura:* ${invoiceUrl}
+
+🚨 *Seu sinal será cortado em ${DAYS_UNTIL_CUTOFF} dias* caso o pagamento não seja regularizado.
 
 Regularize agora para evitar a suspensão do serviço!
 
