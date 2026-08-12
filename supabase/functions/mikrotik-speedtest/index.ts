@@ -80,29 +80,29 @@ Deno.serve(async (req) => {
       // Executar o teste via Tool Fetch (equivalente ao script .rsc)
       // Nota: A API REST do Mikrotik permite executar comandos via POST /rest/tool/fetch
       // Executar o script speedteste.rsc no Mikrotik
-      console.log(`[Speedtest] Executando /import speedteste.rsc na interface ${interfaceName}`)
+      console.log(`[Speedtest] Executando comandos na interface ${interfaceName} (IP: ${ip})`)
       
       let mbps = 0
       let rx_bytes = 0
       let status = 'Error'
 
       try {
-        // O Mikrotik REST API permite executar scripts/comandos via POST /rest/import
-        // Mas como queremos os resultados, o script fornecido grava métricas ou o Mikrotik v7 tool fetch
-        // retorna o 'downloaded' se usarmos 'as-value'.
-        // O usuário pediu explicitamente para rodar o /import speedteste.rsc
-        
-        const resImport = await fetch(`http://${host}:${port}/rest/import`, {
+        // Tentar rodar o import do script
+        await fetch(`http://${host}:${port}/rest/import`, {
           method: 'POST',
           headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json', Connection: 'close' },
           body: JSON.stringify({ "file-name": "speedteste.rsc" })
-        })
+        }).catch(e => console.error("Import failed:", e.message))
 
-        // Após rodar o import, o script deve ter feito o fetch. 
-        // Como o script é assíncrono no Mikrotik, vamos tentar pegar o último resultado do fetch ou do log.
-        // No entanto, para garantir compatibilidade com a UI, mantemos a lógica de captura de dados.
-        // Se o import for bem sucedido, prosseguimos para medir o tráfego atual da interface ou ler o fetch.
-        
+        // Definir o payload para o fetch (mesma lógica do script .rsc)
+        const fetchPayload = {
+          url: testUrl,
+          "src-address": ip,
+          duration: "10s",
+          mode: "http",
+          "as-value": true
+        }
+
         const resFetch = await fetch(`http://${host}:${port}/rest/tool/fetch`, {
           method: 'POST',
           headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json', Connection: 'close' },
@@ -115,11 +115,13 @@ Deno.serve(async (req) => {
           mbps = Math.round(((rx_bytes * 8) / (10 * 1024 * 1024)) * 100) / 100
           status = mbps > 0 ? 'Success' : 'Success (No Traffic)'
         } else {
-          status = 'Import Executed'
+          const errText = await resFetch.text()
+          console.error(`Fetch error ${interfaceName}:`, resFetch.status, errText)
+          status = 'Fetch Failed'
         }
-      } catch (e) {
+      } catch (e: any) {
         console.error(`[Speedtest] Exception ${interfaceName}:`, e.message)
-        status = 'Exception'
+        status = `Exception: ${e.message.slice(0, 30)}`
       }
       
       results.push({
