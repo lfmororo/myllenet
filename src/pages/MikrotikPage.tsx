@@ -5,15 +5,16 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Download, Loader2, RefreshCw, Router, Wifi, WifiOff, FileCode, BookOpen, Activity, History, ArrowUpCircle, ArrowDownCircle, Info, Calendar, Clock, Network } from "lucide-react";
+import { Download, Loader2, RefreshCw, Router, Wifi, WifiOff, FileCode, BookOpen, Activity, History, ArrowUpCircle, ArrowDownCircle, Info, Calendar, Clock, Network, Filter, BarChart3 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useCustomers } from "@/hooks/useCustomers";
 import { usePlans } from "@/hooks/usePlans";
 import { useMikrotikLogs } from "@/hooks/useMikrotikLogs";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
-import { format } from "date-fns";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, BarChart, Bar } from "recharts";
+import { format, subDays, startOfDay, endOfDay, isWithinInterval } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function MikrotikPage() {
   const [loading, setLoading] = useState(false);
@@ -25,6 +26,9 @@ export default function MikrotikPage() {
   const { wanLogs, wanHistory, loading: loadingWan } = useMikrotikLogs();
   const [syncing, setSyncing] = useState(false);
   const [live, setLive] = useState(true);
+  const [dateRange, setDateRange] = useState("today"); // today, 7d, 30d
+  const [selectedWan, setSelectedWan] = useState("all");
+
 
   const checkStatus = async (silent = false) => {
     if (!silent) setLoading(true);
@@ -108,6 +112,60 @@ export default function MikrotikPage() {
       setExporting(false);
     }
   };
+
+  // Filter logic for historical logs
+  const filteredLogs = wanLogs.filter(log => {
+    // Filter by WAN
+    if (selectedWan !== "all") {
+      const keys = Object.keys(log).filter(k => k !== 'time' && k !== 'fullDate');
+      const hasWan = keys.some(k => k.startsWith(selectedWan));
+      if (!hasWan) return false;
+    }
+
+    // Filter by Date Range
+    const logDate = log.fullDate;
+    if (!logDate) return true;
+    
+    const now = new Date();
+    if (dateRange === "today") {
+      return logDate >= startOfDay(now) && logDate <= endOfDay(now);
+    } else if (dateRange === "7d") {
+      return logDate >= startOfDay(subDays(now, 7));
+    } else if (dateRange === "30d") {
+      return logDate >= startOfDay(subDays(now, 30));
+    }
+    
+    return true;
+  });
+
+
+  // Calculate hourly aggregation for speedtest results
+  // Note: We use raw wan_logs here, but in a real scenario we'd query specifically for the speedtest records
+  const hourlyData = filteredLogs.reduce((acc: any[], log: any) => {
+    const hour = log.time.split(':')[0] + ':00';
+    let existing = acc.find(a => a.hour === hour);
+    if (!existing) {
+      existing = { hour };
+      acc.push(existing);
+    }
+    
+    // Sum/Avg values for the hour
+    Object.keys(log).forEach(key => {
+      if (key !== 'time' && key !== 'fullDate') {
+        existing[key] = (existing[key] || 0) + log[key];
+        existing[`${key}_count`] = (existing[`${key}_count`] || 0) + 1;
+      }
+    });
+    return acc;
+  }, []).map(item => {
+    const result = { hour: item.hour };
+    Object.keys(item).forEach(key => {
+      if (key !== 'hour' && !key.endsWith('_count')) {
+        result[key] = item[key] / item[`${key}_count`];
+      }
+    });
+    return result;
+  });
 
   return (
     <div className="space-y-6">
@@ -346,6 +404,89 @@ export default function MikrotikPage() {
           )}
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <div>
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <BarChart3 className="h-5 w-5 text-primary" />
+              Relatório de Desempenho por Hora
+            </CardTitle>
+            <CardDescription>
+              Média de velocidade consumida por WAN em intervalos de 1 hora
+            </CardDescription>
+          </div>
+          <div className="flex gap-2">
+            <Select value={selectedWan} onValueChange={setSelectedWan}>
+              <SelectTrigger className="w-[180px] h-8">
+                <Filter className="h-3 w-3 mr-2" />
+                <SelectValue placeholder="Todas Interfaces" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas Interfaces</SelectItem>
+                {status?.wans?.map((w: any) => (
+                  <SelectItem key={w.name} value={w.name}>{w.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={dateRange} onValueChange={setDateRange}>
+              <SelectTrigger className="w-[150px] h-8">
+                <Calendar className="h-3 w-3 mr-2" />
+                <SelectValue placeholder="Período" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="today">Hoje</SelectItem>
+                <SelectItem value="7d">Últimos 7 dias</SelectItem>
+                <SelectItem value="30d">Últimos 30 dias</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {loadingWan ? (
+            <div className="flex h-[300px] items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : hourlyData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={320}>
+              <BarChart data={hourlyData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" vertical={false} />
+                <XAxis dataKey="hour" className="text-xs" />
+                <YAxis
+                  className="text-xs"
+                  width={64}
+                  tickFormatter={(v) => `${v.toFixed(1)} Mb/s`}
+                />
+                <Tooltip
+                  contentStyle={{
+                    background: "hsl(var(--popover))",
+                    border: "1px solid hsl(var(--border))",
+                    borderRadius: "0.5rem",
+                    fontSize: "0.75rem",
+                  }}
+                />
+                <Legend />
+                {(() => {
+                  const keys = Object.keys(hourlyData[0] || {}).filter(k => k !== 'hour' && k.endsWith('↓'));
+                  const colors = ['#14b8a6', '#8b5cf6', '#f59e0b', '#f43f5e', '#10b981', '#3b82f6'];
+                  return keys.map((key, i) => (
+                    <Bar 
+                      key={key} 
+                      dataKey={key} 
+                      name={key.replace(' ↓', '')} 
+                      fill={colors[i % colors.length]} 
+                      radius={[4, 4, 0, 0]}
+                    />
+                  ));
+                })()}
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <p className="text-center py-12 text-muted-foreground">Dados insuficientes para gerar o gráfico horário.</p>
+          )}
+        </CardContent>
+      </Card>
+
 
       <div className="grid gap-6 md:grid-cols-2">
         <Card>

@@ -29,8 +29,10 @@ export const useMikrotikLogs = () => {
     if (!error && data) {
       const grouped: Record<string, any> = {};
       data.forEach((log: any) => {
-        const time = new Date(log.created_at).toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-        if (!grouped[time]) grouped[time] = { time };
+        const dateObj = new Date(log.created_at);
+        const time = dateObj.toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        const fullKey = `${dateObj.toISOString()}_${time}`; // Keep uniqueness if needed, or just time
+        if (!grouped[time]) grouped[time] = { time, fullDate: dateObj };
         // Download (rx) e Upload (tx) monitorados separadamente, em Mbps
         grouped[time][`${log.interface_name} ↓`] = Number(log.rx_bps || 0) / 1_000_000;
         grouped[time][`${log.interface_name} ↑`] = Number(log.tx_bps || 0) / 1_000_000;
