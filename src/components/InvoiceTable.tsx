@@ -230,11 +230,11 @@ export default function InvoiceTable({ invoices, onCheckPayment, onCancel, onMar
                         </Button>
                         
                         {(inv as any).customers?.id && (
-                          <>
+                          <div className="flex border-l ml-1 pl-1 gap-1">
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 text-orange-600 hover:text-orange-700"
+                              className="h-8 w-8 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
                               title="Bloquear no Mikrotik"
                               disabled={mikrotikLoading === (inv as any).customers.id}
                               onClick={() => syncMikrotik((inv as any).customers.id, 'disable')}
@@ -248,7 +248,7 @@ export default function InvoiceTable({ invoices, onCheckPayment, onCancel, onMar
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 text-teal-600 hover:text-teal-700"
+                              className="h-8 w-8 text-teal-600 hover:text-teal-700 hover:bg-teal-50"
                               title="Desbloquear no Mikrotik"
                               disabled={mikrotikLoading === (inv as any).customers.id}
                               onClick={() => syncMikrotik((inv as any).customers.id, 'enable')}
@@ -259,7 +259,7 @@ export default function InvoiceTable({ invoices, onCheckPayment, onCancel, onMar
                                 <ShieldCheck className="h-4 w-4" />
                               )}
                             </Button>
-                          </>
+                          </div>
                         )}
 
                         <Button
