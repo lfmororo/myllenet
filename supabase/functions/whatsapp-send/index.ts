@@ -334,7 +334,7 @@ async function sendInvoiceNotification(req: Request) {
   try {
     const formattedPhone = formatPhone(customer.telefone);
     const invoiceUrl = `https://myllenet.lovable.app/fatura/${invoice_id}`;
-    const fullMessage = message + `\n\n🔗 *Link da Fatura:* ${invoiceUrl}` + BOT_DISCLAIMER;
+    const fullMessage = message + BOT_DISCLAIMER;
     
     // First send the text message with the link
     const result = await uazapiRequest(UAZAPI_TEXT_ENDPOINT, {
