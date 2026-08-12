@@ -87,13 +87,6 @@ Deno.serve(async (req) => {
       let status = 'Error'
 
       try {
-        // Tentar rodar o import do script
-        await fetch(`http://${host}:${port}/rest/import`, {
-          method: 'POST',
-          headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json', Connection: 'close' },
-          body: JSON.stringify({ "file-name": "speedteste.rsc" })
-        }).catch(e => console.error("Import failed:", e.message))
-
         // Definir o payload para o fetch (mesma lógica do script .rsc)
         const fetchPayload = {
           url: testUrl,
@@ -101,6 +94,17 @@ Deno.serve(async (req) => {
           duration: "10s",
           mode: "http",
           "as-value": true
+        }
+
+        // Tentar rodar o import do script primeiro
+        try {
+          await fetch(`http://${host}:${port}/rest/import`, {
+            method: 'POST',
+            headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json', Connection: 'close' },
+            body: JSON.stringify({ "file-name": "speedteste.rsc" })
+          })
+        } catch (e) {
+          console.log("Import not supported or failed, falling back to tool fetch")
         }
 
         const resFetch = await fetch(`http://${host}:${port}/rest/tool/fetch`, {
@@ -121,7 +125,7 @@ Deno.serve(async (req) => {
         }
       } catch (e: any) {
         console.error(`[Speedtest] Exception ${interfaceName}:`, e.message)
-        status = `Exception: ${e.message.slice(0, 30)}`
+        status = 'Exception'
       }
       
       results.push({
