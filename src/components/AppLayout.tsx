@@ -55,7 +55,7 @@ function AppSidebar() {
     <Sidebar collapsible="offcanvas" className="border-r border-sidebar-border">
       {/* Logo area */}
       <div className="flex items-center gap-3 px-5 py-5 border-b border-sidebar-border overflow-hidden bg-white/5">
-        <img src={logoImg} alt="Mororo.Tech" className="h-10 w-auto max-w-[140px] object-contain brightness-110 contrast-125 drop-shadow-[0_0_8px_rgba(255,255,255,0.2)]" />
+        <img src={logoImg} alt="Mororo.Tech" className="h-10 w-auto max-w-[140px] object-contain logo-high-contrast" />
         <div className="overflow-hidden">
           
           <p className="text-[11px] text-sidebar-foreground/60 truncate">{user?.email}</p>

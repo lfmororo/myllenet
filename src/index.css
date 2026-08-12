@@ -121,3 +121,12 @@ a[href*="lovable.dev"][target="_blank"] {
 .auth-logo-container {
   background-color: transparent;
 }
+
+/* High Contrast mode for logo visibility */
+.logo-high-contrast {
+  filter: drop-shadow(0 0 1px white) drop-shadow(0 0 1px white) brightness(1.1);
+}
+
+.dark .logo-high-contrast {
+  filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.4)) brightness(1.2);
+}
