@@ -264,12 +264,27 @@ Deno.serve(async (req) => {
 
     const pdfOutput = doc.output("arraybuffer");
 
-    return new Response(pdfOutput, {
-      headers: {
-        ...corsHeaders,
-        "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="Fatura_${invoice.descricao.replace(/\s+/g, '_')}.pdf"`
-      },
+    return new Response(JSON.stringify({ 
+      success: true, 
+      data: {
+        invoice,
+        customer,
+        plan,
+        consumption: {
+          download: totalDownload.toFixed(2),
+          upload: totalUpload.toFixed(2),
+          interruptions
+        },
+        pix: {
+          payload: pixPayload,
+          key: pixSettings.pix_key,
+          name: pixSettings.pix_name,
+          cnpj: pixSettings.company_cnpj,
+          phone: pixSettings.company_phone
+        }
+      }
+    }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
 
   } catch (err) {
