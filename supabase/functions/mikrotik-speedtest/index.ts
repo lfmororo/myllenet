@@ -87,72 +87,54 @@ Deno.serve(async (req) => {
         "src-address": ip,
         duration: "10s",
         mode: "http",
-        "keep-result": "yes"
+        "as-value": true
       }
 
       console.log(`[Speedtest] Inciando fetch na interface ${interfaceName} (IP: ${ip})`)
-      const resFetch = await fetch(`http://${host}:${port}/rest/tool/fetch`, {
-        method: 'POST',
-        headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json', Connection: 'close' },
-        body: JSON.stringify(fetchPayload)
-      })
-
-      // Esperar 11 segundos para o fetch terminar no roteador
-      await new Promise(resolve => setTimeout(resolve, 11000))
-
-      // Agora consultamos o resultado do fetch
-      // No Mikrotik v7, o tool fetch pode deixar um resultado temporário ou o log.
-      // O script original usa [:pick $downloaded 0 ([:len $downloaded]-1)]
-      // Vamos tentar capturar o tráfego da interface durante esse período ou o log de download
       
-      const resStatus = await fetch(`http://${host}:${port}/rest/interface?name=${encodeURIComponent(interfaceName)}`, {
-        headers: { Authorization: `Basic ${auth}`, Connection: 'close' }
-      })
+      let mbps = 0
+      let rx_bytes = 0
+      let status = 'Error'
 
-      if (resStatus.ok) {
-        const ifaceData = await resStatus.json()
-        const i = ifaceData?.[0]
-        const downloadedBytes = parseInt(i?.['rx-byte'] || '0')
-        
-        // Para maior precisão, o script original lê a variável do fetch. 
-        // Como a API REST é assíncrona, se o retorno do POST acima não trouxer o dado, 
-        // tentamos capturar o 'downloaded' do resultado se disponível.
-        let mbps = 0
-        let rx_bytes = 0
+      try {
+        const resFetch = await fetch(`http://${host}:${port}/rest/tool/fetch`, {
+          method: 'POST',
+          headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json', Connection: 'close' },
+          body: JSON.stringify(fetchPayload)
+        })
 
-        try {
+        if (resFetch.ok) {
           const fetchResult = await resFetch.json()
+          // O Mikrotik v7 retorna os dados do fetch no corpo da resposta se usarmos "as-value"
+          // O campo 'downloaded' vem como string ou número
           rx_bytes = parseInt(fetchResult.downloaded || '0')
           mbps = Math.round(((rx_bytes * 8) / (10 * 1024 * 1024)) * 100) / 100
-        } catch {
-          // Fallback: se não conseguirmos o JSON do fetch, usamos a diferença de bytes da interface
-          // (isso é menos preciso mas evita o 0.00 se o fetch funcionou)
-          rx_bytes = 0 
+          status = mbps > 0 ? 'Success' : 'Success (No Traffic)'
+          console.log(`[Speedtest] Resultado ${interfaceName}: ${mbps} Mbps (${rx_bytes} bytes)`)
+        } else {
+          const errText = await resFetch.text()
+          console.error(`[Speedtest] Erro fetch ${interfaceName}:`, resFetch.status, errText)
+          status = 'Fetch Failed'
         }
-        
-        results.push({
-          interface_name: interfaceName,
-          rx_bytes: rx_bytes,
-          tx_bytes: 0,
-          mbps: mbps,
-          status: mbps > 0 ? 'Success' : 'Low Traffic',
-          created_at: new Date().toISOString()
-        })
-      } else {
-        results.push({
-          interface_name: interfaceName,
-          rx_bytes: 0,
-          tx_bytes: 0,
-          mbps: 0,
-          status: 'Error',
-          created_at: new Date().toISOString()
-        })
+      } catch (e) {
+        console.error(`[Speedtest] Exception fetch ${interfaceName}:`, e.message)
+        status = 'Exception'
       }
+      
+      results.push({
+        interface_name: interfaceName,
+        rx_bytes: rx_bytes,
+        tx_bytes: 0,
+        mbps: mbps,
+        status: status,
+        created_at: new Date().toISOString()
+      })
     }
 
     // Insert into wan_logs
     await supabase.from('wan_logs').insert(results.map(r => ({
-      interface_name: r.interface_name, rx_bps: Math.round(r.mbps * 1000000),
+      interface_name: r.interface_name,
+      rx_bps: Math.round(r.mbps * 1000000),
       rx_bytes: r.rx_bytes,
       tx_bytes: r.tx_bytes,
       created_at: r.created_at
