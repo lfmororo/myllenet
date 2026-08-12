@@ -8,8 +8,8 @@ const corsHeaders = {
 
 const UAZAPI_BASE_URL = "https://ipazua.uazapi.com/api"; 
 const BOT_DISCLAIMER = "\n\n🤖 _Esta é uma mensagem automática. Para falar com um atendente, entre em contato: (85) 98680-1458_";
-const UAZAPI_FILE_ENDPOINT = "/send/media"; 
-const UAZAPI_TEXT_ENDPOINT = "/send/text";
+const UAZAPI_FILE_ENDPOINT = "/sendMessageFile"; 
+const UAZAPI_TEXT_ENDPOINT = "/sendMessageText";
 
 function getSupabaseAdmin() {
   return createClient(
@@ -101,7 +101,7 @@ async function uazapiRequest(endpoint: string, body: unknown) {
 
 async function sendSupportButton(phone: string) {
   try {
-    await uazapiRequest("/send-menu", {
+    await uazapiRequest("/sendMessageMenu", {
       number: phone,
       type: "button",
       text: "Precisa de Suporte?",
@@ -349,13 +349,12 @@ async function sendInvoiceNotification(req: Request) {
       console.log(`[PDF] Requesting UAZAPI to send PDF from URL: ${pdfUrl}`);
       
       try {
-        // UAZAPI /send/media expects type: "document" for PDF files and the URL in the "file" field
+        // UAZAPI /sendMessageFile expects number, url, caption, and name
         const fileResult = await uazapiRequest(UAZAPI_FILE_ENDPOINT, {
           number: formattedPhone,
-          type: "document",
-          file: pdfUrl,
-          text: `Fatura Mororo.Tech - ${invoice.descricao}`,
-          docName: fileName
+          url: pdfUrl,
+          caption: `Fatura Mororo.Tech - ${invoice.descricao}`,
+          name: fileName
         });
         console.log("[PDF] UAZAPI response:", fileResult);
       } catch (fileErr) {
