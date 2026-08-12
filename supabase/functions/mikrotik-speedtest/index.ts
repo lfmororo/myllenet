@@ -146,6 +146,9 @@ Deno.serve(async (req) => {
       body: {
         phone: ADMIN_PHONE,
         message: message
+      },
+      headers: {
+        Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
       }
     })
 
