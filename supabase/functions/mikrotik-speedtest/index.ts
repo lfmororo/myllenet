@@ -131,7 +131,7 @@ Deno.serve(async (req) => {
             if (matches) reportedDuration = Math.max(1, parseInt(matches[1]));
           }
           
-          mbps = Math.round(((rx_bytes * 8) / (reportedDuration * 1000000)) * 100) / 100
+          mbps = Math.round(((rx_bytes * 8) / (reportedDuration * 1000 * 1000)) * 100) / 100
           status = mbps > 0 ? 'Success' : 'Success (No Traffic)'
         } else {
           const errText = await resFetch.text()
