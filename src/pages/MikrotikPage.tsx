@@ -383,7 +383,7 @@ export default function MikrotikPage() {
                     const num = Number(v);
                     const label = String(name).endsWith("↑") ? "Upload" : "Download";
                     const iface = String(name).replace(/ [↑↓]$/, "");
-                    const value = num >= 1 ? `${num.toFixed(2)} Mb/s` : `${(num * 1000).toFixed(0)} Kb/s`;
+                    const value = `${num.toFixed(2)} Mbps`;
                     return [value, `${iface} · ${label}`];
                   }}
                 />
