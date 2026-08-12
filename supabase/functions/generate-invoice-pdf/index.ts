@@ -143,8 +143,8 @@ Deno.serve(async (req) => {
 
     // Logo
     try {
-      const logoUrl = "https://myllenet.lovable.app/logo.png";
-      const resp = await fetch(logoUrl);
+      const logoUrl = "https://id-preview--6764dda2-b135-4fa9-a305-075890df89c3.lovable.app/logo.png";
+      const resp = await fetch(logoUrl, { signal: AbortSignal.timeout(2000) });
       if (resp.ok) {
         const blob = await resp.blob();
         const buffer = await blob.arrayBuffer();
