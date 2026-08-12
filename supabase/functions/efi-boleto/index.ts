@@ -145,12 +145,16 @@ async function verifyAdmin(authHeader: string | null) {
   if (!authHeader?.startsWith("Bearer ")) {
     throw new Error("Unauthorized");
   }
-  const supabase = getSupabaseClient(authHeader);
+  const adminClient = getSupabaseAdmin();
   const token = authHeader.replace("Bearer ", "");
-  const { data, error } = await supabase.auth.getClaims(token);
-  if (error || !data?.claims) throw new Error("Unauthorized");
+  const { data: { user }, error } = await adminClient.auth.getUser(token);
   
-  const userId = data.claims.sub as string;
+  if (error || !user) {
+    console.error("Auth error:", error);
+    throw new Error("Unauthorized");
+  }
+  
+  const userId = user.id;
   
   // Check admin role using service role
   const admin = getSupabaseAdmin();
