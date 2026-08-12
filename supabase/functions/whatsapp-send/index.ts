@@ -303,17 +303,25 @@ async function sendInvoiceNotification(req: Request) {
   const notifType = type || "boleto_gerado";
 
   switch (notifType) {
-    case "boleto_gerado":
+    case "boleto_gerado": {
       const mesRef = new Date(invoice.vencimento + "T12:00:00").toLocaleDateString("pt-BR", { month: 'long', year: 'numeric' });
       message = `Olá ${customer.nome}! 🌐\n\nSua fatura da *Mororo.Tech* referente a *${mesRef}* foi gerada:\n\n📋 ${invoice.descricao}\n💰 Valor: ${valor}\n📅 Vencimento: ${vencimento}`;
-      if (invoice.efi_link) message += `\n\n🔗 Boleto: ${invoice.efi_link}`;
-      if (invoice.efi_barcode) message += `\n\n📊 Código de barras:\n${invoice.efi_barcode}`;
-      if (invoice.efi_pix_copiacola) message += `\n\n📱 PIX Copia e Cola:\n${invoice.efi_pix_copiacola}`;
+      
+      const functionUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/generate-invoice-pdf`;
+      const pdfLink = `${functionUrl}?invoice_id=${invoice_id}`;
+      
+      message += `\n\n📄 *Sua Fatura PDF:* ${pdfLink}`;
+      
+      if (invoice.efi_link) message += `\n\n🔗 *Link Alternativo:* ${invoice.efi_link}`;
+      if (invoice.efi_pix_copiacola) message += `\n\n📱 *PIX Copia e Cola:*\n${invoice.efi_pix_copiacola}`;
+      
       message += "\n\nQualquer dúvida, estamos à disposição! 😊";
       break;
+    }
     case "lembrete_vencimento":
-      message = `Olá ${customer.nome}! 🌐\n\n⏰ Lembrete: sua fatura da *Mororo.Tech* vence em breve!\n\n📋 ${invoice.descricao}\n💰 Valor: ${valor}\n📅 Vencimento: ${vencimento}`;
-      if (invoice.efi_link) message += `\n\n🔗 Boleto: ${invoice.efi_link}`;
+      const reminderPdfLink = `${Deno.env.get("SUPABASE_URL")}/functions/v1/generate-invoice-pdf?invoice_id=${invoice_id}`;
+      message = `Olá ${customer.nome}! 🌐\n\n⏰ Lembrete: sua fatura da *Mororo.Tech* vence em breve!\n\n📋 ${invoice.descricao}\n💰 Valor: ${valor}\n📅 Vencimento: ${vencimento}\n\n📄 *Fatura PDF:* ${reminderPdfLink}`;
+      if (invoice.efi_link) message += `\n\n🔗 *Link Alternativo:* ${invoice.efi_link}`;
       message += "\n\nEvite a suspensão do serviço. Pague em dia! 😊";
       break;
     case "pagamento_confirmado":
@@ -321,8 +329,10 @@ async function sendInvoiceNotification(req: Request) {
       break;
     case "cobranca_atrasada":
       message = `Olá ${customer.nome}! 🌐\n\n⚠️ Sua fatura da *Mororo.Tech* está vencida!\n\n📋 ${invoice.descricao}\n💰 Valor: ${valor}\n📅 Vencimento: ${vencimento}`;
-      if (invoice.efi_link) message += `\n\n🔗 Boleto: ${invoice.efi_link}`;
-      message += "\n\nRegularize para evitar a suspensão do serviço. Em caso de dúvidas, entre em contato!";
+      const overdueFunctionUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/generate-invoice-pdf`;
+      const overduePdfLink = `${overdueFunctionUrl}?invoice_id=${invoice_id}`;
+      if (invoice.efi_link) message += `\n\n📄 *Fatura PDF:* ${overduePdfLink}`;
+      if (invoice.efi_link) message += `\n\n🔗 *Link Alternativo:* ${invoice.efi_link}`;
       break;
     default:
       message = `Olá ${customer.nome}! Informação sobre sua fatura: ${invoice.descricao} - ${valor}`;

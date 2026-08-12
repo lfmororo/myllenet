@@ -159,22 +159,22 @@ export default function InvoiceTable({ invoices, onCheckPayment, onCancel, onMar
                         </DropdownMenuContent>
                       </DropdownMenu>
                     )}
-                    {/* Send link button - prominent when efi_link exists */}
-                    {inv.efi_link && inv.status !== "paid" && inv.status !== "cancelled" && (
+                    {/* Send PDF button - prominent when pending/overdue */}
+                    {inv.status !== "paid" && inv.status !== "cancelled" && (
                       <Button
                         variant="outline"
                         size="sm"
-                        className="h-8 text-xs px-2 text-green-600 border-green-200 hover:bg-green-50 hover:text-green-700"
-                        title="Enviar link do boleto via WhatsApp"
-                        disabled={sending === inv.id}
+                        className="h-8 text-xs px-2 text-blue-600 border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+                        title="Enviar Fatura PDF via WhatsApp"
+                        disabled={sending === inv.id || generatingPDF}
                         onClick={() => sendInvoiceNotification(inv.id, "boleto_gerado")}
                       >
-                        {sending === inv.id ? (
+                        {sending === inv.id || generatingPDF ? (
                           <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
                         ) : (
                           <Send className="h-3.5 w-3.5 mr-1" />
                         )}
-                        Enviar Link
+                        Enviar Fatura
                       </Button>
                     )}
                     {inv.efi_barcode && (
