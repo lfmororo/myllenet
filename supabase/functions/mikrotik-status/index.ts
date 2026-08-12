@@ -73,6 +73,7 @@ Deno.serve(async (req) => {
       .select('key,value')
       .in('key', [
         'mikrotik_host',
+        'mikrotik_host_secondary',
         'mikrotik_username',
         'mikrotik_password',
         'mikrotik_api_port',
