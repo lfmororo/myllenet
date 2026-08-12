@@ -14,7 +14,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Loader2, Save, Upload, CheckCircle, XCircle, ShieldAlert, Zap, Plus, Pencil, Trash2, Package, MessageCircle, Users, Router } from "lucide-react";
+import { ArrowLeft, Loader2, Save, Upload, CheckCircle, XCircle, ShieldAlert, Zap, Plus, Pencil, Trash2, Package, MessageCircle, Users, Router, FileDown, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -50,6 +50,11 @@ export default function Settings() {
   const [blockingDays, setBlockingDays] = useState("15");
 
   const [savingMikrotik, setSavingMikrotik] = useState(false);
+  const [generatingReport, setGeneratingReport] = useState(false);
+  const [reportDates, setReportDates] = useState({
+    start: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    end: new Date().toISOString().split('T')[0]
+  });
 
   // User management state
   interface SystemUser {
@@ -260,6 +265,40 @@ export default function Settings() {
     setTesting(false);
   };
 
+  const handleDownloadDiagnosticReport = async () => {
+    setGeneratingReport(true);
+    try {
+      const headers = await getAuthHeaders();
+      if (!headers) { setGeneratingReport(false); return; }
+      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+      const res = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/api-diagnostic-report?start=${reportDates.start}T00:00:00Z&end=${reportDates.end}T23:59:59Z`,
+        { headers }
+      );
+      
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Erro ao gerar relatório");
+      }
+      
+      const data = await res.json();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `diagnostico-api-${reportDates.start}-a-${reportDates.end}.json`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast.success("Relatório de diagnóstico baixado com sucesso!");
+    } catch (err: any) {
+      toast.error("Erro ao gerar relatório: " + err.message);
+    }
+    setGeneratingReport(false);
+  };
+
   if (authLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -306,6 +345,9 @@ export default function Settings() {
               <Router className="mr-1.5 h-4 w-4" /> Mikrotik
             </TabsTrigger>
             <TabsTrigger value="pix">PIX Local</TabsTrigger>
+            <TabsTrigger value="diagnostic">
+              <ShieldAlert className="mr-1.5 h-4 w-4" /> Diagnóstico
+            </TabsTrigger>
           </TabsList>
 
           {/* Plans Tab */}
@@ -742,6 +784,67 @@ export default function Settings() {
                 >
                   {savingPix && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Salvar Configurações PIX
+                </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="diagnostic" className="mt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Diagnóstico da API</CardTitle>
+                <CardDescription>
+                  Gere um relatório completo com métricas de chamadas à API, erros por rota, tempo de resposta e histórico de falhas.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Data Inicial</Label>
+                    <div className="relative">
+                      <Input 
+                        type="date" 
+                        value={reportDates.start} 
+                        onChange={(e) => setReportDates({ ...reportDates, start: e.target.value })} 
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Data Final</Label>
+                    <div className="relative">
+                      <Input 
+                        type="date" 
+                        value={reportDates.end} 
+                        onChange={(e) => setReportDates({ ...reportDates, end: e.target.value })} 
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-muted/50 p-4 rounded-lg border text-sm space-y-2">
+                  <p className="font-semibold flex items-center gap-2">
+                    <Zap className="h-4 w-4 text-primary" /> O que este relatório inclui:
+                  </p>
+                  <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+                    <li>Métricas detalhadas da API EFI Pay (sucesso vs erro)</li>
+                    <li>Tempo médio de resposta das integrações</li>
+                    <li>Logs de notificações via WhatsApp (falhas e motivos)</li>
+                    <li>Histórico de conectividade com o Mikrotik</li>
+                    <li>Erros agrupados por rota/endpoint</li>
+                  </ul>
+                </div>
+
+                <Button 
+                  onClick={handleDownloadDiagnosticReport}
+                  disabled={generatingReport}
+                  className="w-full"
+                >
+                  {generatingReport ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <FileDown className="mr-2 h-4 w-4" />
+                  )}
+                  Baixar Relatório de Diagnóstico (.JSON)
                 </Button>
               </CardContent>
             </Card>
