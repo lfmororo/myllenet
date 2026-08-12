@@ -1132,6 +1132,7 @@ async function bulkCheckPayments(req: Request) {
   const paidInvoiceIds: string[] = [];
 
 
+  console.log(`[bulk-check] Processing ${pendingInvoices.length} invoices...`);
   for (const inv of pendingInvoices) {
     try {
       const efiResponse = await efiRequest(`/v1/charge/${inv.efi_charge_id}`, "GET", undefined, "bulk_check");
