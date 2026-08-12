@@ -35,7 +35,8 @@ export function useInvoicePDF() {
       doc.setFillColor(accentColor[0], accentColor[1], accentColor[2]);
       doc.rect(0, 0, pageWidth, 5, "F");
 
-      doc.setFillColor(bgColor[0], bgColor[1], bgColor[2]);
+      // Background matching for header transparency
+      doc.setFillColor(255, 255, 255); // White background
       doc.rect(0, 5, pageWidth, 50, "F");
 
       // Logo
