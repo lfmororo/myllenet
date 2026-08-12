@@ -112,3 +112,12 @@ a[href*="lovable.dev"][target="_blank"] {
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
 }
+
+/* Specific styling for the new logo integration */
+.sidebar-logo-container {
+  background-color: hsl(var(--sidebar-background));
+}
+
+.auth-logo-container {
+  background-color: transparent;
+}
