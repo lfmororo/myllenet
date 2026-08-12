@@ -166,7 +166,9 @@ Deno.serve(async (req) => {
     const ADMIN_PHONE = '85986801458'
     let message = `🚀 *SPEED TEST MIKROTIK (MORORO.TECH)* 🚀\n\n`
     const now = new Date();
-    const formattedDate = now.toLocaleDateString('pt-BR') + ', ' + now.toLocaleTimeString('pt-BR');
+    // Offset for Brazil/Fortaleza (UTC-3)
+    const brDate = new Date(now.getTime() - (3 * 3600 * 1000));
+    const formattedDate = brDate.toLocaleDateString('pt-BR') + ', ' + brDate.toLocaleTimeString('pt-BR');
     message += `📅 Data: ${formattedDate}\n\n`
     
     for (const res of results) {
