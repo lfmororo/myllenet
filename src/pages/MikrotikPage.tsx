@@ -349,7 +349,7 @@ export default function MikrotikPage() {
           <div>
             <CardTitle className="text-base">Monitoramento de Tráfego WAN</CardTitle>
             <CardDescription>
-              Linha cheia = Download (↓) · linha tracejada = Upload (↑) · valores em Mb/s — {live ? "atualizando a cada 10s" : "atualização pausada"}
+              Linha cheia = Download (↓) · linha tracejada = Upload (↑) · valores em Mbps — {live ? "atualizando a cada 10s" : "atualização pausada"}
             </CardDescription>
 
 
