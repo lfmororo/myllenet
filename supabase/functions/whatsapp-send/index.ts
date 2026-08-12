@@ -6,10 +6,10 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const UAZAPI_BASE_URL = "https://ipazua.uazapi.com/api"; // UAZAPI base URL
+const UAZAPI_BASE_URL = "https://ipazua.uazapi.com/api"; 
 const BOT_DISCLAIMER = "\n\n🤖 _Esta é uma mensagem automática. Para falar com um atendente, entre em contato: (85) 98680-1458_";
-const UAZAPI_FILE_ENDPOINT = "/sendMessageFile"; 
-const UAZAPI_TEXT_ENDPOINT = "/sendMessageText";
+const UAZAPI_FILE_ENDPOINT = "/send-file"; 
+const UAZAPI_TEXT_ENDPOINT = "/send-text";
 
 function getSupabaseAdmin() {
   return createClient(
@@ -101,7 +101,7 @@ async function uazapiRequest(endpoint: string, body: unknown) {
 
 async function sendSupportButton(phone: string) {
   try {
-    await uazapiRequest("/sendMessageMenu", {
+    await uazapiRequest("/send-menu", {
       number: phone,
       type: "button",
       text: "Precisa de Suporte?",
