@@ -35,9 +35,9 @@ serve(async (req) => {
     const endDate = url.searchParams.get("end") || new Date().toISOString();
 
     const [efiLogs, notificationLogs, mikrotikLogs] = await Promise.all([
-      supabase.from("efi_api_logs").select("*").gte("created_at", startDate).lte("created_at", endDate).order('created_at', { ascending: true }),
-      supabase.from("notification_logs").select("*").gte("created_at", startDate).lte("created_at", endDate),
-      supabase.from("mikrotik_status_history").select("*").gte("logged_at", startDate).lte("logged_at", endDate),
+      supabase.from("efi_api_logs").select("*").gte("created_at", startDate).lte("created_at", endDate).order('created_at', { ascending: false }),
+      supabase.from("notification_logs").select("*").gte("created_at", startDate).lte("created_at", endDate).order('created_at', { ascending: false }),
+      supabase.from("mikrotik_status_history").select("*").gte("logged_at", startDate).lte("logged_at", endDate).order('logged_at', { ascending: false }),
     ]);
 
     const efiData = efiLogs.data || [];
