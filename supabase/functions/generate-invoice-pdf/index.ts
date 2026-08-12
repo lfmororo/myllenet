@@ -40,7 +40,8 @@ function generatePixPayload(key: string, name: string, city: string, amount: num
   
   const sName = sanitize(name).substring(0, 25);
   const sCity = sanitize(city).substring(0, 15);
-  const sDesc = sanitize(description).substring(0, 25);
+  // TxID must be between 1 and 25 characters
+  const txid = sanitize(description).replace(/\s/g, "").substring(0, 25);
   
   const merchantAccountInfo = f("00", "BR.GOV.BCB.PIX") + f("01", key);
   
@@ -53,7 +54,8 @@ function generatePixPayload(key: string, name: string, city: string, amount: num
   payload += f("59", sName); // Merchant Name
   payload += f("60", sCity); // Merchant City
   
-  const additionalData = f("05", sDesc); // Reference Label
+  // Tag 62 must contain tag 05 (Transaction ID)
+  const additionalData = f("05", txid || "INV" + Date.now().toString().slice(-10));
   payload += f("62", additionalData);
   
   payload += "6304"; // CRC16 indicator
