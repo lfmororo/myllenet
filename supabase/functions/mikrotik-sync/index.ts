@@ -177,7 +177,7 @@ Deno.serve(async (req) => {
       const { data: pendingAlerts } = await supabase
         .from('block_alerts_sent' as any)
         .select('*, customers(nome, telefone)')
-        .is('processed' as any, null)
+        .eq('processed' as any, false)
         .limit(30)
 
       for (const alert of (pendingAlerts as any[]) || []) {
