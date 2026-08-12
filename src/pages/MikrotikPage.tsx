@@ -239,7 +239,7 @@ export default function MikrotikPage() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Mikrotik - Gestão</h2>
-          <p className="text-muted-foreground">O Mikrotik realiza testes de velocidade através do comando <code>tool fetch</code> e monitoramento das WANs periodicamente, gerando gráficos de desempenho por hora e alertas de velocidade configuráveis. Se a API REST não responder, verifique se o serviço WWW está habilitado no roteador e se a porta está liberada no firewall (<code>/ip firewall filter add chain=input action=accept protocol=tcp dst-port=80,443,8728 comment="Allow Mikrotik API"</code>).</p>
+          <p className="text-muted-foreground">O Mikrotik realiza testes de velocidade e monitoramento das WANs periodicamente. Se houver falha de conexão, verifique se o serviço WWW está habilitado e as portas liberadas no firewall.</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={downloadMikrotikScript} disabled={exporting}>
