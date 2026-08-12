@@ -101,7 +101,7 @@ async function uazapiRequest(endpoint: string, body: unknown) {
 
 async function sendSupportButton(phone: string) {
   try {
-    await uazapiRequest("/sendMessageMenu", {
+    await uazapiRequest("/send-menu", {
       number: phone,
       type: "button",
       text: "Precisa de Suporte?",
