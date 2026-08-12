@@ -605,7 +605,7 @@ export default function MikrotikPage() {
                       </div>
                       <div>
                         <p className="text-sm font-medium text-muted-foreground">Upload Médio</p>
-                        <p className="text-xl font-bold">{drillDownData.upload?.toFixed(2)} Mb/s</p>
+                        <p className="text-xl font-bold">{drillDownData.upload?.toFixed(2)} Mbps</p>
                       </div>
                     </div>
                   </div>
