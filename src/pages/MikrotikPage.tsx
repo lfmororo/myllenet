@@ -320,6 +320,7 @@ export default function MikrotikPage() {
                     const entries = (payload || []);
                     const groups = entries.reduce((acc: Record<string, any[]>, entry: any) => {
                       const iface = String(entry.value).replace(/ [↑↓]$/, "");
+                      if (iface === 'time' || iface === 'fullDate') return acc;
                       if (!acc[iface]) acc[iface] = [];
                       acc[iface].push(entry);
                       return acc;
@@ -363,7 +364,7 @@ export default function MikrotikPage() {
                 />
                 {(() => {
                   const last = wanLogs[wanLogs.length - 1] || {};
-                  const keys = Object.keys(last).filter(k => k !== 'time');
+                  const keys = Object.keys(last).filter(k => k !== 'time' && k !== 'fullDate');
                   const interfaces = Array.from(new Set(keys.map(k => k.replace(/ [↑↓]$/, ''))));
                   const families = [
                     { download: '#14b8a6', upload: '#2dd4bf' },   // teal
