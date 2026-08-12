@@ -299,11 +299,6 @@ export default function Settings() {
         document.body.removeChild(a);
         toast.success("Relatório de diagnóstico baixado com sucesso!");
       }
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-      
-      toast.success("Relatório de diagnóstico baixado com sucesso!");
     } catch (err: any) {
       toast.error("Erro ao gerar relatório: " + err.message);
     }
