@@ -295,12 +295,13 @@ export default function CustomersPage() {
           onDelete={setDeletingCustomer} 
           onToggleActive={toggleCustomerActive} 
           onDetail={setDetailCustomer} 
-          customerIdsWithInvoice={customerIdsWithInvoiceThisMonth} 
+          customerIdsWithInvoice={Object.assign(customerIdsWithInvoiceThisMonth, { _allInvoices: allInvoices })}
           plans={plans} 
           onlineList={onlineUsers} 
           syncMikrotik={syncMikrotik}
           mikrotikLoading={mikrotikActionsLoading}
         />
+
       )}
 
       <CustomerFormDialog open={formOpen} onOpenChange={setFormOpen} customer={editingCustomer} onSave={addCustomer} onUpdate={updateCustomer} plans={plans} />

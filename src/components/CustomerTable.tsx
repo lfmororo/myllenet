@@ -64,8 +64,9 @@ export default function CustomerTable({
               <TableHead className="font-semibold">Usuário PPPoE</TableHead>
               <TableHead className="font-semibold">Senha PPPoE</TableHead>
               {customerIdsWithInvoice && <TableHead className="font-semibold text-center">Boleto</TableHead>}
-              <TableHead className="font-semibold text-center">Status Bloqueio</TableHead>
+              <TableHead className="font-semibold text-center">Dias de Atraso</TableHead>
               <TableHead className="font-semibold text-center">Status</TableHead>
+
               <TableHead className="font-semibold text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
@@ -151,10 +152,26 @@ export default function CustomerTable({
                     </div>
                   </TableCell>
                   <TableCell className="text-center">
-                    <Badge variant={c.block_status === "blocked" ? "destructive" : "outline"} className="text-xs">
-                      {c.block_status === "blocked" ? "Bloqueado" : "Liberado"}
-                    </Badge>
+                    {(() => {
+                      const customerInvoices = (customerIdsWithInvoice as any)?._allInvoices?.filter((inv: any) => inv.customer_id === c.id) || [];
+                      const overdueInvoices = customerInvoices.filter((inv: any) => (inv.status === 'overdue' || inv.status === 'pending') && new Date(inv.vencimento + "T12:00:00") < now);
+                      
+                      if (overdueInvoices.length === 0) return <span className="text-muted-foreground text-xs">—</span>;
+                      
+                      const oldestVencimento = overdueInvoices.reduce((oldest: string, inv: any) => {
+                        return inv.vencimento < oldest ? inv.vencimento : oldest;
+                      }, overdueInvoices[0].vencimento);
+                      
+                      const days = Math.floor((now.getTime() - new Date(oldestVencimento + "T12:00:00").getTime()) / 86400000);
+                      
+                      return (
+                        <Badge variant="destructive" className="text-xs">
+                          {days} {days === 1 ? 'dia' : 'dias'}
+                        </Badge>
+                      );
+                    })()}
                   </TableCell>
+
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
                       {syncMikrotik && (
