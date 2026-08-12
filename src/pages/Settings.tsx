@@ -740,6 +740,7 @@ export default function Settings() {
                         setSavingMikrotik(true);
                         try {
                           await upsertSetting("mikrotik_host", mikrotikHost);
+                          await upsertSetting("mikrotik_host_secondary", mikrotikHostSecondary);
                           await upsertSetting("mikrotik_username", mikrotikUser);
                           await upsertSetting("mikrotik_password", mikrotikPass);
                           await upsertSetting("mikrotik_api_port", mikrotikApiPort);
