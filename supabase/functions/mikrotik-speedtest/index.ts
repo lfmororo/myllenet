@@ -44,7 +44,7 @@ Deno.serve(async (req) => {
     const interfaces = await resInt.json()
     // Identificar WANs conforme o script fornecido
     const wanNames = ["BrisanetPPoe", "pppoe-out1"]
-    const wanInterfaces = interfaces.filter((i: any) => wanNames.includes(i.name) || /wan|uplink|internet|link/i.test(`${i.name} ${i.comment}`))
+    const wanInterfaces = interfaces.filter((i: any) => wanNames.includes(i.name))
 
     if (wanInterfaces.length === 0) {
        return new Response(JSON.stringify({ error: "Nenhuma interface WAN encontrada" }), { 
@@ -114,9 +114,24 @@ Deno.serve(async (req) => {
         })
 
         if (resFetch.ok) {
-          const fetchResult = await resFetch.json()
-          rx_bytes = parseInt(fetchResult.downloaded || '0')
-          mbps = Math.round(((rx_bytes * 8) / (10 * 1024 * 1024)) * 100) / 100
+          const fetchResults = await resFetch.json()
+          // Mikrotik with as-value: true returns an array of progress snapshots
+          // We want the last one to get total downloaded bytes
+          const lastSnapshot = Array.isArray(fetchResults) 
+            ? fetchResults[fetchResults.length - 1] 
+            : fetchResults
+          
+          rx_bytes = parseInt(lastSnapshot.downloaded || '0')
+          // Calculate speed based on actual duration reported by Mikrotik if available
+          const reportedDurationStr = lastSnapshot.duration || '10s'
+          // Extract seconds from duration (e.g., "10s", "0s", "1m2s")
+          let reportedDuration = 10;
+          if (reportedDurationStr.includes('s')) {
+            const matches = reportedDurationStr.match(/(\d+)s/);
+            if (matches) reportedDuration = Math.max(1, parseInt(matches[1]));
+          }
+          
+          mbps = Math.round(((rx_bytes * 8) / (reportedDuration * 1000 * 1000)) * 100) / 100
           status = mbps > 0 ? 'Success' : 'Success (No Traffic)'
         } else {
           const errText = await resFetch.text()
@@ -150,13 +165,17 @@ Deno.serve(async (req) => {
     // Send WhatsApp Report to Admin
     const ADMIN_PHONE = '85986801458'
     let message = `🚀 *SPEED TEST MIKROTIK (MORORO.TECH)* 🚀\n\n`
-    message += `📅 Data: ${new Date().toLocaleString('pt-BR')}\n\n`
+    const now = new Date();
+    // Offset for Brazil/Fortaleza (UTC-3)
+    const brDate = new Date(now.getTime() - (3 * 3600 * 1000));
+    const formattedDate = brDate.toLocaleDateString('pt-BR') + ', ' + brDate.toLocaleTimeString('pt-BR');
+    message += `📅 Data: ${formattedDate}\n\n`
     
     for (const res of results) {
       message += `🌐 *Interface: ${res.interface_name}*\n`
       if (res.status === 'Success') {
-        message += `📥 Velocidade: *${res.mbps} Mbps*\n`
-        message += `📦 Downloaded: ${(res.rx_bytes / (1024 * 1024)).toFixed(2)} MB\n`
+        message += `📥 Velocidade: *${res.mbps.toFixed(2)} Mbps*\n`
+        message += `📦 Tráfego: ${(res.rx_bytes / (1024 * 1024)).toFixed(2)} MB\n`
       } else {
         message += `⚠️ Status: ${res.status}\n`
       }

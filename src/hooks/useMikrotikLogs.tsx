@@ -40,7 +40,7 @@ export const useMikrotikLogs = () => {
         
         // Se rx_bps está zerado, mas temos rx_bytes, é provavelmente um log de speedtest
         if (calculatedDownload <= 0 && rx_bytes > 0) {
-          calculatedDownload = (rx_bytes * 8) / (10 * 1024 * 1024);
+          calculatedDownload = (rx_bytes * 8) / (10 * 1000 * 1000);
         }
         
         // Garantir que as chaves existam para evitar que o gráfico oculte a série se um log estiver faltando
