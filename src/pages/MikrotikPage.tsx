@@ -151,7 +151,7 @@ export default function MikrotikPage() {
     
     // Sum/Avg values for the hour
     Object.keys(log).forEach(key => {
-      if (key !== 'time') {
+      if (key !== 'time' && key !== 'fullDate') {
         existing[key] = (existing[key] || 0) + log[key];
         existing[`${key}_count`] = (existing[`${key}_count`] || 0) + 1;
       }
