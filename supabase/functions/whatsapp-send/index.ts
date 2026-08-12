@@ -324,15 +324,16 @@ async function sendInvoiceNotification(req: Request) {
 
   try {
     const formattedPhone = formatPhone(customer.telefone);
-    const fullMessage = message + BOT_DISCLAIMER;
+    const invoiceUrl = `https://myllenet.lovable.app/fatura/${invoice_id}`;
+    const fullMessage = message + `\n\n🔗 *Link da Fatura:* ${invoiceUrl}` + BOT_DISCLAIMER;
     
-    // First send the text message
+    // First send the text message with the link
     const result = await uazapiRequest("/send/text", {
       number: formattedPhone,
       text: fullMessage,
     });
 
-    // If it's a billing notification, send the PDF attachment
+    // If it's a billing notification, try to send the PDF attachment as well
     if (["boleto_gerado", "lembrete_vencimento", "cobranca_atrasada"].includes(notifType)) {
       const pdfUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/generate-invoice-pdf?invoice_id=${invoice_id}`;
       const fileName = `Fatura_${invoice.descricao.replace(/\s+/g, '_')}.pdf`;
