@@ -32,6 +32,9 @@ export default function MikrotikPage() {
   const [speedThreshold, setSpeedThreshold] = useState("10");
   const [alertInterval, setAlertInterval] = useState("30");
   const [updatingSettings, setUpdatingSettings] = useState(false);
+  const [historyPage, setHistoryPage] = useState(1);
+  const historyItemsPerPage = 10;
+
 
 
 
@@ -608,14 +611,37 @@ export default function MikrotikPage() {
 
       <div className="grid gap-6 md:grid-cols-2">
         <Card className="md:col-span-2">
-          <CardHeader>
-            <CardTitle className="text-base font-semibold flex items-center gap-2">
-              <History className="h-4 w-4 text-primary" />
-              Histórico de Speedtests Realizados
-            </CardTitle>
-            <CardDescription>
-              Registros das últimas medições de tráfego efetuadas nas interfaces WAN.
-            </CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <History className="h-4 w-4 text-primary" />
+                Histórico de Speedtests Realizados
+              </CardTitle>
+              <CardDescription>
+                Registros das medições de tráfego efetuadas nas interfaces WAN.
+              </CardDescription>
+            </div>
+            {wanLogs.length > 0 && (
+              <div className="flex items-center gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setHistoryPage(p => Math.max(1, p - 1))}
+                  disabled={historyPage === 1}
+                >
+                  Anterior
+                </Button>
+                <span className="text-xs font-medium">Página {historyPage}</span>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setHistoryPage(p => p + 1)}
+                  disabled={historyPage * historyItemsPerPage >= (wanLogs.reduce((acc, log) => acc + Object.keys(log).filter(k => k.endsWith(' ↓')).length, 0))}
+                >
+                  Próxima
+                </Button>
+              </div>
+            )}
           </CardHeader>
           <CardContent>
             <div className="rounded-md border overflow-hidden">
@@ -636,29 +662,45 @@ export default function MikrotikPage() {
                       </TableCell>
                     </TableRow>
                   ) : wanLogs.length > 0 ? (
-                    // We need raw logs here, but since wanLogs is grouped, let's derive it or fetch specifically
-                    // For now, let's show the last 10 entries from the grouped data to represent history
-                    wanLogs.slice(-10).reverse().map((log, idx) => {
-                      const interfaces = Object.keys(log).filter(k => k.endsWith(' ↓')).map(k => k.replace(' ↓', ''));
-                      return interfaces.map(iface => (
-                        <TableRow key={`${idx}-${iface}`}>
+                    (() => {
+                      const allEntries: any[] = [];
+                      [...wanLogs].reverse().forEach((log) => {
+                        const interfaces = Object.keys(log).filter(k => k.endsWith(' ↓')).map(k => k.replace(' ↓', ''));
+                        interfaces.forEach(iface => {
+                          allEntries.push({
+                            date: log.fullDate,
+                            iface,
+                            download: log[`${iface} ↓`],
+                            upload: log[`${iface} ↑`]
+                          });
+                        });
+                      });
+                      
+                      const startIndex = (historyPage - 1) * historyItemsPerPage;
+                      const pageEntries = allEntries.slice(startIndex, startIndex + historyItemsPerPage);
+                      
+                      if (pageEntries.length === 0 && historyPage > 1) {
+                        setHistoryPage(1);
+                        return null;
+                      }
+
+                      return pageEntries.map((entry, idx) => (
+                        <TableRow key={`${idx}-${entry.iface}`}>
                           <TableCell className="font-medium text-xs">
-                            {format(log.fullDate, "dd/MM HH:mm:ss", { locale: ptBR })}
+                            {format(entry.date, "dd/MM HH:mm:ss", { locale: ptBR })}
                           </TableCell>
                           <TableCell>
-                            <div className="flex items-center gap-2">
-                              <Badge variant="outline" className="text-[10px]">{iface}</Badge>
-                            </div>
+                            <Badge variant="outline" className="text-[10px]">{entry.iface}</Badge>
                           </TableCell>
                           <TableCell className="text-right text-success font-semibold">
-                            {log[`${iface} ↓`]?.toFixed(2)} Mb/s
+                            {entry.download?.toFixed(2)} Mb/s
                           </TableCell>
                           <TableCell className="text-right text-accent">
-                            {log[`${iface} ↑`]?.toFixed(2)} Mb/s
+                            {entry.upload?.toFixed(2)} Mb/s
                           </TableCell>
                         </TableRow>
                       ));
-                    })
+                    })()
                   ) : (
                     <TableRow>
                       <TableCell colSpan={4} className="text-center py-8 text-muted-foreground italic">
@@ -671,6 +713,7 @@ export default function MikrotikPage() {
             </div>
           </CardContent>
         </Card>
+
 
         <Card>
           <CardHeader>
