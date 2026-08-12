@@ -30,7 +30,7 @@ Deno.serve(async (req) => {
       })
     }
 
-    // 1. Get WAN interfaces
+    // 1. Get WAN interfaces to know which IPs to test from
     const resInt = await fetch(`http://${host}:${port}/rest/interface`, {
       headers: { Authorization: `Basic ${auth}`, Connection: 'close' }
     })
@@ -42,7 +42,9 @@ Deno.serve(async (req) => {
     }
 
     const interfaces = await resInt.json()
-    const wanInterfaces = interfaces.filter((i: any) => /wan|uplink|internet|link/i.test(`${i.name} ${i.comment}`))
+    // Identificar WANs conforme o script fornecido
+    const wanNames = ["BrisanetPPoe", "pppoe-out1"]
+    const wanInterfaces = interfaces.filter((i: any) => wanNames.includes(i.name) || /wan|uplink|internet|link/i.test(`${i.name} ${i.comment}`))
 
     if (wanInterfaces.length === 0) {
        return new Response(JSON.stringify({ error: "Nenhuma interface WAN encontrada" }), { 
@@ -50,33 +52,94 @@ Deno.serve(async (req) => {
        })
     }
 
+    const testUrl = "http://ash-speed.hetzner.com/100MB.bin"
     const results = []
+
     for (const wan of wanInterfaces) {
-      const rx = parseInt(wan['rx-byte'] || '0')
-      const tx = parseInt(wan['tx-byte'] || '0')
-      
-      results.push({
-        interface_name: wan.name,
-        rx_bytes: rx,
-        tx_bytes: tx,
-        created_at: new Date().toISOString()
+      const interfaceName = wan.name
+      // Pegar o IP da interface (equivalente ao script .rsc)
+      const resAddr = await fetch(`http://${host}:${port}/rest/ip/address?interface=${encodeURIComponent(interfaceName)}`, {
+        headers: { Authorization: `Basic ${auth}`, Connection: 'close' }
       })
+      const addresses = await resAddr.json()
+      const rawIp = addresses?.[0]?.address || "0.0.0.0"
+      const ip = rawIp.split('/')[0]
+
+      if (ip === "0.0.0.0") {
+        results.push({
+          interface_name: interfaceName,
+          rx_bytes: 0,
+          tx_bytes: 0,
+          mbps: 0,
+          status: 'Offline',
+          created_at: new Date().toISOString()
+        })
+        continue
+      }
+
+      // Executar o teste via Tool Fetch (equivalente ao script .rsc)
+      // Nota: A API REST do Mikrotik permite executar comandos via POST /rest/tool/fetch
+      const fetchPayload = {
+        url: testUrl,
+        "src-address": ip,
+        duration: "3s",
+        "as-value": "true"
+      }
+
+      const resFetch = await fetch(`http://${host}:${port}/rest/tool/fetch`, {
+        method: 'POST',
+        headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json', Connection: 'close' },
+        body: JSON.stringify(fetchPayload)
+      })
+
+      if (resFetch.ok) {
+        const fetchResult = await resFetch.json()
+        const downloaded = parseInt(fetchResult.downloaded || '0')
+        // Duração fixa de 3s conforme o script
+        const mbps = Math.round(((downloaded * 8) / (3 * 1024 * 1024)) * 100) / 100
+        
+        results.push({
+          interface_name: interfaceName,
+          rx_bytes: downloaded,
+          tx_bytes: 0, // tool fetch foca em download
+          mbps: mbps,
+          status: 'Success',
+          created_at: new Date().toISOString()
+        })
+      } else {
+        results.push({
+          interface_name: interfaceName,
+          rx_bytes: 0,
+          tx_bytes: 0,
+          mbps: 0,
+          status: 'Error',
+          created_at: new Date().toISOString()
+        })
+      }
     }
 
-    // Insert into wan_logs (which already exists for metrics)
-    await supabase.from('wan_logs').insert(results)
+    // Insert into wan_logs
+    await supabase.from('wan_logs').insert(results.map(r => ({
+      interface_name: r.interface_name,
+      rx_bytes: r.rx_bytes,
+      tx_bytes: r.tx_bytes,
+      created_at: r.created_at
+    })))
 
     // Send WhatsApp Report to Admin
     const ADMIN_PHONE = '85986801458'
-    let message = `📊 *RELATÓRIO DE TRÁFEGO WAN* 📊\n\n`
-    message += `Data: ${new Date().toLocaleString('pt-BR')}\n\n`
+    let message = `🚀 *SPEED TEST MIKROTIK (MORORO.TECH)* 🚀\n\n`
+    message += `📅 Data: ${new Date().toLocaleString('pt-BR')}\n\n`
     
     for (const res of results) {
-      const rxMb = (res.rx_bytes / (1024 * 1024)).toFixed(2)
-      const txMb = (res.tx_bytes / (1024 * 1024)).toFixed(2)
       message += `🌐 *Interface: ${res.interface_name}*\n`
-      message += `📥 Download: ${rxMb} MB\n`
-      message += `📤 Upload: ${txMb} MB\n\n`
+      if (res.status === 'Success') {
+        message += `📥 Velocidade: *${res.mbps} Mbps*\n`
+        message += `📦 Downloaded: ${(res.rx_bytes / (1024 * 1024)).toFixed(2)} MB\n`
+      } else {
+        message += `⚠️ Status: ${res.status}\n`
+      }
+      message += `\n`
     }
 
     await supabase.functions.invoke('whatsapp-send/send-text', {
