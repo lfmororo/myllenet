@@ -53,9 +53,9 @@ export function useInvoicePDF() {
         });
         
         if (img.complete && img.naturalWidth > 0) {
-          const imgWidth = 50;
+          const imgWidth = 65; // Slightly larger for the new logo
           const imgHeight = (img.naturalHeight * imgWidth) / img.naturalWidth;
-          doc.addImage(img, "PNG", 20, 15, imgWidth, imgHeight);
+          doc.addImage(img, "PNG", 18, 15, imgWidth, imgHeight);
         }
       } catch (e) { console.error(e); }
 
