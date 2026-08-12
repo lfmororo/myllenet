@@ -855,8 +855,20 @@ async function sendPaymentNotification(supabase: any, invoiceId: string) {
   }
 }
 
-async function bulkCheckPayments(_req: Request) {
-  // Public endpoint: only refreshes payment status via EFI. No sensitive data exposed.
+async function bulkCheckPayments(req: Request) {
+  const authHeader = req.headers.get("Authorization");
+  // Check if it's a cron job (via service role key) or a logged-in admin
+  if (authHeader) {
+    try {
+      await verifyAdmin(authHeader);
+    } catch (e) {
+      // If it's not an admin, check if it's the service role key (cron)
+      const token = authHeader.replace("Bearer ", "");
+      if (token !== Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")) {
+        throw e;
+      }
+    }
+  }
 
   const supabase = getSupabaseAdmin();
 
