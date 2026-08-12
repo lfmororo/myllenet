@@ -228,14 +228,20 @@ export function useInvoicePDF() {
         doc.setFontSize(8.5);
         doc.setFont("helvetica", "bold");
         doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-        doc.text(`Favorecido:`, textX, currentY + 52);
+        doc.text(`Identificador:`, textX, currentY + 52);
         doc.setFont("helvetica", "normal");
-        doc.text(`${pix.name || "Mororo Tech"}`, textX + 18, currentY + 52);
+        const ident = `${customer.nome.split(' ')[0].toUpperCase()} ${new Date(invoice.vencimento + "T12:00:00").toLocaleDateString("pt-BR", { month: '2-digit', year: '2-digit' })}`;
+        doc.text(ident, textX + 22, currentY + 52);
+
+        doc.setFont("helvetica", "bold");
+        doc.text(`Favorecido:`, textX, currentY + 57);
+        doc.setFont("helvetica", "normal");
+        doc.text(`${pix.name || "Mororo Tech"}`, textX + 18, currentY + 57);
         
         doc.setFont("helvetica", "bold");
-        doc.text(`Chave:`, textX, currentY + 57);
+        doc.text(`Chave:`, textX, currentY + 62);
         doc.setFont("helvetica", "normal");
-        doc.text(`${pix.key || "N/A"}`, textX + 11, currentY + 57);
+        doc.text(`${pix.key || "N/A"}`, textX + 11, currentY + 62);
 
       } catch (e) { console.error(e); }
 
