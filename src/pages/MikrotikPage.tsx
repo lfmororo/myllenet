@@ -326,13 +326,12 @@ export default function MikrotikPage() {
                   <span className="flex items-center gap-2 text-muted-foreground">
                     <span className="flex items-center gap-0.5 text-primary">
                       <ArrowDownCircle className="h-3 w-3" />
-                      {((w.rx_bps ?? 0) / 1_000_000).toFixed(1)}
+                      {((w.rx_bps ?? 0) / 1_000_000).toFixed(1)} Mbps
                     </span>
                     <span className="flex items-center gap-0.5 text-accent">
                       <ArrowUpCircle className="h-3 w-3" />
-                      {((w.tx_bps ?? 0) / 1_000_000).toFixed(1)}
+                      {((w.tx_bps ?? 0) / 1_000_000).toFixed(1)} Mbps
                     </span>
-                    <span>Mbps</span>
                   </span>
                 </div>
               ))}
@@ -350,7 +349,7 @@ export default function MikrotikPage() {
           <div>
             <CardTitle className="text-base">Monitoramento de Tráfego WAN</CardTitle>
             <CardDescription>
-              Linha cheia = Download (↓) · linha tracejada = Upload (↑) · valores em Mb/s — {live ? "atualizando a cada 10s" : "atualização pausada"}
+              Linha cheia = Download (↓) · linha tracejada = Upload (↑) · valores em Mbps — {live ? "atualizando a cada 10s" : "atualização pausada"}
             </CardDescription>
 
 
@@ -370,7 +369,7 @@ export default function MikrotikPage() {
                 <YAxis
                   className="text-xs"
                   width={64}
-                  tickFormatter={(v) => (v >= 1 ? `${v.toFixed(1)} Mb/s` : `${(v * 1000).toFixed(0)} Kb/s`)}
+                  tickFormatter={(v) => `${v.toFixed(1)} Mbps`}
                 />
                 <Tooltip
                   contentStyle={{
@@ -384,7 +383,7 @@ export default function MikrotikPage() {
                     const num = Number(v);
                     const label = String(name).endsWith("↑") ? "Upload" : "Download";
                     const iface = String(name).replace(/ [↑↓]$/, "");
-                    const value = num >= 1 ? `${num.toFixed(2)} Mb/s` : `${(num * 1000).toFixed(0)} Kb/s`;
+                    const value = `${num.toFixed(2)} Mbps`;
                     return [value, `${iface} · ${label}`];
                   }}
                 />
@@ -712,10 +711,10 @@ export default function MikrotikPage() {
                             <Badge variant="outline" className="text-[10px]">{entry.iface}</Badge>
                           </TableCell>
                           <TableCell className="text-right text-success font-semibold">
-                            {entry.download?.toFixed(2)} Mb/s
+                            {entry.download?.toFixed(2)} Mbps
                           </TableCell>
                           <TableCell className="text-right text-accent">
-                            {entry.upload?.toFixed(2)} Mb/s
+                            {entry.upload?.toFixed(2)} Mbps
                           </TableCell>
                         </TableRow>
                       ));

@@ -40,10 +40,10 @@ export const useMikrotikLogs = () => {
         
         // Se rx_bps está zerado, mas temos rx_bytes, é provavelmente um log de speedtest
         if (calculatedDownload <= 0 && rx_bytes > 0) {
-          calculatedDownload = (rx_bytes * 8) / (10 * 1000 * 1000);
+          // A função mikrotik-speedtest usa 3s como padrão agora
+          calculatedDownload = (rx_bytes * 8) / (3 * 1000 * 1000);
         }
         
-        // Garantir que as chaves existam para evitar que o gráfico oculte a série se um log estiver faltando
         const iface = log.interface_name;
         grouped[time][`${iface} ↓`] = calculatedDownload;
         grouped[time][`${iface} ↑`] = Number(log.tx_bps || 0) / 1_000_000;
