@@ -13,6 +13,7 @@ export function useInvoicePDF() {
     try {
       const { data, error } = await supabase.functions.invoke("generate-invoice-pdf", {
         body: { invoice_id: invoiceId },
+        method: 'POST'
       });
 
       if (error || !data.success) throw new Error(error?.message || "Erro ao gerar dados da fatura");
