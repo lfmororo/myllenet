@@ -1154,8 +1154,16 @@ Deno.serve(async (req) => {
         return await createBoleto(req);
       case "check":
         return await checkPayment(req);
-      case "bulk-check":
+      case "bulk-check": {
+        const authHeader = req.headers.get("Authorization");
+        if (!authHeader) {
+          return new Response(JSON.stringify({ error: "Missing authorization header" }), {
+            status: 401,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
         return await bulkCheckPayments(req);
+      }
       case "import":
         return await importFromEfi(req);
       case "cancel":
