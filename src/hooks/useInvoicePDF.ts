@@ -230,7 +230,9 @@ export function useInvoicePDF() {
         doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
         doc.text(`Identificador:`, textX, currentY + 52);
         doc.setFont("helvetica", "normal");
-        const ident = `INV${invoiceId.substring(0, 8).toUpperCase()}`;
+        const refMonthShort = new Date(invoice.vencimento + "T12:00:00").toLocaleDateString('pt-BR', { month: '2-digit', year: '2-digit' }).replace('/', '');
+        const shortName = (customer.nome || "").split(' ')[0].normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]/g, "").toUpperCase().substring(0, 10);
+        const ident = `${shortName}${refMonthShort}` || `INV${invoiceId.substring(0, 8).toUpperCase()}`;
         doc.text(ident, textX + 22, currentY + 52);
 
         doc.setFont("helvetica", "bold");

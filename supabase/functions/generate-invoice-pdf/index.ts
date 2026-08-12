@@ -54,7 +54,9 @@ function generatePixPayload(key: string, name: string, city: string, amount: num
   payload += f("59", sName); // Merchant Name
   payload += f("60", sCity); // Merchant City
   
-  // Tag 62 must contain tag 05 (Transaction ID)
+  // Tag 62 must contain tag 05 (Transaction ID) and optionally tag 01 (Description)
+  // Note: Tag 01 is not part of the standard Pix static payload for all apps, but some support it.
+  // The most reliable way to show a message is via the TxID (Tag 05)
   const additionalData = f("05", txid || "INV" + Date.now().toString().slice(-10));
   payload += f("62", additionalData);
   
@@ -115,12 +117,16 @@ Deno.serve(async (req) => {
       .in("key", ["pix_key", "pix_name", "pix_city", "company_cnpj", "company_phone"]);
 
     const pixSettings = Object.fromEntries(settings?.map(s => [s.key, s.value]) || []);
+    const refMonth = new Date(invoice.mes_referencia).toLocaleDateString('pt-BR', { month: '2-digit', year: '2-digit' });
+    const shortName = sanitize(customer.nome || "").split(' ')[0].substring(0, 10);
+    const pixDescription = `${shortName}${refMonth.replace('/', '')}`;
+
     const pixPayload = generatePixPayload(
       pixSettings.pix_key || "00000000000",
       pixSettings.pix_name || "Mororo Tech",
       pixSettings.pix_city || "Ipu",
       invoice.valor_centavos / 100,
-      `INV${invoice_id.substring(0, 8).toUpperCase()}`
+      pixDescription || `INV${invoice_id.substring(0, 8).toUpperCase()}`
     );
 
     // Return all data needed for the PDF generation on client or storage
