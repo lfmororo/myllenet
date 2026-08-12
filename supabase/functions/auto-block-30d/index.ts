@@ -32,6 +32,7 @@ Deno.serve(async (req) => {
     const { data: overdueInvoices, error: invErr } = await supabase
       .from("invoices")
       .select(`
+        id,
         customer_id,
         vencimento,
         status,
@@ -52,7 +53,7 @@ Deno.serve(async (req) => {
     const customersToBlock = new Map();
     overdueInvoices?.forEach(inv => {
       if (!customersToBlock.has(inv.customer_id)) {
-        customersToBlock.set(inv.customer_id, inv.customers);
+        customersToBlock.set(inv.customer_id, { ...inv.customers, invoice_id: inv.id });
       }
     });
 
@@ -84,6 +85,7 @@ Deno.serve(async (req) => {
         await supabase.from("block_alerts_sent" as any).insert({
           customer_id: customerId,
           new_status: "blocked",
+          invoice_id: (customer as any).invoice_id,
           processed: null
         } as any);
 

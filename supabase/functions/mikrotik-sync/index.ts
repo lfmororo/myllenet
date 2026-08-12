@@ -185,9 +185,10 @@ Deno.serve(async (req) => {
         const customer = alert.customers
         if (!customer?.telefone) continue
         const blockingDays = cfg.blocking_days || '15'
+        const invoiceUrl = alert.invoice_id ? `https://myllenet.lovable.app/fatura/${alert.invoice_id}` : 'https://myllenet.lovable.app/clientes'
         const message =
           alert.new_status === 'blocked'
-            ? `⚠️ *Aviso de Bloqueio:* Olá ${customer.nome}, identificamos uma fatura com mais de ${blockingDays} dias de atraso e seu sinal foi suspenso automaticamente. Regularize para restabelecer a conexão.`
+            ? `⚠️ *Aviso de Bloqueio:* Olá ${customer.nome}, identificamos uma fatura com mais de ${blockingDays} dias de atraso e seu sinal foi suspenso automaticamente. Regularize para restabelecer a conexão.\n\n🔗 *Link da Fatura:* ${invoiceUrl}`
             : `✅ *Sinal Liberado:* Olá ${customer.nome}, seu pagamento foi identificado e seu sinal já foi liberado no sistema. Obrigado!`
 
         try {
