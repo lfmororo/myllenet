@@ -94,9 +94,8 @@ export function useWhatsApp() {
     if (!headers) return false;
 
     try {
-      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
       const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/whatsapp-send/send-text`,
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-send/send-text`,
         {
           method: "POST",
           headers,
