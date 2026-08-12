@@ -270,7 +270,7 @@ export default function MikrotikPage() {
         </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-4">
+      <div className="grid gap-6 md:grid-cols-5">
         <Card className={`border-l-4 ${status?.online ? "border-l-success" : "border-l-destructive"}`}>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">Status do IP Externo</CardTitle>
@@ -291,18 +291,51 @@ export default function MikrotikPage() {
           <CardContent>
             <div className="flex items-center gap-2">
               <Router className="h-5 w-5 text-primary" />
-              <span className="text-lg font-bold">{status?.identity || status?.host || "—"}</span>
+              <div className="flex flex-col">
+                <span className="text-lg font-bold truncate max-w-[120px]">{status?.identity || status?.host || "—"}</span>
+                <span className="text-[10px] text-muted-foreground">Uptime: {status?.uptime || "—"}</span>
+              </div>
             </div>
           </CardContent>
         </Card>
         <Card className="border-l-4 border-l-accent">
           <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Hardware</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-1">
+              <div className="flex items-center justify-between text-xs">
+                <span>CPU:</span>
+                <span className={`font-bold ${status?.cpuLoad > 80 ? "text-destructive" : status?.cpuLoad > 50 ? "text-warning" : "text-success"}`}>
+                  {status?.cpuLoad !== null ? `${status.cpuLoad}%` : "—"}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span>RAM:</span>
+                <span className="text-muted-foreground">
+                  {status?.freeMemory ? `${(status.freeMemory / 1024 / 1024).toFixed(0)}MB libres` : "—"}
+                </span>
+              </div>
+              {status?.temperature !== null && (
+                <div className="flex items-center justify-between text-xs">
+                  <span>Temp:</span>
+                  <span className={`font-bold ${status.temperature > 65 ? "text-destructive" : status.temperature > 50 ? "text-warning" : "text-primary"}`}>
+                    {status.temperature}°C
+                  </span>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-l-4 border-l-success">
+          <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">Usuários PPPoE</CardTitle>
           </CardHeader>
           <CardContent>
-            <Badge variant="outline">
-              {(status?.activeUsers ?? "—")} online / {customers.filter(c => c.ativo).length} cadastrados
-            </Badge>
+            <div className="flex flex-col gap-1">
+              <span className="text-2xl font-bold">{status?.activeUsers ?? "—"}</span>
+              <p className="text-[10px] text-muted-foreground">{customers.filter(c => c.ativo).length} cadastrados</p>
+            </div>
           </CardContent>
         </Card>
         <Card className="border-l-4 border-l-warning">
