@@ -1,4 +1,0 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
-const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-const { data } = await supabase.from("invoices").select("id").limit(1);
-console.log(data?.[0]?.id || "");
