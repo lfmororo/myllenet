@@ -916,8 +916,6 @@ async function bulkCheckPayments(req: Request) {
   const supabase = getSupabaseAdmin();
 
   // ===== PASS 1: Reconcile invoices WITHOUT efi_charge_id by querying EFI by CPF =====
-  // Lists open invoices per customer, fetches the customer's recent EFI charges, and
-  // links/updates each one matched by month of vencimento + valor.
   let reconciled = 0;
   try {
     const { data: orphanInvoices } = await supabase
@@ -926,7 +924,8 @@ async function bulkCheckPayments(req: Request) {
       .in("status", ["pending", "waiting", "overdue"])
       .is("efi_charge_id", null)
       .order('vencimento', { ascending: false })
-      .limit(15);
+      .limit(10); // Reduzido de 15 para 10 para evitar timeouts
+
 
 
     // Group by customer CPF
