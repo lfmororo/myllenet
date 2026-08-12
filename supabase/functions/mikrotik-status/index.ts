@@ -179,7 +179,7 @@ Deno.serve(async (req) => {
               }
             })
 
-            // await supabase.from('wan_logs').insert(rows) // REMOVED: Moved to mikrotik-speedtest only to avoid excessive logging every 10s
+            // Removed: Moved to mikrotik-speedtest only to avoid excessive logging every 10s
 
             wans = wanInterfaces.map((i) => {
               const row = rows.find((r) => r.interface_name === i.name)
