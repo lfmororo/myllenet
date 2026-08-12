@@ -13,13 +13,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Plus, Search, Download, Loader2, Upload, AlertTriangle, Zap, Filter, MessageCircle } from "lucide-react";
+import { Plus, Search, Download, Loader2, Upload, AlertTriangle, Zap, Filter, MessageCircle, ShieldAlert, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
+import { useMikrotikActions } from "@/hooks/useMikrotikActions";
 
 export default function CustomersPage() {
   const { customers, loading, searchTerm, setSearchTerm, addCustomer, updateCustomer, deleteCustomer, toggleCustomerActive, exportCSV, bulkImport, refetch: refetchCustomers } = useCustomers();
   const { allInvoices, createBoleto, refetch: refetchInvoices } = useInvoices();
   const { plans } = usePlans();
+  const { syncMikrotik, loading: mikrotikActionsLoading } = useMikrotikActions();
 
   const [formOpen, setFormOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
@@ -287,7 +289,18 @@ export default function CustomersPage() {
       {loading ? (
         <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
       ) : (
-        <CustomerTable customers={displayedCustomers} onEdit={handleEdit} onDelete={setDeletingCustomer} onToggleActive={toggleCustomerActive} onDetail={setDetailCustomer} customerIdsWithInvoice={customerIdsWithInvoiceThisMonth} plans={plans} onlineList={onlineUsers} />
+        <CustomerTable 
+          customers={displayedCustomers} 
+          onEdit={handleEdit} 
+          onDelete={setDeletingCustomer} 
+          onToggleActive={toggleCustomerActive} 
+          onDetail={setDetailCustomer} 
+          customerIdsWithInvoice={customerIdsWithInvoiceThisMonth} 
+          plans={plans} 
+          onlineList={onlineUsers} 
+          syncMikrotik={syncMikrotik}
+          mikrotikLoading={mikrotikActionsLoading}
+        />
       )}
 
       <CustomerFormDialog open={formOpen} onOpenChange={setFormOpen} customer={editingCustomer} onSave={addCustomer} onUpdate={updateCustomer} plans={plans} />

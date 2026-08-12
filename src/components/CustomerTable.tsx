@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Pencil, Trash2, Eye, EyeOff, FileSearch, FileText, AlertCircle, Gift } from "lucide-react";
+import { Pencil, Trash2, Eye, EyeOff, FileSearch, FileText, AlertCircle, Gift, ShieldAlert, ShieldCheck, Loader2 } from "lucide-react";
 import { useState } from "react";
 import type { Customer } from "@/hooks/useCustomers";
 import type { Plan } from "@/hooks/usePlans";
@@ -17,9 +17,14 @@ interface Props {
   customerIdsWithInvoice?: Set<string>;
   plans?: Plan[];
   onlineList?: string[];
+  syncMikrotik?: (id: string, action: 'enable' | 'disable' | 'sync') => Promise<boolean>;
+  mikrotikLoading?: string | null;
 }
 
-export default function CustomerTable({ customers, onEdit, onDelete, onToggleActive, onDetail, customerIdsWithInvoice, plans = [], onlineList = [] }: Props) {
+export default function CustomerTable({ 
+  customers, onEdit, onDelete, onToggleActive, onDetail, customerIdsWithInvoice, plans = [], onlineList = [],
+  syncMikrotik, mikrotikLoading 
+}: Props) {
   const now = new Date();
   const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
   const planMap = Object.fromEntries(plans.map(p => [p.id, p.nome]));
@@ -152,6 +157,38 @@ export default function CustomerTable({ customers, onEdit, onDelete, onToggleAct
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
+                      {syncMikrotik && (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                            title="Bloquear no Mikrotik"
+                            disabled={mikrotikLoading === c.id}
+                            onClick={() => syncMikrotik(c.id, 'disable')}
+                          >
+                            {mikrotikLoading === c.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <ShieldAlert className="h-4 w-4" />
+                            )}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-teal-600 hover:text-teal-700 hover:bg-teal-50"
+                            title="Desbloquear no Mikrotik"
+                            disabled={mikrotikLoading === c.id}
+                            onClick={() => syncMikrotik(c.id, 'enable')}
+                          >
+                            {mikrotikLoading === c.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <ShieldCheck className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </>
+                      )}
                       <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onDetail(c)} title="Detalhes">
                         <FileSearch className="h-4 w-4" />
                       </Button>
