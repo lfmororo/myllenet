@@ -21,13 +21,33 @@ async function restCall(base: string, path: string, auth: string, timeoutMs = 80
   const t = setTimeout(() => ac.abort(), timeoutMs)
   try {
     const res = await fetch(`${base}/rest${path}`, {
-      headers: { Authorization: `Basic ${auth}`, Connection: 'close' },
+      method: 'GET',
+      headers: { 
+        'Authorization': `Basic ${auth}`, 
+        'Connection': 'close',
+        'Accept': 'application/json'
+      },
       signal: ac.signal,
     })
-    if (!res.ok) return { ok: false, status: res.status, data: null as unknown }
-    return { ok: true, status: res.status, data: await res.json() }
+    
+    if (res.status === 401) return { ok: false, status: 401, data: null }
+    if (!res.ok) {
+      // Tentar ler o erro se possível
+      const text = await res.text().catch(() => "");
+      console.error(`REST Error [${res.status}] at ${path}: ${text}`);
+      return { ok: false, status: res.status, data: null }
+    }
+    
+    const data = await res.json().catch(err => {
+      console.error(`JSON Parse Error at ${path}:`, err);
+      return null;
+    });
+    
+    return { ok: true, status: res.status, data }
   } catch (e) {
-    return { ok: false, status: 0, data: null as unknown, error: (e as Error).message }
+    const isAbort = (e as Error).name === 'AbortError';
+    if (!isAbort) console.error(`Fetch Error at ${path}:`, (e as Error).message);
+    return { ok: false, status: 0, data: null, error: (e as Error).message }
   } finally {
     clearTimeout(t)
   }
@@ -106,17 +126,16 @@ Deno.serve(async (req) => {
 
     const openRest = restPorts.filter((p) => openMap.get(p))
     if (openRest.length) {
-      const attempts = await Promise.all(
-        openRest.map(async (p) => {
-          const base = `${schemeFor(p)}://${host}:${p}`
-          const res = await restCall(base, '/system/resource', auth, 4000)
-          if (res.ok || res.status === 401) return { port: p, base, res }
-          // try the alternate scheme once
-          const altBase = `${schemeFor(p) === 'http' ? 'https' : 'http'}://${host}:${p}`
-          const alt = await restCall(altBase, '/system/resource', auth, 4000)
-          return { port: p, base: altBase, res: alt }
-        }),
-      )
+      const attempts = [];
+      for (const p of openRest) {
+        const base = `${schemeFor(p)}://${host}:${p}`;
+        // Testar uma porta de cada vez para evitar sobrecarga no switch/firewall do Mikrotik
+        const res = await restCall(base, '/system/resource', auth, 3000);
+        if (res.ok || res.status === 401) {
+          attempts.push({ port: p, base, res });
+          if (res.ok) break; // Sucesso na primeira porta, não precisa testar outras
+        }
+      }
 
       for (const a of attempts) {
         if (a.res.status) lastStatus = a.res.status
