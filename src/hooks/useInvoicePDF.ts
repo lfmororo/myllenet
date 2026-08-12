@@ -40,25 +40,33 @@ export function useInvoicePDF() {
       doc.setFillColor(255, 255, 255); // White background
       doc.rect(0, 5, pageWidth, 50, "F");
 
-      // Logo
+      // Logo (flattened over white to avoid black transparency background)
       try {
         const img = new Image();
+        img.crossOrigin = "anonymous";
         img.src = "/logo.png";
         await new Promise((resolve) => {
           img.onload = resolve;
-          img.onerror = () => {
-            img.src = new URL("/src/assets/logo.png", window.location.origin).href;
-            img.onload = resolve;
-            img.onerror = () => resolve(null);
-          };
+          img.onerror = () => resolve(null);
         });
-        
+
         if (img.complete && img.naturalWidth > 0) {
-          const imgWidth = 65; // Slightly larger for the new logo
-          const imgHeight = (img.naturalHeight * imgWidth) / img.naturalWidth;
-          doc.addImage(img, "PNG", 18, 15, imgWidth, imgHeight);
+          const canvas = document.createElement("canvas");
+          canvas.width = img.naturalWidth;
+          canvas.height = img.naturalHeight;
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.fillStyle = "#FFFFFF";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0);
+            const flattened = canvas.toDataURL("image/jpeg", 0.95);
+            const imgWidth = 65;
+            const imgHeight = (img.naturalHeight * imgWidth) / img.naturalWidth;
+            doc.addImage(flattened, "JPEG", 18, 15, imgWidth, imgHeight);
+          }
         }
       } catch (e) { console.error(e); }
+
 
       // Invoice Title & Number
       doc.setFontSize(22);
