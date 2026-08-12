@@ -348,12 +348,13 @@ async function sendInvoiceNotification(req: Request) {
       console.log(`[PDF] Requesting UAZAPI to send PDF from URL: ${pdfUrl}`);
       
       try {
-        const fileResult = await uazapiRequest("/send/media", {
+        // Many UAZAPI instances use /send/file or /send/media
+        // Let's try the most common one first and ensure the structure is correct
+        const fileResult = await uazapiRequest("/send/file", {
           number: formattedPhone,
           url: pdfUrl,
           caption: `Fatura Mororo.Tech - ${invoice.descricao}`,
-          fileName: fileName,
-          type: "document"
+          name: fileName
         });
         console.log("[PDF] UAZAPI response:", fileResult);
       } catch (fileErr) {
