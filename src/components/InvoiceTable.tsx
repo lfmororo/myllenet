@@ -116,6 +116,21 @@ export default function InvoiceTable({ invoices, onCheckPayment, onCancel, onMar
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-1">
+                    {/* Public link button */}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-slate-600 hover:text-slate-700"
+                      title="Ver Link Público da Fatura"
+                      onClick={() => {
+                        const url = `${window.location.origin}/fatura/${inv.id}`;
+                        navigator.clipboard.writeText(url);
+                        toast.success("Link da fatura copiado!");
+                        window.open(url, "_blank");
+                      }}
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                    </Button>
                     {/* PDF button */}
                     <Button
                       variant="ghost"
