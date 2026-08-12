@@ -44,6 +44,7 @@ export default function Settings() {
 
   // Mikrotik settings
   const [mikrotikHost, setMikrotikHost] = useState("");
+  const [mikrotikHostSecondary, setMikrotikHostSecondary] = useState("");
   const [mikrotikUser, setMikrotikUser] = useState("");
   const [mikrotikPass, setMikrotikPass] = useState("");
   const [mikrotikApiPort, setMikrotikApiPort] = useState("8728");
