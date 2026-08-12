@@ -115,13 +115,29 @@ export default function MikrotikPage() {
 
   // Filter logic for historical logs
   const filteredLogs = wanLogs.filter(log => {
+    // Filter by WAN
     if (selectedWan !== "all") {
-      const keys = Object.keys(log).filter(k => k !== 'time');
+      const keys = Object.keys(log).filter(k => k !== 'time' && k !== 'fullDate');
       const hasWan = keys.some(k => k.startsWith(selectedWan));
       if (!hasWan) return false;
     }
+
+    // Filter by Date Range
+    const logDate = log.fullDate;
+    if (!logDate) return true;
+    
+    const now = new Date();
+    if (dateRange === "today") {
+      return logDate >= startOfDay(now) && logDate <= endOfDay(now);
+    } else if (dateRange === "7d") {
+      return logDate >= startOfDay(subDays(now, 7));
+    } else if (dateRange === "30d") {
+      return logDate >= startOfDay(subDays(now, 30));
+    }
+    
     return true;
   });
+
 
   // Calculate hourly aggregation for speedtest results
   // Note: We use raw wan_logs here, but in a real scenario we'd query specifically for the speedtest records
