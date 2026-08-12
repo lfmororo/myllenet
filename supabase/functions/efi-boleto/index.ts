@@ -788,12 +788,55 @@ async function sendPaymentNotification(supabase: any, invoiceId: string) {
   try {
     const { data: invoice } = await supabase
       .from("invoices")
-      .select("*, customers(nome, telefone, cpf)")
+      .select("*, customers(*)")
       .eq("id", invoiceId)
       .single();
 
     if (!invoice) return;
     const customer = (invoice as any).customers;
+
+    // --- Automatic Unblock Logic ---
+    if (customer && customer.block_status === 'blocked') {
+      const today = new Date().toISOString().split('T')[0];
+      const { count: overdueCount } = await supabase
+        .from("invoices")
+        .select("id", { count: 'exact', head: true })
+        .eq("customer_id", customer.id)
+        .in("status", ["pending", "overdue"])
+        .lt("vencimento", today)
+        .neq("id", invoiceId); // Exclude the current invoice which just got paid
+
+      if (overdueCount === 0) {
+        console.log(`[Unblock] Customer ${customer.nome} has no other overdue invoices. Unblocking...`);
+        
+        // Update DB status
+        await supabase
+          .from("customers")
+          .update({ block_status: "active" })
+          .eq("id", customer.id);
+
+        // Audit log
+        await supabase.from("block_history").insert({
+          customer_id: customer.id,
+          old_status: "blocked",
+          new_status: "active",
+          reason: "Desbloqueio automático: pagamento realizado e sem outras pendências vencidas",
+          changed_by: null // System action
+        });
+
+        // Trigger Mikrotik unblock via edge function
+        try {
+          const { error: syncErr } = await supabase.functions.invoke("mikrotik-customer", {
+            body: { customer_id: customer.id, action: "enable" }
+          });
+          if (syncErr) console.error("[Unblock] Mikrotik sync error:", syncErr);
+        } catch (e) {
+          console.error("[Unblock] Failed to invoke mikrotik-customer:", e);
+        }
+      }
+    }
+    // --- End Unblock Logic ---
+
     if (!customer?.telefone) {
       // Log even if no phone
       await supabase.from("notification_logs").insert({
@@ -963,10 +1006,9 @@ async function bulkCheckPayments(req: Request) {
       } catch (e) {
         console.error(`reconcile by cpf ${cpf} failed:`, e);
       }
-      // Small delay between customers to avoid rate limits
       await new Promise(r => setTimeout(r, 200));
     }
-    }
+
 
     // ===== PASS 1.5: Deep Reconciliation for Overdue Orphans =====
     try {
