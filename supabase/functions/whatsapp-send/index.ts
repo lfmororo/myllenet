@@ -6,9 +6,10 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const UAZAPI_BASE_URL = "https://ipazua.uazapi.com/api"; // UAZAPI base URL without trailing slash for correct endpoint concatenation
+const UAZAPI_BASE_URL = "https://ipazua.uazapi.com/api"; // UAZAPI base URL
 const BOT_DISCLAIMER = "\n\n🤖 _Esta é uma mensagem automática. Para falar com um atendente, entre em contato: (85) 98680-1458_";
-const UAZAPI_FILE_ENDPOINT = "/send/file"; // or /send/media if preferred, setting default back to /send/file for now to verify 405 fix via base URL verification
+const UAZAPI_FILE_ENDPOINT = "/sendMessageFile"; 
+const UAZAPI_TEXT_ENDPOINT = "/sendMessageText";
 
 function getSupabaseAdmin() {
   return createClient(
@@ -100,7 +101,7 @@ async function uazapiRequest(endpoint: string, body: unknown) {
 
 async function sendSupportButton(phone: string) {
   try {
-    await uazapiRequest("/send/menu", {
+    await uazapiRequest("/sendMessageMenu", {
       number: phone,
       type: "button",
       text: "Precisa de Suporte?",
@@ -170,7 +171,7 @@ async function sendText(req: Request) {
   try {
     const formattedPhone = formatPhone(phone);
     const fullMessage = message + BOT_DISCLAIMER;
-    const result = await uazapiRequest("/send/text", {
+    const result = await uazapiRequest(UAZAPI_TEXT_ENDPOINT, {
       number: formattedPhone,
       text: fullMessage,
     });
@@ -228,7 +229,7 @@ async function sendBulk(req: Request) {
     try {
       const formattedPhone = formatPhone(msg.phone);
       const fullMsg = msg.message + BOT_DISCLAIMER;
-      await uazapiRequest("/send/text", {
+      await uazapiRequest(UAZAPI_TEXT_ENDPOINT, {
         number: formattedPhone,
         text: fullMsg,
       });
@@ -335,7 +336,7 @@ async function sendInvoiceNotification(req: Request) {
     const fullMessage = message + `\n\n🔗 *Link da Fatura:* ${invoiceUrl}` + BOT_DISCLAIMER;
     
     // First send the text message with the link
-    const result = await uazapiRequest("/send/text", {
+    const result = await uazapiRequest(UAZAPI_TEXT_ENDPOINT, {
       number: formattedPhone,
       text: fullMessage,
     });
@@ -350,7 +351,7 @@ async function sendInvoiceNotification(req: Request) {
       try {
         // Many UAZAPI instances use /send/file or /send/media
         // Let's try the most common one first and ensure the structure is correct
-        const fileResult = await uazapiRequest("/send/file", {
+        const fileResult = await uazapiRequest(UAZAPI_FILE_ENDPOINT, {
           number: formattedPhone,
           url: pdfUrl,
           caption: `Fatura Mororo.Tech - ${invoice.descricao}`,
@@ -433,7 +434,7 @@ async function resendPaidNotifications(req: Request) {
       const formattedPhone = formatPhone(customer.telefone);
 
       const fullMessage = message + BOT_DISCLAIMER;
-      await uazapiRequest("/send/text", { number: formattedPhone, text: fullMessage });
+      await uazapiRequest(UAZAPI_TEXT_ENDPOINT, { number: formattedPhone, text: fullMessage });
       await sendSupportButton(formattedPhone);
       await logNotification({ customer_id: invoice.customer_id, customer_name: customer.nome, phone: customer.telefone, type: "pagamento_confirmado", message: fullMessage, status: "sent" });
       sent++;
