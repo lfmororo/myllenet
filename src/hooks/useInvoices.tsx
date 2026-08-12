@@ -205,11 +205,11 @@ export function useInvoices() {
     const token = sessionData?.session?.access_token;
     const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
 
-    // Cancel charge on EFI if it has an efi_charge_id
+    // Mark as paid or settle on EFI if it has an efi_charge_id
     if (invoice?.efi_charge_id && token) {
       try {
-        const cancelRes = await fetch(
-          `https://${projectId}.supabase.co/functions/v1/efi-boleto/cancel`,
+        const settleRes = await fetch(
+          `https://${projectId}.supabase.co/functions/v1/efi-boleto/settle`,
           {
             method: "POST",
             headers: {
@@ -220,14 +220,14 @@ export function useInvoices() {
             body: JSON.stringify({ charge_id: invoice.efi_charge_id }),
           }
         );
-        if (cancelRes.ok) {
-          toast.success("Cobrança cancelada na EFI");
+        if (settleRes.ok) {
+          toast.success("Baixa realizada na EFI");
         } else {
-          const err = await cancelRes.json();
-          console.warn("EFI cancel warning:", err.error);
+          const err = await settleRes.json();
+          console.warn("EFI settle warning:", err.error);
         }
       } catch (e) {
-        console.warn("EFI cancel failed:", e);
+        console.warn("EFI settle failed:", e);
       }
     }
 

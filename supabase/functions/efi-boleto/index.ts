@@ -1209,6 +1209,34 @@ async function bulkCheckPayments(req: Request) {
   );
 }
 
+async function settleCharge(req: Request) {
+  const authHeader = req.headers.get("Authorization");
+  await verifyAdmin(authHeader);
+
+  const { charge_id } = await req.json();
+  if (!charge_id) {
+    return new Response(JSON.stringify({ error: "charge_id obrigatório" }), {
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  try {
+    // EFI API: /v1/charge/:id/settle marks a charge as paid manually
+    await efiRequest(`/v1/charge/${charge_id}/settle`, "PUT", undefined, "baixar_manual_efi");
+    return new Response(JSON.stringify({ success: true }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (err) {
+    console.error("EFI settle error:", err);
+    // If it's already paid or can't be settled, we log but don't necessarily want to block the system
+    return new Response(
+      JSON.stringify({ error: err.message || "Erro ao baixar na EFI" }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -1237,6 +1265,8 @@ Deno.serve(async (req) => {
         return await importFromEfi(req);
       case "cancel":
         return await cancelCharge(req);
+      case "settle":
+        return await settleCharge(req);
       case "check-customer":
         return await checkCustomerCharges(req);
       case "test": {
