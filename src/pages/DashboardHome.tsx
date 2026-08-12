@@ -93,33 +93,41 @@ export default function DashboardHome() {
   const stats = useMemo(() => {
     const activeCustomers = customers.filter(c => c.ativo).length;
     const inactiveCustomers = customers.filter(c => !c.ativo).length;
-    const totalInvoices = allInvoices.length;
-    const paidInvoices = allInvoices.filter(i => i.status === "paid");
+    
     const now = new Date();
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
-    const pendingInvoices = allInvoices.filter(i => {
-      if (i.status !== "waiting" && i.status !== "pending") return false;
+    
+    // Invoices of current month
+    const currentMonthInvoices = allInvoices.filter(i => {
       const d = new Date(i.vencimento + "T12:00:00");
       return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
     });
+
+    // Invoices paid in current month (actually based on payment date would be better, but we use status+vencimento for current month stats if payment_date is not present)
+    const currentMonthPaid = currentMonthInvoices.filter(i => i.status === "paid");
+    const totalReceivedMonth = currentMonthPaid.reduce((sum, i) => sum + i.valor_centavos, 0);
+
+    const pendingInvoices = currentMonthInvoices.filter(i => i.status === "waiting" || i.status === "pending");
+    
     const overdueInvoices = allInvoices.filter(i => {
       if (i.status === "paid" || i.status === "cancelled") return false;
       return new Date(i.vencimento + "T23:59:59") < new Date();
     });
 
-    const totalReceived = paidInvoices.reduce((sum, i) => sum + i.valor_centavos, 0);
+    const totalReceivedAll = allInvoices.filter(i => i.status === "paid").reduce((sum, i) => sum + i.valor_centavos, 0);
     const totalPending = pendingInvoices.reduce((sum, i) => sum + i.valor_centavos, 0);
     const totalOverdue = overdueInvoices.reduce((sum, i) => sum + i.valor_centavos, 0);
 
     return {
       activeCustomers,
       inactiveCustomers,
-      totalInvoices,
-      paidCount: paidInvoices.length,
+      totalInvoices: allInvoices.length,
+      paidCountMonth: currentMonthPaid.length,
       pendingCount: pendingInvoices.length,
       overdueCount: overdueInvoices.length,
-      totalReceived,
+      totalReceivedMonth,
+      totalReceivedAll,
       totalPending,
       totalOverdue,
     };
@@ -152,7 +160,7 @@ export default function DashboardHome() {
   // Status distribution for pie chart
   const statusData = useMemo(() => {
     return [
-      { name: "Pagos", value: stats.paidCount, color: "hsl(var(--success))" },
+      { name: "Pagos", value: stats.paidCountMonth, color: "hsl(var(--success))" },
       { name: "Pendentes", value: stats.pendingCount, color: "hsl(var(--warning))" },
       { name: "Vencidos", value: stats.overdueCount, color: "hsl(var(--destructive))" },
     ].filter(d => d.value > 0);
@@ -254,12 +262,12 @@ export default function DashboardHome() {
         </Card>
         <Card className="border-l-4 border-l-success">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Recebido</CardTitle>
+            <CardTitle className="text-sm font-medium">Recebimentos do Mês</CardTitle>
             <div className="rounded-lg bg-success/10 p-2"><DollarSign className="h-4 w-4 text-success" /></div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-success">{formatCurrency(stats.totalReceived)}</div>
-            <p className="text-xs text-muted-foreground">{stats.paidCount} faturas pagas</p>
+            <div className="text-2xl font-bold text-success">{formatCurrency(stats.totalReceivedMonth)}</div>
+            <p className="text-xs text-muted-foreground">{stats.paidCountMonth} faturas pagas este mês</p>
           </CardContent>
         </Card>
         <Card className="border-l-4 border-l-warning">
