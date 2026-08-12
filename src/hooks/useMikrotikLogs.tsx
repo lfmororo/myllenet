@@ -34,7 +34,10 @@ export const useMikrotikLogs = () => {
         const fullKey = `${dateObj.toISOString()}_${time}`; // Keep uniqueness if needed, or just time
         if (!grouped[time]) grouped[time] = { time, fullDate: dateObj };
         // Download (rx) e Upload (tx) monitorados separadamente, em Mbps
-        grouped[time][`${log.interface_name} ↓`] = Number(log.rx_bps || 0) / 1_000_000;
+        // O speedtest via 'tool fetch' salva em 'rx_bytes' o total baixado em 3 segundos.
+        // Se rx_bps estiver zerado, tentamos calcular a partir de rx_bytes (downloaded / 3s)
+        const calculatedDownload = log.rx_bps ? (Number(log.rx_bps) / 1_000_000) : (log.rx_bytes ? ((Number(log.rx_bytes) * 8) / (3 * 1024 * 1024)) : 0);
+        grouped[time][`${log.interface_name} ↓`] = calculatedDownload;
         grouped[time][`${log.interface_name} ↑`] = Number(log.tx_bps || 0) / 1_000_000;
 
       });
