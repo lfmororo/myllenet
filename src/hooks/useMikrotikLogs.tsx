@@ -31,24 +31,27 @@ export const useMikrotikLogs = () => {
       data.forEach((log: any) => {
         const dateObj = new Date(log.created_at);
         const time = dateObj.toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-        const fullKey = `${dateObj.toISOString()}_${time}`; // Keep uniqueness if needed, or just time
+        
         if (!grouped[time]) grouped[time] = { time, fullDate: dateObj };
-        // Download (rx) e Upload (tx) monitorados separadamente, em Mbps
-        // O speedtest via 'tool fetch' salva em 'rx_bytes' o total baixado em 3 segundos.
-        // Se rx_bps estiver zerado ou ausente, tentamos calcular a partir de rx_bytes (downloaded / 3s)
+        
         const rx_bps = Number(log.rx_bps || 0);
         const rx_bytes = Number(log.rx_bytes || 0);
         let calculatedDownload = rx_bps / 1_000_000;
         
+        // Se rx_bps está zerado, mas temos rx_bytes, é provavelmente um log de speedtest
         if (calculatedDownload <= 0 && rx_bytes > 0) {
           calculatedDownload = (rx_bytes * 8) / (10 * 1024 * 1024);
         }
         
-        grouped[time][`${log.interface_name} ↓`] = calculatedDownload;
-        grouped[time][`${log.interface_name} ↑`] = Number(log.tx_bps || 0) / 1_000_000;
-
+        // Garantir que as chaves existam para evitar que o gráfico oculte a série se um log estiver faltando
+        const iface = log.interface_name;
+        grouped[time][`${iface} ↓`] = calculatedDownload;
+        grouped[time][`${iface} ↑`] = Number(log.tx_bps || 0) / 1_000_000;
       });
-      setWanLogs(Object.values(grouped).reverse().slice(-60));
+      
+      // Ordenar por data e pegar os últimos 60 pontos
+      const sorted = Object.values(grouped).sort((a: any, b: any) => a.fullDate.getTime() - b.fullDate.getTime());
+      setWanLogs(sorted.slice(-60));
     }
     setLoading(false);
   };

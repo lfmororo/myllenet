@@ -139,7 +139,9 @@ Deno.serve(async (req) => {
         const isWanName = (i: any) => /wan|uplink|internet|link/i.test(`${i.name ?? ''} ${i.comment ?? ''}`)
         const uplinkTypes = ['ether', 'vlan', 'pppoe-out', 'lte', 'wireless', 'wlan']
         const candidates = interfaces.filter(i => uplinkTypes.includes(String(i.type ?? '').toLowerCase()))
-        let wanInterfaces = candidates.filter(isWanName)
+        const wanNames = ["BrisanetPPoe", "pppoe-out1"]
+        let wanInterfaces = candidates.filter(i => wanNames.includes(i.name) || isWanName(i))
+        
         if (wanInterfaces.length === 0) {
           // No explicit WAN naming: use pppoe-out clients, otherwise the physical uplinks
           const pppoeOut = candidates.filter(i => String(i.type).toLowerCase() === 'pppoe-out')
