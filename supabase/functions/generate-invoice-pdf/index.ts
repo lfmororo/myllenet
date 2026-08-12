@@ -119,6 +119,11 @@ Deno.serve(async (req) => {
     doc.setTextColor(lightTextColor[0], lightTextColor[1], lightTextColor[2]);
     doc.text(`#${invoice_id.substring(0, 8).toUpperCase()}`, pageWidth - 20, 32, { align: "right" });
 
+    // Logo (Simulated for server-side jsPDF)
+    doc.setFontSize(16);
+    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.text("Mororo.Tech", 20, 26);
+
     let currentY = 55;
 
     // Company Info
@@ -191,6 +196,11 @@ Deno.serve(async (req) => {
     doc.setFontSize(8);
     doc.setTextColor(lightTextColor[0], lightTextColor[1], lightTextColor[2]);
     doc.text("Escaneie o QR Code ou use o Copia e Cola para pagamento imediato.", 20, currentY);
+
+    // Footer
+    doc.setFontSize(7);
+    doc.text("ESTA É UMA FATURA DE SERVIÇOS DE COMUNICAÇÃO MULTIMÍDIA.", 20, pageHeight - 10);
+    doc.text("Mororo.Tech © 2026", pageWidth - 20, pageHeight - 10, { align: "right" });
 
     const pdfOutput = doc.output("arraybuffer");
 
