@@ -320,6 +320,7 @@ export default function MikrotikPage() {
                     const entries = (payload || []);
                     const groups = entries.reduce((acc: Record<string, any[]>, entry: any) => {
                       const iface = String(entry.value).replace(/ [↑↓]$/, "");
+                      if (iface === 'time' || iface === 'fullDate') return acc;
                       if (!acc[iface]) acc[iface] = [];
                       acc[iface].push(entry);
                       return acc;
