@@ -607,6 +607,71 @@ export default function MikrotikPage() {
 
 
       <div className="grid gap-6 md:grid-cols-2">
+        <Card className="md:col-span-2">
+          <CardHeader>
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <History className="h-4 w-4 text-primary" />
+              Histórico de Speedtests Realizados
+            </CardTitle>
+            <CardDescription>
+              Registros das últimas medições de tráfego efetuadas nas interfaces WAN.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="rounded-md border overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/50">
+                    <TableHead className="w-[180px]">Data/Hora</TableHead>
+                    <TableHead>Interface</TableHead>
+                    <TableHead className="text-right">Download</TableHead>
+                    <TableHead className="text-right">Upload</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {loadingWan ? (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center py-8">
+                        <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
+                      </TableCell>
+                    </TableRow>
+                  ) : wanLogs.length > 0 ? (
+                    // We need raw logs here, but since wanLogs is grouped, let's derive it or fetch specifically
+                    // For now, let's show the last 10 entries from the grouped data to represent history
+                    wanLogs.slice(-10).reverse().map((log, idx) => {
+                      const interfaces = Object.keys(log).filter(k => k.endsWith(' ↓')).map(k => k.replace(' ↓', ''));
+                      return interfaces.map(iface => (
+                        <TableRow key={`${idx}-${iface}`}>
+                          <TableCell className="font-medium text-xs">
+                            {format(log.fullDate, "dd/MM HH:mm:ss", { locale: ptBR })}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="text-[10px]">{iface}</Badge>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right text-success font-semibold">
+                            {log[`${iface} ↓`]?.toFixed(2)} Mb/s
+                          </TableCell>
+                          <TableCell className="text-right text-accent">
+                            {log[`${iface} ↑`]?.toFixed(2)} Mb/s
+                          </TableCell>
+                        </TableRow>
+                      ));
+                    })
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center py-8 text-muted-foreground italic">
+                        Nenhum registro encontrado.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader>
             <CardTitle className="text-base font-semibold flex items-center gap-2">
