@@ -151,6 +151,7 @@ Deno.serve(async (req) => {
         const base64 = btoa(new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), ''));
         doc.addImage(`data:image/png;base64,${base64}`, "PNG", 20, 12, 50, 20);
       } else {
+        console.error(`[PDF] Logo fetch failed: ${resp.status}`);
         doc.setFontSize(16);
         doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
         doc.text("Mororo.Tech", 20, 26);

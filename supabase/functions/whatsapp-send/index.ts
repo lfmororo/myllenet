@@ -343,7 +343,7 @@ async function sendInvoiceNotification(req: Request) {
 
     // If it's a billing notification, try to send the PDF attachment as well
     if (["boleto_gerado", "lembrete_vencimento", "cobranca_atrasada"].includes(notifType)) {
-      const pdfUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/generate-invoice-pdf?invoice_id=${invoice_id}`;
+      const pdfUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/generate-invoice-pdf?invoice_id=${invoice_id}&t=${Date.now()}`;
       const fileName = `Fatura_${invoice.descricao.replace(/\s+/g, '_')}.pdf`;
       
       console.log(`[PDF] Requesting UAZAPI to send PDF from URL: ${pdfUrl}`);
