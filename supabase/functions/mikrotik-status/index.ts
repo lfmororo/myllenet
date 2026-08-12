@@ -128,13 +128,16 @@ Deno.serve(async (req) => {
       const openMap = new Map<number, boolean>()
       probePorts.forEach((p, i) => openMap.set(p, probes[i]))
 
+      const currentOpenPorts = probePorts.filter((p) => openMap.get(p))
+      
+      // Only proceed with this host if it has open ports OR if it's the primary host (to report unreachable if all fail)
+      if (currentOpenPorts.length === 0 && host !== hosts[0]) continue
+
       if (openMap.get(apiPort)) apiOpen = true
       if (openMap.get(80)) p80 = true
       if (openMap.get(443)) p443 = true
       
-      const currentOpenPorts = probePorts.filter((p) => openMap.get(p))
       openPorts = [...new Set([...openPorts, ...currentOpenPorts])]
-      
       if (currentOpenPorts.length > 0) reachable = true
 
       const openRest = restPorts.filter((p) => openMap.get(p))
@@ -316,7 +319,7 @@ Deno.serve(async (req) => {
     let message: string
     if (restOk) message = `Conectado via API REST no host ${connectedHost} (porta ${restPort})`
     else if (authFailed) message = 'API REST respondeu, mas usuário/senha foram rejeitados (401)'
-    else if (reachable) message = 'Host alcançável, mas a API REST não respondeu. Certifique-se de que o serviço REST está habilitado (/ip service enable www) e a porta está liberada no firewall.'
+    else if (reachable) message = 'A API REST do Mikrotik não respondeu.'
     else message = 'Não foi possível alcançar o Mikrotik em nenhum dos IPs configurados'
 
     const responseData = {
