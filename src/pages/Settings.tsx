@@ -18,6 +18,7 @@ import { ArrowLeft, Loader2, Save, Upload, CheckCircle, XCircle, ShieldAlert, Za
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useDiagnosticPDF } from "@/hooks/useDiagnosticPDF";
 
 export default function Settings() {
   const { user, isAdmin, loading: authLoading } = useAuth();
