@@ -54,7 +54,9 @@ function generatePixPayload(key: string, name: string, city: string, amount: num
   payload += f("59", sName); // Merchant Name
   payload += f("60", sCity); // Merchant City
   
-  // Tag 62 must contain tag 05 (Transaction ID)
+  // Tag 62 must contain tag 05 (Transaction ID) and optionally tag 01 (Description)
+  // Note: Tag 01 is not part of the standard Pix static payload for all apps, but some support it.
+  // The most reliable way to show a message is via the TxID (Tag 05)
   const additionalData = f("05", txid || "INV" + Date.now().toString().slice(-10));
   payload += f("62", additionalData);
   
