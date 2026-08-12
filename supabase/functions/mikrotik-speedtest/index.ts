@@ -165,8 +165,8 @@ Deno.serve(async (req) => {
     for (const res of results) {
       message += `🌐 *Interface: ${res.interface_name}*\n`
       if (res.status === 'Success') {
-        message += `📥 Velocidade: *${res.mbps} Mbps*\n`
-        message += `📦 Downloaded: ${(res.rx_bytes / (1024 * 1024)).toFixed(2)} MB\n`
+        message += `📥 Velocidade: *${res.mbps.toFixed(2)} Mbps*\n`
+        message += `📦 Tráfego: ${(res.rx_bytes / (1024 * 1024)).toFixed(2)} MB\n`
       } else {
         message += `⚠️ Status: ${res.status}\n`
       }
