@@ -27,9 +27,8 @@ export function useWhatsApp() {
 
     setSending(invoiceId);
     try {
-      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
       const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/whatsapp-send/notify-invoice`,
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-send/notify-invoice`,
         {
           method: "POST",
           headers,
