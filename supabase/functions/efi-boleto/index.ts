@@ -60,7 +60,7 @@ async function logEfiApiCall(
   context: string | null
 ) {
   try {
-    await supabase.from("efi_api_logs").insert({
+    const { error } = await supabase.from("efi_api_logs").insert({
       method,
       endpoint,
       status_code: statusCode,
@@ -70,6 +70,7 @@ async function logEfiApiCall(
       duration_ms: durationMs,
       context,
     });
+    if (error) console.error("Error inserting into efi_api_logs:", error);
   } catch (e) {
     console.error("Failed to log EFI API call:", e);
   }
