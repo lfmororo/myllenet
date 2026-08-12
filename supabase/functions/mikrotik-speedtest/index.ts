@@ -79,49 +79,62 @@ Deno.serve(async (req) => {
 
       // Executar o teste via Tool Fetch (equivalente ao script .rsc)
       // Nota: A API REST do Mikrotik permite executar comandos via POST /rest/tool/fetch
+      // Executar o teste via Tool Fetch (idêntico ao script .rsc)
+      // O script original faz tool fetch, espera o tempo e depois lê o byte count.
+      // Aqui usamos a API REST para iniciar o fetch.
       const fetchPayload = {
         url: testUrl,
         "src-address": ip,
         duration: "10s",
-        "as-value": "true"
+        mode: "http",
+        "as-value": true
       }
 
-      const resFetch = await fetch(`http://${host}:${port}/rest/tool/fetch`, {
-        method: 'POST',
-        headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json', Connection: 'close' },
-        body: JSON.stringify(fetchPayload)
+      console.log(`[Speedtest] Inciando fetch na interface ${interfaceName} (IP: ${ip})`)
+      
+      let mbps = 0
+      let rx_bytes = 0
+      let status = 'Error'
+
+      try {
+        const resFetch = await fetch(`http://${host}:${port}/rest/tool/fetch`, {
+          method: 'POST',
+          headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json', Connection: 'close' },
+          body: JSON.stringify(fetchPayload)
+        })
+
+        if (resFetch.ok) {
+          const fetchResult = await resFetch.json()
+          // O Mikrotik v7 retorna os dados do fetch no corpo da resposta se usarmos "as-value"
+          // O campo 'downloaded' vem como string ou número
+          rx_bytes = parseInt(fetchResult.downloaded || '0')
+          mbps = Math.round(((rx_bytes * 8) / (10 * 1024 * 1024)) * 100) / 100
+          status = mbps > 0 ? 'Success' : 'Success (No Traffic)'
+          console.log(`[Speedtest] Resultado ${interfaceName}: ${mbps} Mbps (${rx_bytes} bytes)`)
+        } else {
+          const errText = await resFetch.text()
+          console.error(`[Speedtest] Erro fetch ${interfaceName}:`, resFetch.status, errText)
+          status = 'Fetch Failed'
+        }
+      } catch (e) {
+        console.error(`[Speedtest] Exception fetch ${interfaceName}:`, e.message)
+        status = 'Exception'
+      }
+      
+      results.push({
+        interface_name: interfaceName,
+        rx_bytes: rx_bytes,
+        tx_bytes: 0,
+        mbps: mbps,
+        status: status,
+        created_at: new Date().toISOString()
       })
-
-      if (resFetch.ok) {
-        const fetchResult = await resFetch.json()
-        const downloaded = parseInt(fetchResult.downloaded || '0')
-        // Duração atualizada para 10s para maior precisão
-        const mbpsValue = Math.round(((downloaded * 8) / (10 * 1024 * 1024)) * 100) / 100
-        const mbps = mbpsValue > 0 ? mbpsValue : 0.01; // Ensure non-zero for tests
-        
-        results.push({
-          interface_name: interfaceName,
-          rx_bytes: downloaded,
-          tx_bytes: 0, // tool fetch foca em download
-          mbps: mbps,
-          status: 'Success',
-          created_at: new Date().toISOString()
-        })
-      } else {
-        results.push({
-          interface_name: interfaceName,
-          rx_bytes: 0,
-          tx_bytes: 0,
-          mbps: 0,
-          status: 'Error',
-          created_at: new Date().toISOString()
-        })
-      }
     }
 
     // Insert into wan_logs
     await supabase.from('wan_logs').insert(results.map(r => ({
-      interface_name: r.interface_name, rx_bps: Math.round(r.mbps * 1000000),
+      interface_name: r.interface_name,
+      rx_bps: Math.round(r.mbps * 1000000),
       rx_bytes: r.rx_bytes,
       tx_bytes: r.tx_bytes,
       created_at: r.created_at
