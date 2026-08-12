@@ -159,34 +159,37 @@ export default function CustomerTable({
                     <div className="flex justify-end gap-1">
                       {syncMikrotik && (
                         <>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
-                            title="Bloquear no Mikrotik"
-                            disabled={mikrotikLoading === c.id}
-                            onClick={() => syncMikrotik(c.id, 'disable')}
-                          >
-                            {mikrotikLoading === c.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <ShieldAlert className="h-4 w-4" />
-                            )}
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-teal-600 hover:text-teal-700 hover:bg-teal-50"
-                            title="Desbloquear no Mikrotik"
-                            disabled={mikrotikLoading === c.id}
-                            onClick={() => syncMikrotik(c.id, 'enable')}
-                          >
-                            {mikrotikLoading === c.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <ShieldCheck className="h-4 w-4" />
-                            )}
-                          </Button>
+                          {c.block_status === "blocked" ? (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-teal-600 hover:text-teal-700 hover:bg-teal-50"
+                              title="Desbloquear no Mikrotik"
+                              disabled={mikrotikLoading === c.id}
+                              onClick={() => syncMikrotik(c.id, 'enable')}
+                            >
+                              {mikrotikLoading === c.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <ShieldCheck className="h-4 w-4" />
+                              )}
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                              title="Bloquear no Mikrotik"
+                              disabled={mikrotikLoading === c.id}
+                              onClick={() => syncMikrotik(c.id, 'disable')}
+                            >
+                              {mikrotikLoading === c.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <ShieldAlert className="h-4 w-4" />
+                              )}
+                            </Button>
+                          )}
                         </>
                       )}
                       <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onDetail(c)} title="Detalhes">
