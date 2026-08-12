@@ -29,6 +29,10 @@ export default function MikrotikPage() {
   const [dateRange, setDateRange] = useState("today"); // today, 7d, 30d
   const [selectedWan, setSelectedWan] = useState("all");
   const [drillDownData, setDrillDownData] = useState<any>(null);
+  const [speedThreshold, setSpeedThreshold] = useState("10");
+  const [alertInterval, setAlertInterval] = useState("30");
+  const [updatingSettings, setUpdatingSettings] = useState(false);
+
 
 
 
@@ -66,7 +70,48 @@ export default function MikrotikPage() {
 
   useEffect(() => {
     checkStatus();
+    fetchAlertSettings();
   }, []);
+
+  const fetchAlertSettings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('settings')
+        .select('key, value')
+        .in('key', ['mikrotik_speed_threshold_mbps', 'mikrotik_alert_interval_minutes']);
+      
+      if (error) throw error;
+      
+      data?.forEach(item => {
+        if (item.key === 'mikrotik_speed_threshold_mbps') setSpeedThreshold(item.value || "10");
+        if (item.key === 'mikrotik_alert_interval_minutes') setAlertInterval(item.value || "30");
+      });
+    } catch (err) {
+      console.error("Erro ao carregar configurações de alerta:", err);
+    }
+  };
+
+  const saveAlertSettings = async () => {
+    setUpdatingSettings(true);
+    try {
+      const { error: err1 } = await supabase
+        .from('settings')
+        .upsert({ key: 'mikrotik_speed_threshold_mbps', value: speedThreshold }, { onConflict: 'key' });
+      
+      const { error: err2 } = await supabase
+        .from('settings')
+        .upsert({ key: 'mikrotik_alert_interval_minutes', value: alertInterval }, { onConflict: 'key' });
+
+      if (err1 || err2) throw new Error("Falha ao salvar");
+      
+      toast.success("Configurações de alerta atualizadas!");
+    } catch (err) {
+      toast.error("Erro ao salvar configurações");
+    } finally {
+      setUpdatingSettings(false);
+    }
+  };
+
 
   // Amostragem em tempo real: cada chamada coleta os contadores das WANs e grava em wan_logs
   useEffect(() => {
@@ -174,7 +219,7 @@ export default function MikrotikPage() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Mikrotik - Gestão</h2>
-          <p className="text-muted-foreground">O Mikrotik realiza testes de velocidade e monitoramento das WANs periodicamente, gerando gráficos de desempenho por hora.</p>
+          <p className="text-muted-foreground">O Mikrotik realiza testes de velocidade e monitoramento das WANs periodicamente, gerando gráficos de desempenho por hora e alertas de velocidade configuráveis.</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={downloadMikrotikScript} disabled={exporting}>
@@ -643,6 +688,47 @@ export default function MikrotikPage() {
           </CardContent>
         </Card>
 
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <Activity className="h-4 w-4 text-primary" />
+              Configuração de Alertas de Velocidade
+            </CardTitle>
+            <CardDescription>
+              Receba avisos no WhatsApp quando a média de download ficar abaixo do limite.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-muted-foreground uppercase">Limite (Mbps)</label>
+                <Input 
+                  type="number" 
+                  value={speedThreshold} 
+                  onChange={(e) => setSpeedThreshold(e.target.value)}
+                  placeholder="Ex: 10"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-muted-foreground uppercase">Período (Minutos)</label>
+                <Input 
+                  type="number" 
+                  value={alertInterval} 
+                  onChange={(e) => setAlertInterval(e.target.value)}
+                  placeholder="Ex: 30"
+                />
+              </div>
+            </div>
+            <Button className="w-full" onClick={saveAlertSettings} disabled={updatingSettings}>
+              {updatingSettings ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+              Salvar Configurações
+            </Button>
+            <p className="text-[10px] text-muted-foreground italic text-center">
+              Os alertas possuem um intervalo de segurança de 4 horas entre envios para evitar spam.
+            </p>
+          </CardContent>
+        </Card>
+
         <Card className="p-8 space-y-4">
           <div className="flex items-center gap-3">
             <div className="bg-primary/10 p-3 rounded-lg">
@@ -657,6 +743,7 @@ export default function MikrotikPage() {
             Baixar Script (.rsc)
           </Button>
         </Card>
+
       </div>
 
       <Card className="mt-6">

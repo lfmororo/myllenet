@@ -201,6 +201,67 @@ Deno.serve(async (req) => {
         }
       }
     }
+    
+    // 6. Check WAN Speed Alerts
+    const { data: thresholdData } = await supabase
+      .from('settings')
+      .select('value')
+      .eq('key', 'mikrotik_speed_threshold_mbps')
+      .single()
+    
+    const { data: intervalData } = await supabase
+      .from('settings')
+      .select('value')
+      .eq('key', 'mikrotik_alert_interval_minutes')
+      .single()
+
+    const speedThresholdMbps = parseFloat(thresholdData?.value || '10')
+    const alertIntervalMinutes = parseInt(intervalData?.value || '30')
+
+    // Get average speed per WAN in the last interval
+    const intervalAgo = new Date(Date.now() - alertIntervalMinutes * 60 * 1000).toISOString()
+    
+    const { data: speedMetrics } = await supabase
+      .from('wan_logs')
+      .select('interface_name, rx_bps')
+      .gt('created_at', intervalAgo)
+
+    if (speedMetrics && speedMetrics.length > 0) {
+      const averages = speedMetrics.reduce((acc: Record<string, { sum: number, count: number }>, curr) => {
+        if (!acc[curr.interface_name]) acc[curr.interface_name] = { sum: 0, count: 0 }
+        acc[curr.interface_name].sum += Number(curr.rx_bps || 0)
+        acc[curr.interface_name].count += 1
+        return acc;
+      }, {})
+
+      for (const [iface, stats] of Object.entries(averages)) {
+        const avgMbps = (stats.sum / stats.count) / 1_000_000
+        
+        if (avgMbps < speedThresholdMbps) {
+          // Check for cooldown
+          const { data: alerted } = await supabase
+            .from('customer_alerts_sent')
+            .select('id')
+            .eq('alert_type', `wan_speed_low_${iface}`)
+            .gt('sent_at', new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString()) // 4 hour cooldown
+            .single()
+
+          if (!alerted) {
+            await supabase.functions.invoke('whatsapp-send/send-text', {
+              body: {
+                phone: ADMIN_PHONE,
+                message: `⚠️ *ALERTA DE DESEMPENHO WAN* ⚠️\n\nA interface *${iface}* está operando abaixo do limite!\n\nMédia atual: *${avgMbps.toFixed(2)} Mbps*\nLimite configurado: *${speedThresholdMbps} Mbps*\nPeríodo analisado: *${alertIntervalMinutes} min*`
+              }
+            })
+
+            await supabase.from('customer_alerts_sent').insert({
+              alert_type: `wan_speed_low_${iface}`,
+              sent_at: new Date().toISOString()
+            })
+          }
+        }
+      }
+    }
 
     return json({ success: true })
   } catch (e) {
