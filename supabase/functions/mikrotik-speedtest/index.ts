@@ -156,10 +156,15 @@ Deno.serve(async (req) => {
       message += `\n`
     }
 
+    // Explicitly append disclaimer here since we are invoking the internal send-text
+    // which normally appends it, but we want to be sure the message matches exactly what the user sees
+    // and the whatsapp-send function's sendText already adds BOT_DISCLAIMER.
+
     await supabase.functions.invoke('whatsapp-send/send-text', {
       body: {
         phone: ADMIN_PHONE,
-        message: message
+        message: message,
+        customer_name: "Admin"
       },
       headers: {
         Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
