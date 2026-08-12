@@ -916,8 +916,6 @@ async function bulkCheckPayments(req: Request) {
   const supabase = getSupabaseAdmin();
 
   // ===== PASS 1: Reconcile invoices WITHOUT efi_charge_id by querying EFI by CPF =====
-  // Lists open invoices per customer, fetches the customer's recent EFI charges, and
-  // links/updates each one matched by month of vencimento + valor.
   let reconciled = 0;
   try {
     const { data: orphanInvoices } = await supabase
@@ -926,7 +924,8 @@ async function bulkCheckPayments(req: Request) {
       .in("status", ["pending", "waiting", "overdue"])
       .is("efi_charge_id", null)
       .order('vencimento', { ascending: false })
-      .limit(15);
+      .limit(10); // Reduzido de 15 para 10 para evitar timeouts
+
 
 
     // Group by customer CPF
@@ -1112,7 +1111,7 @@ async function bulkCheckPayments(req: Request) {
     .in("status", ["pending", "waiting", "overdue"])
     .not("efi_charge_id", "is", null)
     .order('vencimento', { ascending: false })
-    .limit(30);
+    .limit(10); // Reduzido de 30 para 10 para evitar timeouts
 
   if (error) {
     return new Response(JSON.stringify({ error: "Erro ao buscar faturas" }), {
@@ -1135,7 +1134,10 @@ async function bulkCheckPayments(req: Request) {
   console.log(`[bulk-check] Processing ${pendingInvoices.length} invoices...`);
   for (const inv of pendingInvoices) {
     try {
+      // Pequeno delay entre requisições individuais
+      await new Promise(r => setTimeout(r, 200));
       const efiResponse = await efiRequest(`/v1/charge/${inv.efi_charge_id}`, "GET", undefined, "bulk_check");
+
       const chargeData = efiResponse.data || efiResponse;
       const efiStatus = chargeData.status;
 
