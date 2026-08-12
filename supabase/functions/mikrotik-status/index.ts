@@ -156,13 +156,27 @@ Deno.serve(async (req) => {
               .select('interface_name, rx_bytes, tx_bytes, created_at')
               .in('interface_name', wanInterfaces.map(i => i.name))
               .order('created_at', { ascending: false })
-              .limit(wanInterfaces.length * 3)
+              .limit(wanInterfaces.length * 10)
 
             const now = Date.now()
+            // Sanity limit: nenhuma WAN doméstica passa de 1 Gbps
+            const MAX_BPS = 1_000_000_000
+            const MAX_AGE_SECS = 300
             const rows = wanInterfaces.map(i => {
               const rxBytes = parseInt(i['rx-byte'] ?? '0', 10) || 0
               const txBytes = parseInt(i['tx-byte'] ?? '0', 10) || 0
-              const prev = (prevLogs ?? []).find((p: any) => p.interface_name === i.name)
+              // Ignora amostras antigas ou de speedtest (contadores parciais)
+              const prev = (prevLogs ?? []).find((p: any) => {
+                if (p.interface_name !== i.name) return false
+                const ageSecs = (now - new Date(p.created_at).getTime()) / 1000
+                if (ageSecs > MAX_AGE_SECS) return false
+                const pRx = Number(p.rx_bytes ?? 0)
+                const pTx = Number(p.tx_bytes ?? 0)
+                // amostra de speedtest: contador muito menor que o acumulado atual
+                if (rxBytes > 0 && pRx < rxBytes * 0.5) return false
+                if (txBytes > 0 && pTx < txBytes * 0.5) return false
+                return true
+              })
               let rxBps = 0
               let txBps = 0
               if (prev) {
@@ -171,6 +185,8 @@ Deno.serve(async (req) => {
                 const dTx = txBytes - Number(prev.tx_bytes ?? 0)
                 if (dRx >= 0) rxBps = Math.round((dRx * 8) / secs)
                 if (dTx >= 0) txBps = Math.round((dTx * 8) / secs)
+                if (rxBps > MAX_BPS) rxBps = 0
+                if (txBps > MAX_BPS) txBps = 0
               }
               return {
                 interface_name: i.name,
