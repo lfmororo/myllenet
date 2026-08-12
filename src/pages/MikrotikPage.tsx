@@ -369,7 +369,7 @@ export default function MikrotikPage() {
                 <YAxis
                   className="text-xs"
                   width={64}
-                  tickFormatter={(v) => (v >= 1 ? `${v.toFixed(1)} Mb/s` : `${(v * 1000).toFixed(0)} Kb/s`)}
+                  tickFormatter={(v) => `${v.toFixed(1)} Mbps`}
                 />
                 <Tooltip
                   contentStyle={{
