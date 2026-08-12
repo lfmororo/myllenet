@@ -44,7 +44,7 @@ Deno.serve(async (req) => {
     const interfaces = await resInt.json()
     // Identificar WANs conforme o script fornecido
     const wanNames = ["BrisanetPPoe", "pppoe-out1"]
-    const wanInterfaces = interfaces.filter((i: any) => wanNames.includes(i.name) || /wan|uplink|internet|link/i.test(`${i.name} ${i.comment}`))
+    const wanInterfaces = interfaces.filter((i: any) => wanNames.includes(i.name))
 
     if (wanInterfaces.length === 0) {
        return new Response(JSON.stringify({ error: "Nenhuma interface WAN encontrada" }), { 
