@@ -8,8 +8,8 @@ const corsHeaders = {
 
 const UAZAPI_BASE_URL = "https://ipazua.uazapi.com/api"; 
 const BOT_DISCLAIMER = "\n\n🤖 _Esta é uma mensagem automática. Para falar com um atendente, entre em contato: (85) 98680-1458_";
-const UAZAPI_FILE_ENDPOINT = "/send-file"; 
-const UAZAPI_TEXT_ENDPOINT = "/send-text";
+const UAZAPI_FILE_ENDPOINT = "/send/media"; 
+const UAZAPI_TEXT_ENDPOINT = "/send/text";
 
 function getSupabaseAdmin() {
   return createClient(
@@ -349,13 +349,13 @@ async function sendInvoiceNotification(req: Request) {
       console.log(`[PDF] Requesting UAZAPI to send PDF from URL: ${pdfUrl}`);
       
       try {
-        // Many UAZAPI instances use /send/file or /send/media
-        // Let's try the most common one first and ensure the structure is correct
+        // UAZAPI /send/media expects type: "document" for PDF files and the URL in the "file" field
         const fileResult = await uazapiRequest(UAZAPI_FILE_ENDPOINT, {
           number: formattedPhone,
-          url: pdfUrl,
-          caption: `Fatura Mororo.Tech - ${invoice.descricao}`,
-          name: fileName
+          type: "document",
+          file: pdfUrl,
+          text: `Fatura Mororo.Tech - ${invoice.descricao}`,
+          docName: fileName
         });
         console.log("[PDF] UAZAPI response:", fileResult);
       } catch (fileErr) {
