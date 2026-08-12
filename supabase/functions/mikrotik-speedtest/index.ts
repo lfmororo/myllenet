@@ -91,7 +91,7 @@ Deno.serve(async (req) => {
         const fetchPayload = {
           url: testUrl,
           "src-address": ip,
-          duration: "10s",
+          duration: "3s",
           mode: "http",
           "as-value": true
         }
