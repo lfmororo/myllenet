@@ -110,7 +110,7 @@ export default function AppLayout() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-3">
-          <img src={logoImg} alt="Mororo.Tech" className="h-14 w-14 rounded-xl object-contain animate-pulse" />
+          <img src={logoImg} alt="Mororo.Tech" className="h-14 w-auto max-w-[150px] object-contain animate-pulse" />
           <Loader2 className="h-6 w-6 animate-spin text-primary" />
         </div>
       </div>
