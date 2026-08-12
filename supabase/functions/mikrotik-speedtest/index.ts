@@ -66,6 +66,26 @@ Deno.serve(async (req) => {
     // Insert into wan_logs (which already exists for metrics)
     await supabase.from('wan_logs').insert(results)
 
+    // Send WhatsApp Report to Admin
+    const ADMIN_PHONE = '85986801458'
+    let message = `📊 *RELATÓRIO DE TRÁFEGO WAN* 📊\n\n`
+    message += `Data: ${new Date().toLocaleString('pt-BR')}\n\n`
+    
+    for (const res of results) {
+      const rxMb = (res.rx_bytes / (1024 * 1024)).toFixed(2)
+      const txMb = (res.tx_bytes / (1024 * 1024)).toFixed(2)
+      message += `🌐 *Interface: ${res.interface_name}*\n`
+      message += `📥 Download: ${rxMb} MB\n`
+      message += `📤 Upload: ${txMb} MB\n\n`
+    }
+
+    await supabase.functions.invoke('whatsapp-send/send-text', {
+      body: {
+        phone: ADMIN_PHONE,
+        message: message
+      }
+    })
+
     return new Response(JSON.stringify({ success: true, processed: results.length }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
