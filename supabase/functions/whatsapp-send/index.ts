@@ -328,8 +328,10 @@ async function sendInvoiceNotification(req: Request) {
       break;
     case "cobranca_atrasada":
       message = `Olá ${customer.nome}! 🌐\n\n⚠️ Sua fatura da *Mororo.Tech* está vencida!\n\n📋 ${invoice.descricao}\n💰 Valor: ${valor}\n📅 Vencimento: ${vencimento}`;
-      if (invoice.efi_link) message += `\n\n🔗 Boleto: ${invoice.efi_link}`;
-      message += "\n\nRegularize para evitar a suspensão do serviço. Em caso de dúvidas, entre em contato!";
+      const overdueFunctionUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/generate-invoice-pdf`;
+      const overduePdfLink = `${overdueFunctionUrl}?invoice_id=${invoice_id}`;
+      if (invoice.efi_link) message += `\n\n📄 *Fatura PDF:* ${overduePdfLink}`;
+      if (invoice.efi_link) message += `\n\n🔗 *Link Alternativo:* ${invoice.efi_link}`;
       break;
     default:
       message = `Olá ${customer.nome}! Informação sobre sua fatura: ${invoice.descricao} - ${valor}`;
