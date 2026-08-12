@@ -433,7 +433,7 @@ async function checkPayment(req: Request) {
         .eq("id", invoiceId);
 
       // Send notification if newly paid
-      if (newStatus === "paid") {
+      if (newStatus === "paid" && invoice.status !== "paid") {
         await sendPaymentNotification(supabase, invoiceId);
       }
     }
