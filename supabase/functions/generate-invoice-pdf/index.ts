@@ -109,7 +109,7 @@ Deno.serve(async (req) => {
       pixSettings.pix_name || "Mororo Tech",
       pixSettings.pix_city || "Ipu",
       invoice.valor_centavos / 100,
-      `FAT-${invoice.vencimento}`
+      `${sanitize(customer.nome).substring(0, 10)} ${invoice.vencimento.substring(5, 7)}/${invoice.vencimento.substring(2, 4)}`
     );
 
     // Return all data needed for the PDF generation on client or storage
