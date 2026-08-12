@@ -711,10 +711,10 @@ export default function MikrotikPage() {
                             <Badge variant="outline" className="text-[10px]">{entry.iface}</Badge>
                           </TableCell>
                           <TableCell className="text-right text-success font-semibold">
-                            {entry.download?.toFixed(2)} Mb/s
+                            {entry.download?.toFixed(2)} Mbps
                           </TableCell>
                           <TableCell className="text-right text-accent">
-                            {entry.upload?.toFixed(2)} Mb/s
+                            {entry.upload?.toFixed(2)} Mbps
                           </TableCell>
                         </TableRow>
                       ));
