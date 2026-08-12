@@ -114,9 +114,19 @@ Deno.serve(async (req) => {
         })
 
         if (resFetch.ok) {
-          const fetchResult = await resFetch.json()
-          rx_bytes = parseInt(fetchResult.downloaded || '0')
-          mbps = Math.round(((rx_bytes * 8) / (10 * 1024 * 1024)) * 100) / 100
+          const fetchResults = await resFetch.json()
+          // Mikrotik with as-value: true returns an array of progress snapshots
+          // We want the last one to get total downloaded bytes
+          const lastSnapshot = Array.isArray(fetchResults) 
+            ? fetchResults[fetchResults.length - 1] 
+            : fetchResults
+          
+          rx_bytes = parseInt(lastSnapshot.downloaded || '0')
+          // Calculate speed based on actual duration reported by Mikrotik if available
+          const reportedDurationStr = lastSnapshot.duration || '10s'
+          const reportedDuration = parseInt(reportedDurationStr.replace('s', '')) || 10
+          
+          mbps = Math.round(((rx_bytes * 8) / (reportedDuration * 1024 * 1024)) * 100) / 100
           status = mbps > 0 ? 'Success' : 'Success (No Traffic)'
         } else {
           const errText = await resFetch.text()
