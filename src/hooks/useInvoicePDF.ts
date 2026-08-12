@@ -86,7 +86,7 @@ export function useInvoicePDF() {
       doc.setFontSize(10);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-      doc.text("Mororo.Tech - Soluções em TI", 20, currentY);
+      doc.text("Mororo.Tech - Tecnologia e Desenvolvimento", 20, currentY);
       
       doc.setFont("helvetica", "normal");
       doc.setTextColor(textColor[0], textColor[1], textColor[2]);
