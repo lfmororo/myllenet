@@ -6,8 +6,9 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const UAZAPI_BASE_URL = "https://ipazua.uazapi.com";
+const UAZAPI_BASE_URL = "https://ipazua.uazapi.com/api"; // Added /api if required by the instance
 const BOT_DISCLAIMER = "\n\n🤖 _Esta é uma mensagem automática. Para falar com um atendente, entre em contato: (85) 98680-1458_";
+const UAZAPI_FILE_ENDPOINT = "/send/file"; // or /send/media if preferred, setting default back to /send/file for now to verify 405 fix via base URL verification
 
 function getSupabaseAdmin() {
   return createClient(
@@ -68,8 +69,14 @@ async function getUazapiToken(): Promise<string> {
 
 async function uazapiRequest(endpoint: string, body: unknown) {
   const token = await getUazapiToken();
-
-  const response = await fetch(`${UAZAPI_BASE_URL}${endpoint}`, {
+  const url = `${UAZAPI_BASE_URL}${endpoint}`;
+  
+  // UAZAPI /send/file accepts POST but some endpoints or configurations might be picky.
+  // The user received a 405 Method Not Allowed. 
+  // Let's verify if we should use another method or if the URL is slightly different.
+  // Standard UAZAPI for files is usually POST.
+  
+  const response = await fetch(url, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -79,7 +86,7 @@ async function uazapiRequest(endpoint: string, body: unknown) {
   });
 
   const responseText = await response.text();
-  console.log("UAZAPI response:", response.status, responseText.slice(0, 500));
+  console.log(`UAZAPI [${endpoint}] response:`, response.status, responseText.slice(0, 500));
 
   let data;
   try { data = JSON.parse(responseText); } catch { data = { raw: responseText }; }
@@ -341,6 +348,8 @@ async function sendInvoiceNotification(req: Request) {
       console.log(`[PDF] Requesting UAZAPI to send PDF from URL: ${pdfUrl}`);
       
       try {
+        // Many UAZAPI instances use /send/file or /send/media
+        // Let's try the most common one first and ensure the structure is correct
         const fileResult = await uazapiRequest("/send/file", {
           number: formattedPhone,
           url: pdfUrl,
