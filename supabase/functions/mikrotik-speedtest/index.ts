@@ -124,9 +124,14 @@ Deno.serve(async (req) => {
           rx_bytes = parseInt(lastSnapshot.downloaded || '0')
           // Calculate speed based on actual duration reported by Mikrotik if available
           const reportedDurationStr = lastSnapshot.duration || '10s'
-          const reportedDuration = parseInt(reportedDurationStr.replace('s', '')) || 10
+          // Extract seconds from duration (e.g., "10s", "0s", "1m2s")
+          let reportedDuration = 10;
+          if (reportedDurationStr.includes('s')) {
+            const matches = reportedDurationStr.match(/(\d+)s/);
+            if (matches) reportedDuration = Math.max(1, parseInt(matches[1]));
+          }
           
-          mbps = Math.round(((rx_bytes * 8) / (reportedDuration * 1024 * 1024)) * 100) / 100
+          mbps = Math.round(((rx_bytes * 8) / (reportedDuration * 1000000)) * 100) / 100
           status = mbps > 0 ? 'Success' : 'Success (No Traffic)'
         } else {
           const errText = await resFetch.text()
