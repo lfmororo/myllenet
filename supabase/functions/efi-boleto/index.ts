@@ -881,7 +881,10 @@ async function bulkCheckPayments(req: Request) {
       .from("invoices")
       .select("id, customer_id, valor_centavos, vencimento, status, customers(cpf)")
       .in("status", ["pending", "waiting", "overdue"])
-      .is("efi_charge_id", null);
+      .is("efi_charge_id", null)
+      .order('vencimento', { ascending: false })
+      .limit(15);
+
 
     // Group by customer CPF
     const byCpf = new Map<string, { customer_id: string; invoices: any[] }>();
