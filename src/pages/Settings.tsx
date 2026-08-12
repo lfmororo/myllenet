@@ -18,6 +18,7 @@ import { ArrowLeft, Loader2, Save, Upload, CheckCircle, XCircle, ShieldAlert, Za
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useDiagnosticPDF } from "@/hooks/useDiagnosticPDF";
 
 export default function Settings() {
   const { user, isAdmin, loading: authLoading } = useAuth();
@@ -51,6 +52,7 @@ export default function Settings() {
 
   const [savingMikrotik, setSavingMikrotik] = useState(false);
   const [generatingReport, setGeneratingReport] = useState(false);
+  const { generatePDF: downloadPDF, generating: generatingPDF } = useDiagnosticPDF();
   const [reportDates, setReportDates] = useState({
     start: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     end: new Date().toISOString().split('T')[0]
@@ -265,7 +267,7 @@ export default function Settings() {
     setTesting(false);
   };
 
-  const handleDownloadDiagnosticReport = async () => {
+  const handleDownloadDiagnosticReport = async (format: 'json' | 'pdf' = 'json') => {
     setGeneratingReport(true);
     try {
       const headers = await getAuthHeaders();
@@ -282,17 +284,21 @@ export default function Settings() {
       }
       
       const data = await res.json();
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `diagnostico-api-${reportDates.start}-a-${reportDates.end}.json`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
       
-      toast.success("Relatório de diagnóstico baixado com sucesso!");
+      if (format === 'pdf') {
+        await downloadPDF(data);
+      } else {
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `diagnostico-api-${reportDates.start}-a-${reportDates.end}.json`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        toast.success("Relatório de diagnóstico baixado com sucesso!");
+      }
     } catch (err: any) {
       toast.error("Erro ao gerar relatório: " + err.message);
     }
@@ -834,18 +840,34 @@ export default function Settings() {
                   </ul>
                 </div>
 
-                <Button 
-                  onClick={handleDownloadDiagnosticReport}
-                  disabled={generatingReport}
-                  className="w-full"
-                >
-                  {generatingReport ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <FileDown className="mr-2 h-4 w-4" />
-                  )}
-                  Baixar Relatório de Diagnóstico (.JSON)
-                </Button>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <Button 
+                    onClick={() => handleDownloadDiagnosticReport('json')}
+                    disabled={generatingReport || generatingPDF}
+                    variant="outline"
+                    className="flex-1"
+                  >
+                    {generatingReport && !generatingPDF ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <FileDown className="mr-2 h-4 w-4" />
+                    )}
+                    Baixar JSON
+                  </Button>
+
+                  <Button 
+                    onClick={() => handleDownloadDiagnosticReport('pdf')}
+                    disabled={generatingReport || generatingPDF}
+                    className="flex-1"
+                  >
+                    {generatingPDF ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <FileDown className="mr-2 h-4 w-4" />
+                    )}
+                    Baixar PDF
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
