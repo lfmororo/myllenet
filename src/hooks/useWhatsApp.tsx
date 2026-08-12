@@ -8,12 +8,13 @@ export function useWhatsApp() {
   const [sending, setSending] = useState<string | null>(null);
 
   const getAuthHeaders = async () => {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const token = sessionData?.session?.access_token;
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
     if (!token) {
-      toast.error("Sessão expirada");
+      toast.error("Sessão expirada. Por favor, faça login novamente.");
       return null;
     }
+    
     return {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
@@ -27,9 +28,8 @@ export function useWhatsApp() {
 
     setSending(invoiceId);
     try {
-      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
       const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/whatsapp-send/notify-invoice`,
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-send/notify-invoice`,
         {
           method: "POST",
           headers,
@@ -64,9 +64,8 @@ export function useWhatsApp() {
     for (const id of invoiceIds) {
       setSending(id);
       try {
-        const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
         const response = await fetch(
-          `https://${projectId}.supabase.co/functions/v1/whatsapp-send/notify-invoice`,
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-send/notify-invoice`,
           {
             method: "POST",
             headers,
@@ -96,9 +95,8 @@ export function useWhatsApp() {
     if (!headers) return false;
 
     try {
-      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
       const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/whatsapp-send/send-text`,
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-send/send-text`,
         {
           method: "POST",
           headers,

@@ -16,13 +16,7 @@ function getSupabaseAdmin() {
   );
 }
 
-function getSupabaseClient(authHeader: string) {
-  return createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_ANON_KEY")!,
-    { global: { headers: { Authorization: authHeader } } }
-  );
-}
+// Helper removed as we prefer verifyAdmin to use admin client with passed token directly.
 
 async function verifyAdmin(authHeader: string | null) {
   if (!authHeader?.startsWith("Bearer ")) {
@@ -35,9 +29,13 @@ async function verifyAdmin(authHeader: string | null) {
     return "service_role";
   }
 
-  const supabase = getSupabaseClient(authHeader);
-  const { data: { user }, error } = await supabase.auth.getUser();
-  if (error || !user) throw new Error("Unauthorized");
+  const adminClient = getSupabaseAdmin();
+  const { data: { user }, error } = await adminClient.auth.getUser(token);
+  
+  if (error || !user) {
+    console.error("Auth error:", error);
+    throw new Error("Unauthorized");
+  }
 
   const userId = user.id;
   const admin = getSupabaseAdmin();
