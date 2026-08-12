@@ -44,6 +44,7 @@ export default function Settings() {
 
   // Mikrotik settings
   const [mikrotikHost, setMikrotikHost] = useState("");
+  const [mikrotikHostSecondary, setMikrotikHostSecondary] = useState("");
   const [mikrotikUser, setMikrotikUser] = useState("");
   const [mikrotikPass, setMikrotikPass] = useState("");
   const [mikrotikApiPort, setMikrotikApiPort] = useState("8728");
@@ -174,7 +175,7 @@ export default function Settings() {
     const { data } = await supabase
       .from("settings")
       .select("key, value")
-      .in("key", ["efi_client_id", "efi_client_secret", "efi_certificate_path", "uazapi_token", "mikrotik_host", "mikrotik_username", "mikrotik_password", "mikrotik_api_port", "mikrotik_rest_port", "blocking_days", "pix_key", "pix_name", "pix_city"]);
+      .in("key", ["efi_client_id", "efi_client_secret", "efi_certificate_path", "uazapi_token", "mikrotik_host", "mikrotik_host_secondary", "mikrotik_username", "mikrotik_password", "mikrotik_api_port", "mikrotik_rest_port", "blocking_days", "pix_key", "pix_name", "pix_city"]);
 
     if (data) {
       for (const row of data) {
@@ -183,6 +184,7 @@ export default function Settings() {
         if (row.key === "efi_certificate_path") setCertUploaded(!!row.value);
         if (row.key === "uazapi_token") setUazapiToken(row.value || "");
         if (row.key === "mikrotik_host") setMikrotikHost(row.value || "");
+        if (row.key === "mikrotik_host_secondary") setMikrotikHostSecondary(row.value || "");
         if (row.key === "mikrotik_username") setMikrotikUser(row.value || "");
         if (row.key === "mikrotik_password") setMikrotikPass(row.value || "");
         if (row.key === "mikrotik_api_port") setMikrotikApiPort(row.value || "8728");
@@ -651,14 +653,26 @@ export default function Settings() {
                   </div>
                 ) : (
                   <div className="space-y-5">
-                    <div className="space-y-2">
-                      <Label htmlFor="mikrotik_host">IP/Host Mikrotik</Label>
-                      <Input
-                        id="mikrotik_host"
-                        value={mikrotikHost}
-                        onChange={(e) => setMikrotikHost(e.target.value)}
-                        placeholder="IP Externo ou DNS"
-                      />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="mikrotik_host">IP/Host Mikrotik (Preferencial)</Label>
+                        <Input
+                          id="mikrotik_host"
+                          value={mikrotikHost}
+                          onChange={(e) => setMikrotikHost(e.target.value)}
+                          placeholder="IP Externo ou DNS"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="mikrotik_host_secondary">IP/Host Mikrotik (Secundário)</Label>
+                        <Input
+                          id="mikrotik_host_secondary"
+                          value={mikrotikHostSecondary}
+                          onChange={(e) => setMikrotikHostSecondary(e.target.value)}
+                          placeholder="IP Externo ou DNS (Opcional)"
+                        />
+                      </div>
                     </div>
 
                     <div className="space-y-2">
@@ -726,6 +740,7 @@ export default function Settings() {
                         setSavingMikrotik(true);
                         try {
                           await upsertSetting("mikrotik_host", mikrotikHost);
+                          await upsertSetting("mikrotik_host_secondary", mikrotikHostSecondary);
                           await upsertSetting("mikrotik_username", mikrotikUser);
                           await upsertSetting("mikrotik_password", mikrotikPass);
                           await upsertSetting("mikrotik_api_port", mikrotikApiPort);

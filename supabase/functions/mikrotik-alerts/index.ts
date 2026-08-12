@@ -32,7 +32,7 @@ Deno.serve(async (req) => {
         await supabase.functions.invoke('whatsapp-send/send-text', {
           body: {
             phone: ADMIN_PHONE,
-            message: `🚨 *ALERTA DE MONITORAMENTO* 🚨\n\nO servidor Mikrotik está *OFF-LINE* há mais de 3 minutos!\n\nHost: ${recentHistory[0].host}\nÚltimo erro: ${recentHistory[0].message}`
+            message: `🚨 *ALERTA DE MONITORAMENTO* 🚨\n\nO servidor Mikrotik está *OFF-LINE* em todos os endereços configurados há mais de 3 minutos!\n\nÚltimo erro: ${recentHistory[0].message}`
           }
         })
       }
@@ -46,7 +46,6 @@ Deno.serve(async (req) => {
 
     if (disconnections && disconnections.length > 0) {
       for (const disc of disconnections) {
-        // Only alert if customer has alert_on_disconnect enabled
         const { data: customer } = await supabase
           .from('customers')
           .select('alert_on_disconnect, nome')
@@ -54,7 +53,6 @@ Deno.serve(async (req) => {
           .single()
 
         if (customer?.alert_on_disconnect) {
-          // Check if we already alerted recently to avoid spam
           const { data: recentAlert } = await supabase
             .from('customer_alerts_sent')
             .select('id')
@@ -80,12 +78,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 3. Check for Frequent Drops (e.g., 3+ reconnections in 1 hour)
+    // 3. Check for Frequent Drops
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
-    
-    // We can identify a "drop" by checking if a user appears in logs with a small uptime 
-    // after a period of being missing, or if they have multiple distinct session starts.
-    // For now, let's look at the pppoe_logs to find customers with multiple short sessions.
     const { data: frequentDrops } = await supabase.rpc('check_frequent_drops', {
       time_threshold: oneHourAgo,
       drop_count: 3
@@ -124,9 +118,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 4. Check for Abnormal Usage (e.g., usage > 2x average or extreme peaks)
-    // This requires historical data. For now, let's check for very high traffic in a short window.
-    // Example: > 500MB in 5 minutes (assuming 15min sync interval, this is ~33Mbps sustained)
+    // 4. Check for Abnormal Usage
     const { data: highUsage } = await supabase.rpc('check_abnormal_usage', {
       bytes_threshold: 500 * 1024 * 1024 // 500 MB
     })
@@ -174,12 +166,11 @@ Deno.serve(async (req) => {
 
     if (recentWanHistory && recentWanHistory.length > 0) {
       for (const event of recentWanHistory) {
-        // Check if this specific event was already alerted
         const { data: alerted } = await supabase
           .from('customer_alerts_sent')
           .select('id')
           .eq('alert_type', `wan_${event.interface_name}_${event.status}`)
-          .gt('sent_at', new Date(Date.now() - 60 * 60 * 1000).toISOString()) // 1 hour cooldown
+          .gt('sent_at', new Date(Date.now() - 60 * 60 * 1000).toISOString())
           .single()
 
         if (!alerted) {
@@ -217,8 +208,6 @@ Deno.serve(async (req) => {
 
     const speedThresholdMbps = parseFloat(thresholdData?.value || '10')
     const alertIntervalMinutes = parseInt(intervalData?.value || '30')
-
-    // Get average speed per WAN in the last interval
     const intervalAgo = new Date(Date.now() - alertIntervalMinutes * 60 * 1000).toISOString()
     
     const { data: speedMetrics } = await supabase
@@ -238,12 +227,11 @@ Deno.serve(async (req) => {
         const avgMbps = (stats.sum / stats.count) / 1_000_000
         
         if (avgMbps < speedThresholdMbps) {
-          // Check for cooldown
           const { data: alerted } = await supabase
             .from('customer_alerts_sent')
             .select('id')
             .eq('alert_type', `wan_speed_low_${iface}`)
-            .gt('sent_at', new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString()) // 4 hour cooldown
+            .gt('sent_at', new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString())
             .single()
 
           if (!alerted) {
