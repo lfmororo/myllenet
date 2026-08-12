@@ -128,13 +128,16 @@ Deno.serve(async (req) => {
       const openMap = new Map<number, boolean>()
       probePorts.forEach((p, i) => openMap.set(p, probes[i]))
 
+      const currentOpenPorts = probePorts.filter((p) => openMap.get(p))
+      
+      // Only proceed with this host if it has open ports OR if it's the primary host (to report unreachable if all fail)
+      if (currentOpenPorts.length === 0 && host !== hosts[0]) continue
+
       if (openMap.get(apiPort)) apiOpen = true
       if (openMap.get(80)) p80 = true
       if (openMap.get(443)) p443 = true
       
-      const currentOpenPorts = probePorts.filter((p) => openMap.get(p))
       openPorts = [...new Set([...openPorts, ...currentOpenPorts])]
-      
       if (currentOpenPorts.length > 0) reachable = true
 
       const openRest = restPorts.filter((p) => openMap.get(p))
