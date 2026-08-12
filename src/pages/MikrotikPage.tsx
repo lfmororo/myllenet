@@ -239,7 +239,7 @@ export default function MikrotikPage() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Mikrotik - Gestão</h2>
-          <p className="text-muted-foreground">O Mikrotik realiza testes de velocidade através do comando <code>tool fetch</code> e monitoramento das WANs periodicamente, gerando gráficos de desempenho por hora e alertas de velocidade configuráveis.</p>
+          <p className="text-muted-foreground">O Mikrotik realiza testes de velocidade através do comando <code>tool fetch</code> e monitoramento das WANs periodicamente, gerando gráficos de desempenho por hora e alertas de velocidade configuráveis. Se a API REST não responder, verifique se o serviço WWW está habilitado no roteador.</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={downloadMikrotikScript} disabled={exporting}>
