@@ -184,6 +184,7 @@ export default function Settings() {
         if (row.key === "efi_certificate_path") setCertUploaded(!!row.value);
         if (row.key === "uazapi_token") setUazapiToken(row.value || "");
         if (row.key === "mikrotik_host") setMikrotikHost(row.value || "");
+        if (row.key === "mikrotik_host_secondary") setMikrotikHostSecondary(row.value || "");
         if (row.key === "mikrotik_username") setMikrotikUser(row.value || "");
         if (row.key === "mikrotik_password") setMikrotikPass(row.value || "");
         if (row.key === "mikrotik_api_port") setMikrotikApiPort(row.value || "8728");
