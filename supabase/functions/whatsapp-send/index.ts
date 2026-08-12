@@ -321,7 +321,8 @@ async function sendInvoiceNotification(req: Request) {
       message += "\n\nEvite a suspensão do serviço. Pague em dia! 😊";
       break;
     case "pagamento_confirmado":
-      message = `Olá ${customer.nome}! 🌐\n\n✅ Pagamento confirmado!\n\n📋 ${invoice.descricao}\n💰 Valor: ${valor}\n\nObrigado por manter sua internet em dia! 🚀`;
+      const mesRefPag = new Date(invoice.vencimento + "T12:00:00").toLocaleDateString("pt-BR", { month: 'long', year: 'numeric' });
+      message = `Olá ${customer.nome}! 🌐\n\n✅ Pagamento confirmado!\n\n📋 ${invoice.descricao}\n💰 Valor: ${valor}\n📅 Vencimento: ${vencimento}\n📂 Referência: ${mesRefPag}\n\nObrigado por manter sua internet em dia! 🚀`;
       break;
     case "cobranca_atrasada":
       message = `Olá ${customer.nome}! 🌐\n\n⚠️ Sua fatura da *Mororo.Tech* está vencida!\n\n📋 ${invoice.descricao}\n💰 Valor: ${valor}\n📅 Vencimento: ${vencimento}`;
