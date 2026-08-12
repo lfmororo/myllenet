@@ -432,7 +432,9 @@ async function resendPaidNotifications(req: Request) {
       }
 
       const valor = (invoice.valor_centavos / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-      const message = `Olá ${customer.nome}! 🌐\n\n✅ Pagamento confirmado!\n\n📋 ${invoice.descricao}\n💰 Valor: ${valor}\n\nObrigado por manter sua internet em dia! 🚀`;
+      const vencimento = new Date(invoice.vencimento + "T12:00:00").toLocaleDateString("pt-BR");
+      const mesRefPag = new Date(invoice.vencimento + "T12:00:00").toLocaleDateString("pt-BR", { month: 'long', year: 'numeric' });
+      const message = `Olá ${customer.nome}! 🌐\n\n✅ Pagamento confirmado!\n\n📋 ${invoice.descricao}\n💰 Valor: ${valor}\n📅 Vencimento: ${vencimento}\n📂 Referência: ${mesRefPag}\n\nObrigado por manter sua internet em dia! 🚀`;
       const formattedPhone = formatPhone(customer.telefone);
 
       const fullMessage = message + BOT_DISCLAIMER;
