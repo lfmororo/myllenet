@@ -15,6 +15,7 @@ import NotificationsPage from "./pages/NotificationsPage";
 import EfiLogsPage from "./pages/EfiLogsPage";
 import Settings from "./pages/Settings";
 import MikrotikPage from "./pages/MikrotikPage";
+import InvoiceView from "./pages/InvoiceView";
 
 const queryClient = new QueryClient();
 
@@ -28,6 +29,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/fatura/:id" element={<InvoiceView />} />
             <Route element={<AppLayout />}>
               <Route path="/dashboard" element={<DashboardHome />} />
               <Route path="/clientes" element={<CustomersPage />} />
