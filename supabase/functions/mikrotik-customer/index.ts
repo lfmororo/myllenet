@@ -101,7 +101,7 @@ Deno.serve(async (req) => {
       return json({ success: true, action, message: `Usuário ${username} removido do Mikrotik` })
     }
 
-    const disabled = action === 'disable' ? true : action === 'enable' ? false : !customer.ativo || customer.block_status === 'blocked'
+    const disabled = action === 'disable' ? true : action === 'enable' ? false : (customer.ativo === false || customer.block_status === 'blocked')
 
     const secretData: Record<string, string> = {
       name: username,
