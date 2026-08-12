@@ -346,7 +346,7 @@ async function sendInvoiceNotification(req: Request) {
       const pdfUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/generate-invoice-pdf?invoice_id=${invoice_id}&t=${Date.now()}`;
       const fileName = `Fatura_${invoice.descricao.replace(/\s+/g, '_')}.pdf`;
       
-      console.log(`[PDF] Requesting UAZAPI to send PDF from URL: ${pdfUrl}`);
+      console.log(`[PDF] Requesting UAZAPI to send PDF from URL: ${pdfUrl} (Phone: ${formattedPhone})`);
       
       try {
         // UAZAPI /send/media expects type: "document" for PDF files and the URL in the "file" field
