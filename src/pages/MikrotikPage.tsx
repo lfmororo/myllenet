@@ -438,9 +438,8 @@ export default function MikrotikPage() {
                   }}
                 />
                 {(() => {
-                  const last = wanLogs[wanLogs.length - 1] || {};
-                  const keys = Object.keys(last).filter(k => k !== 'time' && k !== 'fullDate');
-                  const interfaces = Array.from(new Set(keys.map(k => k.replace(/ [↑↓]$/, ''))));
+                  const allKeys = Array.from(new Set(wanLogs.flatMap(log => Object.keys(log).filter(k => k !== 'time' && k !== 'fullDate'))));
+                  const interfaces = Array.from(new Set(allKeys.map(k => k.replace(/ [↑↓]$/, ''))));
                   const families = [
                     { download: '#14b8a6', upload: '#2dd4bf' },   // teal
                     { download: '#8b5cf6', upload: '#a78bfa' },     // violet
@@ -450,8 +449,9 @@ export default function MikrotikPage() {
                     { download: '#3b82f6', upload: '#60a5fa' },     // blue
                   ];
                   const colorMap = new Map<string, { download: string; upload: string }>();
-                  interfaces.forEach((iface, i) => colorMap.set(iface, families[i % families.length]));
-                  return keys.map((key) => {
+                  interfaces.sort().forEach((iface, i) => colorMap.set(iface, families[i % families.length]));
+                  
+                  return allKeys.sort().map((key) => {
                     const isUpload = key.endsWith('↑');
                     const iface = key.replace(/ [↑↓]$/, '');
                     const family = colorMap.get(iface) || families[0];
@@ -467,10 +467,12 @@ export default function MikrotikPage() {
                         strokeDasharray={isUpload ? "4 3" : undefined}
                         dot={false}
                         activeDot={{ r: 3, strokeWidth: 0, fill: color }}
+                        connectNulls
                       />
                     );
                   });
                 })()}
+
               </LineChart>
             </ResponsiveContainer>
 
