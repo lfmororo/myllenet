@@ -72,7 +72,8 @@ Deno.serve(async (req) => {
       // Trigger WhatsApp notification via the other edge function
       // In a real env, we call it internally or via fetch
       const projectId = Deno.env.get("SUPABASE_PROJECT_ID");
-      await fetch(`https://${projectId}.supabase.co/functions/v1/whatsapp-send/notify-invoice`, {
+      const baseUrl = Deno.env.get("SUPABASE_URL") || `https://${projectId}.supabase.co`;
+      await fetch(`${baseUrl}/functions/v1/whatsapp-send/notify-invoice`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
