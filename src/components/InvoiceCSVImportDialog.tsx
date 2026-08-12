@@ -5,11 +5,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Upload, FileText, AlertTriangle, CheckCircle, Loader2, X } from "lucide-react";
+import { Upload, FileText, AlertTriangle, CheckCircle, Loader2, X, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import type { Plan } from "@/hooks/usePlans";
 import type { CustomerInput } from "@/hooks/useCustomers";
 import { supabase } from "@/integrations/supabase/client";
+import { reconcileInvoicesFromCSV } from "@/utils/csvReconciliation";
 
 interface Props {
   open: boolean;
@@ -127,16 +128,12 @@ function cleanCPF(cpf: string): string {
 
 function parseValor(raw: string): number | null {
   if (!raw) return null;
-  // Handle "R$ 1.234,56" or "1234.56" or "1234,56"
   let cleaned = raw.replace(/[R$\s]/g, "");
-  // Detect locale: if has comma as last separator, it's decimal
   const lastComma = cleaned.lastIndexOf(",");
   const lastDot = cleaned.lastIndexOf(".");
   if (lastComma > lastDot) {
-    // Brazilian format: 1.234,56
     cleaned = cleaned.replace(/\./g, "").replace(",", ".");
   } else if (lastDot > lastComma) {
-    // US format or no thousands: 1,234.56
     cleaned = cleaned.replace(/,/g, "");
   }
   const num = parseFloat(cleaned);
@@ -146,13 +143,11 @@ function parseValor(raw: string): number | null {
 
 function parseDate(raw: string): string | null {
   if (!raw) return null;
-  // Try DD/MM/YYYY
   const brMatch = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
   if (brMatch) {
     const [, d, m, y] = brMatch;
     return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
   }
-  // Try YYYY-MM-DD
   const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
   return null;
@@ -175,12 +170,13 @@ export default function InvoiceCSVImportDialog({ open, onOpenChange, customers, 
   const [validRows, setValidRows] = useState<InvoiceRow[]>([]);
   const [importing, setImporting] = useState(false);
   const [fileName, setFileName] = useState("");
+  const [rawText, setRawText] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
   const reset = () => {
     setStep("upload"); setHeaders([]); setRows([]);
     setMapping({ cpf: null, nome: null, email: null, complemento: null, descricao: null, valor: null, vencimento: null, status: null, link_boleto: null });
-    setIssues([]); setValidRows([]); setImporting(false); setFileName("");
+    setIssues([]); setValidRows([]); setImporting(false); setFileName(""); setRawText("");
   };
 
   const handleClose = (val: boolean) => { if (!val) reset(); onOpenChange(val); };
@@ -191,6 +187,7 @@ export default function InvoiceCSVImportDialog({ open, onOpenChange, customers, 
     reader.onload = (e) => {
       const text = e.target?.result as string;
       if (!text) { toast.error("Arquivo vazio"); return; }
+      setRawText(text);
       const lines = text.split(/\r?\n/).filter((l) => l.trim());
       if (lines.length < 2) { toast.error("Arquivo precisa ter cabeçalho e pelo menos 1 linha"); return; }
       const sep = detectSeparator(lines[0]);
@@ -210,6 +207,28 @@ export default function InvoiceCSVImportDialog({ open, onOpenChange, customers, 
 
   const handleMapChange = (field: FieldKey, value: string) => {
     setMapping((prev) => ({ ...prev, [field]: value === "__none__" ? null : Number(value) }));
+  };
+
+  const handleReconcile = async () => {
+    if (!rawText) return;
+    setImporting(true);
+    try {
+      const { updated, errors } = await reconcileInvoicesFromCSV(rawText);
+      if (updated > 0) {
+        toast.success(`${updated} fatura(s) baixada(s) com sucesso!`);
+        await onRefetchCustomers();
+        handleClose(false);
+      } else if (errors > 0) {
+        toast.warning(`Nenhuma fatura pendente encontrada para baixar, mas ocorreram ${errors} erros de processamento.`);
+      } else {
+        toast.info("Nenhuma fatura pendente correspondente encontrada no relatório.");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Erro ao processar baixa via relatório.");
+    } finally {
+      setImporting(false);
+    }
   };
 
   const cpfToCustomer = new Map(customers.map(c => [cleanCPF(c.cpf), c]));
@@ -239,7 +258,6 @@ export default function InvoiceCSVImportDialog({ open, onOpenChange, customers, 
           newIssues.push({ row: rowNum, field: "CPF", message: cpf ? "Formato inválido" : "Vazio", type: "error" });
           rowValid = false;
         } else {
-          // Will be auto-created
           const nome = getValue("nome");
           const email = getValue("email");
           if (!nome && !email) {
@@ -263,7 +281,6 @@ export default function InvoiceCSVImportDialog({ open, onOpenChange, customers, 
       const statusRaw = getValue("status");
       const status = statusRaw ? mapStatus(statusRaw) : "pending";
       const paid_at = status === "paid" ? vencimento + "T12:00:00Z" : null;
-
       const linkBoleto = getValue("link_boleto") || null;
 
       if (rowValid && valorCentavos && vencimento) {
@@ -288,7 +305,6 @@ export default function InvoiceCSVImportDialog({ open, onOpenChange, customers, 
     if (validRows.length === 0) return;
     setImporting(true);
     try {
-      // Step 1: Auto-create missing customers
       const pendingRows = validRows.filter(r => r.customer_id === "__pending__");
       if (pendingRows.length > 0) {
         const cpfsSeen = new Set<string>();
@@ -297,20 +313,13 @@ export default function InvoiceCSVImportDialog({ open, onOpenChange, customers, 
           const cpf = row._cpf || "";
           if (cpfsSeen.has(cpf)) continue;
           cpfsSeen.add(cpf);
-
           const complementoPPPoE = row._complemento ? row._complemento.toLowerCase().replace(/\s+/g, "") : "";
           const customerData: CustomerInput = {
             nome: row._nome || `Cliente ${cpf}`,
-            cpf,
-            email: row._email || `${cpf}@importado.com`,
-            telefone: null,
-            usuario_pppoe: complementoPPPoE || cpf,
-            senha_pppoe: complementoPPPoE || "myllenet123",
+            cpf, email: row._email || `${cpf}@importado.com`, telefone: null,
+            usuario_pppoe: complementoPPPoE || cpf, senha_pppoe: complementoPPPoE || "myllenet123",
             rua: null, numero: null, complemento: row._complemento || null,
-            bairro: null, cidade: null, estado: null, cep: null,
-            dia_vencimento: 10,
-            plan_id: null,
-            desconto_especial_centavos: 0,
+            bairro: null, cidade: null, estado: null, cep: null, dia_vencimento: 10, plan_id: null, desconto_especial_centavos: 0,
           };
           const ok = await onAddCustomer(customerData);
           if (ok) created++;
@@ -321,10 +330,8 @@ export default function InvoiceCSVImportDialog({ open, onOpenChange, customers, 
         }
       }
 
-      // Step 2: Re-resolve customer IDs from DB for pending rows
       const { data: freshCustomers } = await supabase.from("customers").select("id, cpf");
       const freshCpfMap = new Map((freshCustomers || []).map(c => [cleanCPF(c.cpf), c.id]));
-
       const resolvedRows = validRows.map(row => {
         if (row.customer_id === "__pending__" && row._cpf) {
           return { ...row, customer_id: freshCpfMap.get(row._cpf) || "__pending__" };
@@ -332,7 +339,6 @@ export default function InvoiceCSVImportDialog({ open, onOpenChange, customers, 
         return row;
       });
 
-      // Strip internal fields before sending to DB
       const dbRows = resolvedRows
         .filter(r => r.customer_id !== "__pending__")
         .map(({ _cpf, _nome, _email, _complemento, ...rest }) => rest);
@@ -340,9 +346,7 @@ export default function InvoiceCSVImportDialog({ open, onOpenChange, customers, 
       const result = await onImport(dbRows);
       toast.success(`${result.success} cobrança(s) importada(s)!`);
       if (result.updated && result.updated > 0) toast.success(`${result.updated} cobrança(s) atualizada(s) para "pago"`);
-      if (result.failed > 0) toast.error(`${result.failed} falha(s) na importação`);
-
-      // Post-import: update dia_vencimento and plan_id on each customer
+      
       if (plans.length > 0) {
         const byCustomer = new Map<string, InvoiceRow[]>();
         for (const row of resolvedRows) {
@@ -351,45 +355,38 @@ export default function InvoiceCSVImportDialog({ open, onOpenChange, customers, 
           arr.push(row);
           byCustomer.set(row.customer_id, arr);
         }
-
-        let updated = 0;
+        let updatedCount = 0;
         for (const [customerId, invoices] of byCustomer) {
           const sorted = invoices.sort((a, b) => b.vencimento.localeCompare(a.vencimento));
           const latest = sorted[0];
           const vencDate = new Date(latest.vencimento + "T12:00:00");
           const diaVencimento = vencDate.getDate();
           const matchedPlan = plans.find(p => p.ativo && p.valor_centavos === latest.valor_centavos);
-
           const updateData: Partial<CustomerInput> = { dia_vencimento: diaVencimento };
           if (matchedPlan) updateData.plan_id = matchedPlan.id;
-
           const ok = await onUpdateCustomer(customerId, updateData);
-          if (ok) updated++;
+          if (ok) updatedCount++;
         }
-        if (updated > 0) toast.success(`${updated} cliente(s) atualizado(s) com vencimento e plano`);
+        if (updatedCount > 0) toast.success(`${updatedCount} cliente(s) atualizado(s) com vencimento e plano`);
       }
-
       handleClose(false);
-    } catch {
-      toast.error("Erro durante a importação");
-    }
+    } catch { toast.error("Erro durante a importação"); }
     setImporting(false);
   };
 
   const errors = issues.filter((i) => i.type === "error");
   const warnings = issues.filter((i) => i.type === "warning");
-
   const formatCentavos = (v: number) => (v / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
         <DialogHeader className="flex-shrink-0">
-          <DialogTitle>Importar Cobranças via CSV</DialogTitle>
+          <DialogTitle>Importar ou Baixar Cobranças via CSV</DialogTitle>
           <DialogDescription>
-            {step === "upload" && "Selecione ou arraste um arquivo CSV com as cobranças"}
-            {step === "mapping" && "Mapeie as colunas do arquivo para os campos do sistema"}
-            {step === "preview" && "Revise os dados antes de importar"}
+            {step === "upload" && "Selecione um relatório da EFI para baixar faturas ou um CSV para importar novas."}
+            {step === "mapping" && "Mapeie as colunas para importar novas faturas ou clique em 'Dar Baixa' se for um relatório EFI."}
+            {step === "preview" && "Revise os dados antes de importar novas faturas."}
           </DialogDescription>
         </DialogHeader>
 
@@ -404,7 +401,7 @@ export default function InvoiceCSVImportDialog({ open, onOpenChange, customers, 
               <Upload className="h-10 w-10 text-muted-foreground" />
               <div className="text-center">
                 <p className="font-medium">Clique ou arraste o arquivo CSV aqui</p>
-                <p className="text-sm text-muted-foreground">Colunas esperadas: CPF, Valor, Vencimento, Descrição (opcional), Status (opcional)</p>
+                <p className="text-sm text-muted-foreground">Relatório da EFI (Semicolon ;) ou CSV genérico.</p>
               </div>
               <input ref={fileRef} type="file" accept=".csv,.txt" className="hidden" onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])} />
             </div>
@@ -412,90 +409,65 @@ export default function InvoiceCSVImportDialog({ open, onOpenChange, customers, 
 
           {step === "mapping" && (
             <div className="space-y-4">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <FileText className="h-4 w-4" />
-                <span>{fileName} — {rows.length} linhas, {headers.length} colunas</span>
+              <div className="bg-muted/50 p-4 rounded-lg flex items-center justify-between gap-4">
+                <div className="flex items-center gap-2 text-sm">
+                  <FileText className="h-4 w-4" />
+                  <span>{fileName}</span>
+                </div>
+                <Button variant="default" className="bg-green-600 hover:bg-green-700" onClick={handleReconcile} disabled={importing}>
+                  {importing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+                  Dar Baixa nas Faturas
+                </Button>
               </div>
-              <p className="text-xs font-medium text-muted-foreground">Campos obrigatórios</p>
+              <div className="separator flex items-center gap-2 my-4">
+                <div className="h-px bg-border flex-1"></div>
+                <span className="text-[10px] uppercase font-bold text-muted-foreground">Ou importar como novas</span>
+                <div className="h-px bg-border flex-1"></div>
+              </div>
               <div className="grid gap-2">
                 {EXPECTED_FIELDS.filter(f => REQUIRED_FIELDS.includes(f)).map((field) => (
                   <div key={field} className="flex items-center gap-3">
-                    <span className="w-32 text-sm font-medium truncate">{FIELD_LABELS[field]} <span className="text-destructive">*</span></span>
+                    <span className="w-32 text-sm font-medium truncate">{FIELD_LABELS[field]} *</span>
                     <Select value={mapping[field] !== null ? String(mapping[field]) : "__none__"} onValueChange={(v) => handleMapChange(field, v)}>
-                      <SelectTrigger className="flex-1 h-9"><SelectValue placeholder="Selecionar coluna..." /></SelectTrigger>
+                      <SelectTrigger className="flex-1 h-9"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="__none__">— Não mapear —</SelectItem>
+                        <SelectItem value="__none__">— —</SelectItem>
                         {headers.map((h, i) => <SelectItem key={i} value={String(i)}>{h}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
                 ))}
-              </div>
-              <p className="text-xs font-medium text-muted-foreground">Campos opcionais</p>
-              <div className="grid gap-2">
                 {EXPECTED_FIELDS.filter(f => !REQUIRED_FIELDS.includes(f)).map((field) => (
                   <div key={field} className="flex items-center gap-3">
                     <span className="w-32 text-sm font-medium truncate">{FIELD_LABELS[field]}</span>
                     <Select value={mapping[field] !== null ? String(mapping[field]) : "__none__"} onValueChange={(v) => handleMapChange(field, v)}>
-                      <SelectTrigger className="flex-1 h-9"><SelectValue placeholder="Selecionar coluna..." /></SelectTrigger>
+                      <SelectTrigger className="flex-1 h-9"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="__none__">— Não mapear —</SelectItem>
+                        <SelectItem value="__none__">— —</SelectItem>
                         {headers.map((h, i) => <SelectItem key={i} value={String(i)}>{h}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
                 ))}
               </div>
-              <p className="text-xs text-muted-foreground">
-                O CPF será usado para vincular ao cliente. Valores em R$ (ex: 89,90 ou 89.90). Datas no formato DD/MM/AAAA ou AAAA-MM-DD.
-              </p>
             </div>
           )}
 
           {step === "preview" && (
             <div className="space-y-4">
-              <div className="flex flex-wrap gap-3">
-                <Badge variant="default" className="gap-1"><CheckCircle className="h-3 w-3" /> {validRows.length} válidos</Badge>
-                {errors.length > 0 && <Badge variant="destructive" className="gap-1"><X className="h-3 w-3" /> {errors.length} erros</Badge>}
-                {warnings.length > 0 && <Badge variant="outline" className="gap-1"><AlertTriangle className="h-3 w-3" /> {warnings.length} avisos</Badge>}
+              <div className="flex gap-2">
+                <Badge variant="default">{validRows.length} válidos</Badge>
+                {errors.length > 0 && <Badge variant="destructive">{errors.length} erros</Badge>}
               </div>
-              {issues.length > 0 && (
-                <ScrollArea className="max-h-32 rounded border p-2">
-                  <div className="space-y-1">
-                    {issues.slice(0, 50).map((issue, i) => (
-                      <p key={i} className={`text-xs ${issue.type === "error" ? "text-destructive" : "text-yellow-600"}`}>
-                        Linha {issue.row}: {issue.field} — {issue.message}
-                      </p>
-                    ))}
-                    {issues.length > 50 && <p className="text-xs text-muted-foreground">... e mais {issues.length - 50} problemas</p>}
-                  </div>
-                </ScrollArea>
-              )}
-              <ScrollArea className="max-h-48 rounded border">
+              <ScrollArea className="h-48 rounded border">
                 <Table>
-                  <TableHeader>
-                    <TableRow className="bg-muted/50">
-                      <TableHead className="text-xs">Cliente</TableHead>
-                      <TableHead className="text-xs">Valor</TableHead>
-                      <TableHead className="text-xs">Vencimento</TableHead>
-                      <TableHead className="text-xs">Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
+                  <TableHeader><TableRow><TableHead>Cliente</TableHead><TableHead>Valor</TableHead><TableHead>Vencimento</TableHead></TableRow></TableHeader>
                   <TableBody>
-                    {validRows.slice(0, 20).map((r, i) => {
-                      const cust = customers.find(c => c.id === r.customer_id);
-                      return (
-                        <TableRow key={i}>
-                          <TableCell className="text-xs py-1">{cust?.nome || "—"}</TableCell>
-                          <TableCell className="text-xs py-1 font-mono">{formatCentavos(r.valor_centavos)}</TableCell>
-                          <TableCell className="text-xs py-1">{r.vencimento}</TableCell>
-                          <TableCell className="text-xs py-1">{r.status}</TableCell>
-                        </TableRow>
-                      );
-                    })}
+                    {validRows.slice(0, 10).map((r, i) => (
+                      <TableRow key={i}><TableCell>{customers.find(c => c.id === r.customer_id)?.nome || "Novo"}</TableCell><TableCell>{formatCentavos(r.valor_centavos)}</TableCell><TableCell>{r.vencimento}</TableCell></TableRow>
+                    ))}
                   </TableBody>
                 </Table>
-                {validRows.length > 20 && <p className="text-xs text-muted-foreground p-2">Mostrando 20 de {validRows.length}</p>}
               </ScrollArea>
             </div>
           )}
@@ -505,7 +477,7 @@ export default function InvoiceCSVImportDialog({ open, onOpenChange, customers, 
           {step === "mapping" && (
             <>
               <Button variant="outline" onClick={() => setStep("upload")}>Voltar</Button>
-              <Button onClick={processPreview}>Validar e Pré-visualizar</Button>
+              <Button onClick={processPreview}>Pré-visualizar Importação</Button>
             </>
           )}
           {step === "preview" && (
@@ -513,7 +485,7 @@ export default function InvoiceCSVImportDialog({ open, onOpenChange, customers, 
               <Button variant="outline" onClick={() => setStep("mapping")}>Voltar</Button>
               <Button onClick={handleImport} disabled={importing || validRows.length === 0}>
                 {importing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
-                Importar {validRows.length} cobrança(s)
+                Importar {validRows.length} novas faturas
               </Button>
             </>
           )}
