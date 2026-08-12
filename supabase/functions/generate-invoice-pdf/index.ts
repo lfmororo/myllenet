@@ -82,6 +82,26 @@ Deno.serve(async (req) => {
       .select("key, value")
       .in("key", ["pix_key", "pix_name", "pix_city", "company_cnpj", "company_phone", "company_address"]);
 
+    // Fetch consumption data for the month
+    const startOfMonth = new Date(invoice.vencimento);
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+    const endOfMonth = new Date(invoice.vencimento);
+    endOfMonth.setMonth(endOfMonth.getMonth() + 1);
+    endOfMonth.setDate(0);
+    endOfMonth.setHours(23, 59, 59, 999);
+
+    const { data: consumptionData } = await supabase
+      .from("pppoe_logs")
+      .select("rx_bytes, tx_bytes, event_type")
+      .eq("customer_id", customer.id)
+      .gte("logged_at", startOfMonth.toISOString())
+      .lte("logged_at", endOfMonth.toISOString());
+
+    const totalDownload = (consumptionData?.reduce((acc, log) => acc + (Number(log.rx_bytes) || 0), 0) || 0) / (1024 * 1024 * 1024);
+    const totalUpload = (consumptionData?.reduce((acc, log) => acc + (Number(log.tx_bytes) || 0), 0) || 0) / (1024 * 1024 * 1024);
+    const interruptions = consumptionData?.filter(log => log.event_type === 'disconnected').length || 0;
+
     const pixSettings = Object.fromEntries(settings?.map(s => [s.key, s.value]) || []);
     const refDate = new Date(invoice.vencimento + "T12:00:00");
     const refMonth = refDate.toLocaleDateString('pt-BR', { month: '2-digit', year: '2-digit' });
@@ -105,7 +125,9 @@ Deno.serve(async (req) => {
     const textColor = [30, 41, 59];
     const lightTextColor = [71, 85, 105];
 
-    // Header Accent
+    // Header Area with Logo Background
+    doc.setFillColor(255, 255, 255);
+    doc.rect(0, 0, pageWidth, 50, "F");
     doc.setFillColor(accentColor[0], accentColor[1], accentColor[2]);
     doc.rect(0, 0, pageWidth, 5, "F");
 
@@ -119,12 +141,28 @@ Deno.serve(async (req) => {
     doc.setTextColor(lightTextColor[0], lightTextColor[1], lightTextColor[2]);
     doc.text(`#${invoice_id.substring(0, 8).toUpperCase()}`, pageWidth - 20, 32, { align: "right" });
 
-    // Logo (Simulated for server-side jsPDF)
-    doc.setFontSize(16);
-    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-    doc.text("Mororo.Tech", 20, 26);
+    // Logo
+    try {
+      const logoUrl = "https://myllenet.lovable.app/logo.png";
+      const resp = await fetch(logoUrl);
+      if (resp.ok) {
+        const blob = await resp.blob();
+        const buffer = await blob.arrayBuffer();
+        const base64 = btoa(new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), ''));
+        doc.addImage(`data:image/png;base64,${base64}`, "PNG", 20, 12, 50, 20);
+      } else {
+        doc.setFontSize(16);
+        doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+        doc.text("Mororo.Tech", 20, 26);
+      }
+    } catch (e) {
+      doc.setFontSize(16);
+      doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+      doc.text("Mororo.Tech", 20, 26);
+    }
 
-    let currentY = 55;
+    let currentY = 60;
+
 
     // Company Info
     doc.setFontSize(10);
@@ -165,7 +203,28 @@ Deno.serve(async (req) => {
     doc.text(new Date(invoice.vencimento + "T12:00:00").toLocaleDateString("pt-BR"), 100, currentY);
     doc.text((invoice.valor_centavos / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }), pageWidth - 25, currentY, { align: "right" });
 
-    currentY += 20;
+    currentY += 15;
+
+    // Technical Info / Consumption
+    doc.setFillColor(248, 250, 252);
+    doc.rect(20, currentY, pageWidth - 40, 25, "F");
+    doc.setDrawColor(226, 232, 240);
+    doc.rect(20, currentY, pageWidth - 40, 25, "S");
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.setTextColor(lightTextColor[0], lightTextColor[1], lightTextColor[2]);
+    doc.text("INFORMAÇÕES TÉCNICAS DO PERÍODO", 25, currentY + 7);
+    
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(textColor[0], textColor[1], textColor[2]);
+    doc.text(`Trafego Download: ${totalDownload.toFixed(2)} GB`, 25, currentY + 15);
+    doc.text(`Trafego Upload: ${totalUpload.toFixed(2)} GB`, 80, currentY + 15);
+    doc.text(`Interrupções: ${interruptions}`, 140, currentY + 15);
+    doc.text(`Plano Contratado: ${plan?.nome || "Internet Residencial"}`, 25, currentY + 20);
+
+    currentY += 35;
+
 
     // PIX Area
     doc.setFontSize(12);
