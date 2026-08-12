@@ -39,7 +39,7 @@ export default function Auth() {
       <Card className="w-full max-w-md shadow-lg">
         <CardHeader className="text-center space-y-3">
           <div className="mx-auto flex h-16 w-full items-center justify-center mb-2">
-            <img src={logoImg} alt="Mororo.Tech" className="h-16 w-auto max-w-[200px] object-contain" />
+            <img src={logoImg} alt="Mororo.Tech" className="h-16 w-auto max-w-[200px] object-contain logo-high-contrast" />
           </div>
           <CardTitle className="text-2xl font-bold tracking-tight">Mororo.Tech</CardTitle>
           <CardDescription>Acesse o painel de gerenciamento</CardDescription>
