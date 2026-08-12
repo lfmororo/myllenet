@@ -326,13 +326,12 @@ export default function MikrotikPage() {
                   <span className="flex items-center gap-2 text-muted-foreground">
                     <span className="flex items-center gap-0.5 text-primary">
                       <ArrowDownCircle className="h-3 w-3" />
-                      {((w.rx_bps ?? 0) / 1_000_000).toFixed(1)}
+                      {((w.rx_bps ?? 0) / 1_000_000).toFixed(1)} Mbps
                     </span>
                     <span className="flex items-center gap-0.5 text-accent">
                       <ArrowUpCircle className="h-3 w-3" />
-                      {((w.tx_bps ?? 0) / 1_000_000).toFixed(1)}
+                      {((w.tx_bps ?? 0) / 1_000_000).toFixed(1)} Mbps
                     </span>
-                    <span>Mbps</span>
                   </span>
                 </div>
               ))}
