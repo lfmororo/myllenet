@@ -970,11 +970,14 @@ async function bulkCheckPayments(req: Request) {
 
     // ===== PASS 1.5: Deep Reconciliation for Overdue Orphans =====
     try {
-      const { data: overdueOrphans } = await supabase
+    const { data: overdueOrphans } = await supabase
         .from("invoices")
         .select("id, customer_id, valor_centavos, vencimento, status, customers(cpf)")
         .eq("status", "overdue")
-        .is("efi_charge_id", null);
+        .is("efi_charge_id", null)
+        .order('vencimento', { ascending: false })
+        .limit(10);
+
 
       if (overdueOrphans && overdueOrphans.length > 0) {
         console.log(`Deep reconciliation for ${overdueOrphans.length} overdue orphans...`);
