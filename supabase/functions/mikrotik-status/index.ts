@@ -83,10 +83,14 @@ Deno.serve(async (req) => {
     const cfg: Record<string, string> = {}
     for (const r of rows ?? []) cfg[r.key] = r.value ?? ''
 
-    const host = (cfg.mikrotik_host || '').trim()
-    if (!host) {
+    const hostPrimary = (cfg.mikrotik_host || '').trim()
+    const hostSecondary = (cfg.mikrotik_host_secondary || '').trim()
+    
+    if (!hostPrimary && !hostSecondary) {
       return json({ online: false, message: 'Configure o IP/Host do Mikrotik em Configurações' })
     }
+
+    const hosts = [hostPrimary, hostSecondary].filter(Boolean)
 
     const apiPort = parseInt(cfg.mikrotik_api_port || '8728', 10) || 8728
     const user = cfg.mikrotik_username || 'admin'
