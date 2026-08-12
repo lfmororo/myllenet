@@ -284,12 +284,21 @@ export default function Settings() {
       }
       
       const data = await res.json();
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `diagnostico-api-${reportDates.start}-a-${reportDates.end}.json`;
-      document.body.appendChild(a);
+      
+      if (format === 'pdf') {
+        await downloadPDF(data);
+      } else {
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `diagnostico-api-${reportDates.start}-a-${reportDates.end}.json`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        toast.success("Relatório de diagnóstico baixado com sucesso!");
+      }
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
