@@ -267,7 +267,7 @@ export default function Settings() {
     setTesting(false);
   };
 
-  const handleDownloadDiagnosticReport = async () => {
+  const handleDownloadDiagnosticReport = async (format: 'json' | 'pdf' = 'json') => {
     setGeneratingReport(true);
     try {
       const headers = await getAuthHeaders();
