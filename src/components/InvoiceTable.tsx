@@ -25,7 +25,7 @@ const statusMap: Record<string, { label: string; variant: "default" | "secondary
 };
 
 const whatsappOptions: { type: NotificationType; label: string; statusFilter?: string[] }[] = [
-  { type: "boleto_gerado", label: "📄 Boleto gerado", statusFilter: ["pending"] },
+  { type: "boleto_gerado", label: "📄 Enviar Fatura", statusFilter: ["pending"] },
   { type: "lembrete_vencimento", label: "⏰ Lembrete de vencimento", statusFilter: ["pending"] },
   { type: "pagamento_confirmado", label: "✅ Pagamento confirmado", statusFilter: ["paid"] },
   { type: "cobranca_atrasada", label: "⚠️ Cobrança atrasada", statusFilter: ["overdue"] },
@@ -192,28 +192,6 @@ export default function InvoiceTable({ invoices, onCheckPayment, onCancel, onMar
                           <Send className="h-3.5 w-3.5 mr-1" />
                         )}
                         Enviar Fatura
-                      </Button>
-                    )}
-                    {inv.efi_barcode && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        title="Copiar código de barras"
-                        onClick={() => copyBarcode(inv.efi_barcode!)}
-                      >
-                        <Copy className="h-4 w-4" />
-                      </Button>
-                    )}
-                    {inv.efi_link && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        title="Abrir boleto"
-                        onClick={() => window.open(inv.efi_link!, "_blank")}
-                      >
-                        <ExternalLink className="h-4 w-4" />
                       </Button>
                     )}
                     {inv.status !== "paid" && inv.status !== "cancelled" && (
