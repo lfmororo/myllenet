@@ -11,13 +11,13 @@ export function useWhatsApp() {
     const { data: { session } } = await supabase.auth.getSession();
     const token = session?.access_token;
     if (!token) {
-      toast.error("Sessão expirada");
+      toast.error("Sessão expirada. Por favor, faça login novamente.");
       return null;
     }
+    
     return {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
-      apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
     };
   };
 
