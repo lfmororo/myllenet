@@ -70,6 +70,7 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
+    const authHeader = req.headers.get("Authorization");
     let invoice_id;
     const url = new URL(req.url);
     
@@ -83,6 +84,29 @@ Deno.serve(async (req) => {
     if (!invoice_id) throw new Error("invoice_id is required");
 
     const supabase = getSupabaseAdmin();
+
+    // Check if the request is internal (service role) or from an authenticated admin
+    if (authHeader) {
+      const token = authHeader.replace("Bearer ", "");
+      if (token !== Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")) {
+        const { data: { user }, error: authErr } = await supabase.auth.getUser(token);
+        if (authErr || !user) throw new Error("Unauthorized");
+        
+        const { data: role } = await supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", user.id)
+          .eq("role", "admin")
+          .maybeSingle();
+        
+        if (!role) throw new Error("Forbidden: Admin only");
+      }
+    } else if (req.method !== "GET") {
+      // If it's a POST/other without auth, reject
+      throw new Error("Missing authorization header");
+    }
+    // Note: GET requests for PDFs are currently allowed to support public UAZAPI fetch, 
+    // but protected by the UUID invoice_id which is hard to guess.
 
     // Fetch invoice and customer data
     const { data: invoice, error: invErr } = await supabase
