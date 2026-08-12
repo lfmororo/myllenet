@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import type { Invoice } from "@/hooks/useInvoices";
 import { useWhatsApp, type NotificationType } from "@/hooks/useWhatsApp";
 import { useInvoicePDF } from "@/hooks/useInvoicePDF";
+import { useMikrotikActions } from "@/hooks/useMikrotikActions";
 
 interface Props {
   invoices: Invoice[];
@@ -34,6 +35,7 @@ export default function InvoiceTable({ invoices, onCheckPayment, onCancel, onMar
   const [checking, setChecking] = useState<string | null>(null);
   const { sendInvoiceNotification, sending } = useWhatsApp();
   const { generatePDF, generating: generatingPDF } = useInvoicePDF();
+  const { syncMikrotik, loading: mikrotikLoading } = useMikrotikActions();
 
   const handleCheck = async (id: string) => {
     setChecking(id);
@@ -226,6 +228,40 @@ export default function InvoiceTable({ invoices, onCheckPayment, onCancel, onMar
                         >
                           <CheckCircle2 className="h-4 w-4" />
                         </Button>
+                        
+                        {(inv as any).customers?.id && (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-orange-600 hover:text-orange-700"
+                              title="Bloquear no Mikrotik"
+                              disabled={mikrotikLoading === (inv as any).customers.id}
+                              onClick={() => syncMikrotik((inv as any).customers.id, 'disable')}
+                            >
+                              {mikrotikLoading === (inv as any).customers.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <ShieldAlert className="h-4 w-4" />
+                              )}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-teal-600 hover:text-teal-700"
+                              title="Desbloquear no Mikrotik"
+                              disabled={mikrotikLoading === (inv as any).customers.id}
+                              onClick={() => syncMikrotik((inv as any).customers.id, 'enable')}
+                            >
+                              {mikrotikLoading === (inv as any).customers.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <ShieldCheck className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </>
+                        )}
+
                         <Button
                           variant="ghost"
                           size="icon"
