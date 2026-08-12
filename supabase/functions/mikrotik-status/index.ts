@@ -32,7 +32,6 @@ async function restCall(base: string, path: string, auth: string, timeoutMs = 80
     
     if (res.status === 401) return { ok: false, status: 401, data: null }
     if (!res.ok) {
-      // Tentar ler o erro se possível
       const text = await res.text().catch(() => "");
       console.error(`REST Error [${res.status}] at ${path}: ${text}`);
       return { ok: false, status: res.status, data: null }
@@ -91,29 +90,15 @@ Deno.serve(async (req) => {
     }
 
     const hosts = [hostPrimary, hostSecondary].filter(Boolean)
-
     const apiPort = parseInt(cfg.mikrotik_api_port || '8728', 10) || 8728
     const user = cfg.mikrotik_username || 'admin'
     const pass = cfg.mikrotik_password || ''
     const auth = btoa(`${user}:${pass}`)
 
-    // Candidate REST ports: user-defined first, then common ones
     const configured = parseInt(cfg.mikrotik_rest_port || '', 10)
     const restPorts = [...new Set([configured, 80, 8080, 443, 8443, 81, 4443, 8081].filter(Boolean))] as number[]
     const schemeFor = (p: number): 'http' | 'https' => (p === 443 || p === 8443 || p === 4443 ? 'https' : 'http')
 
-    // 1) Probe all ports in parallel with short timeouts
-    const probePorts = [...new Set([apiPort, ...restPorts])]
-    const probes = await Promise.all(probePorts.map((p) => tcpCheck(host, p, 1500)))
-    const openMap = new Map<number, boolean>()
-    probePorts.forEach((p, i) => openMap.set(p, probes[i]))
-
-    const apiOpen = !!openMap.get(apiPort)
-    const p80 = !!openMap.get(80)
-    const p443 = !!openMap.get(443)
-    const openPorts = probePorts.filter((p) => openMap.get(p))
-
-    // 2) Try RouterOS v7 REST in parallel on open ports; first success wins
     let identity: string | null = null
     let uptime: string | null = null
     let version: string | null = null
@@ -122,210 +107,221 @@ Deno.serve(async (req) => {
     let totalMemory: number | null = null
     let temperature: number | null = null
     let activeUsers: number | null = null
-    let activeList: { name: string; address?: string; uptime?: string; rx_bytes?: number; tx_bytes?: number }[] = []
-    let wans: { name: string; running: boolean; disabled: boolean; rx_bps: number; tx_bps: number; type?: string }[] = []
+    let activeList: any[] = []
+    let wans: any[] = []
     let restOk = false
     let restPort: number | null = null
     let lastStatus = 0
     let authFailed = false
+    let reachable = false
+    let connectedHost = hostPrimary
+    let apiOpen = false
+    let p80 = false
+    let p443 = false
+    let openPorts: number[] = []
 
-    const openRest = restPorts.filter((p) => openMap.get(p))
-    if (openRest.length) {
-      const attempts = [];
-      for (const p of openRest) {
-        const base = `${schemeFor(p)}://${host}:${p}`;
-        // Testar uma porta de cada vez para evitar sobrecarga no switch/firewall do Mikrotik
-        const res = await restCall(base, '/system/resource', auth, 3000);
-        if (res.ok || res.status === 401) {
-          attempts.push({ port: p, base, res });
-          if (res.ok) break; // Sucesso na primeira porta, não precisa testar outras
-        }
-      }
+    for (const host of hosts) {
+      if (restOk) break;
+      
+      const probePorts = [...new Set([apiPort, ...restPorts])]
+      const probes = await Promise.all(probePorts.map((p) => tcpCheck(host, p, 1500)))
+      const openMap = new Map<number, boolean>()
+      probePorts.forEach((p, i) => openMap.set(p, probes[i]))
 
-      for (const a of attempts) {
-        if (a.res.status) lastStatus = a.res.status
-        if (a.res.status === 401) authFailed = true
-      }
+      if (openMap.get(apiPort)) apiOpen = true
+      if (openMap.get(80)) p80 = true
+      if (openMap.get(443)) p443 = true
+      
+      const currentOpenPorts = probePorts.filter((p) => openMap.get(p))
+      openPorts = [...new Set([...openPorts, ...currentOpenPorts])]
+      
+      if (currentOpenPorts.length > 0) reachable = true
 
-      const winner = attempts.find((a) => a.res.ok && a.res.data)
-      if (winner) {
-        const r = winner.res.data as Record<string, any>
-        restOk = true
-        restPort = winner.port
-        uptime = r.uptime ?? null
-        version = r.version ?? null
-        cpuLoad = r['cpu-load'] !== undefined ? Number(r['cpu-load']) : null
-        freeMemory = r['free-memory'] !== undefined ? Number(r['free-memory']) : null
-        totalMemory = r['total-memory'] !== undefined ? Number(r['total-memory']) : null
-
-        const [idty, active, resource, health] = await Promise.all([
-          restCall(winner.base, '/system/identity', auth, 4000),
-          restCall(winner.base, '/ppp/active', auth, 5000),
-          restCall(winner.base, '/interface', auth, 5000),
-          restCall(winner.base, '/system/health', auth, 4000),
-        ])
-        identity = (idty.data as Record<string, string> | null)?.name ?? null
-        
-        if (Array.isArray(health.data)) {
-          const temp = (health.data as any[]).find(h => h.name === 'temperature')
-          if (temp) temperature = Number(temp.value)
-        } else if (health.data && (health.data as any).temperature !== undefined) {
-          temperature = Number((health.data as any).temperature)
-        }
-        
-        const interfaces = Array.isArray(resource.data) ? resource.data as any[] : []
-
-        // Identify WAN interfaces: prefer explicit naming, fallback to physical/uplink types
-        const isWanName = (i: any) => /wan|uplink|internet|link/i.test(`${i.name ?? ''} ${i.comment ?? ''}`)
-        const uplinkTypes = ['ether', 'vlan', 'pppoe-out', 'lte', 'wireless', 'wlan']
-        const candidates = interfaces.filter(i => uplinkTypes.includes(String(i.type ?? '').toLowerCase()))
-        const wanNames = ["BrisanetPPoe", "pppoe-out1"]
-        let wanInterfaces = candidates.filter(i => wanNames.includes(i.name) || isWanName(i))
-        
-        if (wanInterfaces.length === 0) {
-          // No explicit WAN naming: use pppoe-out clients, otherwise the physical uplinks
-          const pppoeOut = candidates.filter(i => String(i.type).toLowerCase() === 'pppoe-out')
-          wanInterfaces = (pppoeOut.length ? pppoeOut : candidates.filter(i => String(i.type).toLowerCase() === 'ether')).slice(0, 4)
+      const openRest = restPorts.filter((p) => openMap.get(p))
+      if (openRest.length) {
+        const attempts = [];
+        for (const p of openRest) {
+          const base = `${schemeFor(p)}://${host}:${p}`;
+          const res = await restCall(base, '/system/resource', auth, 3000);
+          if (res.ok || res.status === 401) {
+            attempts.push({ port: p, base, res });
+            if (res.ok) break;
+          }
         }
 
-        if (wanInterfaces.length > 0) {
-          try {
-            // Previous samples to convert cumulative byte counters into bits per second
-            const { data: prevLogs } = await supabase
-              .from('wan_logs')
-              .select('interface_name, rx_bytes, tx_bytes, created_at')
-              .in('interface_name', wanInterfaces.map(i => i.name))
-              .order('created_at', { ascending: false })
-              .limit(wanInterfaces.length * 10)
+        for (const a of attempts) {
+          if (a.res.status) lastStatus = a.res.status
+          if (a.res.status === 401) authFailed = true
+        }
 
-            const now = Date.now()
-            // Sanity limit: nenhuma WAN doméstica passa de 1 Gbps
-            const MAX_BPS = 1_000_000_000
-            const MAX_AGE_SECS = 300
-            const rows = wanInterfaces.map(i => {
-              const rxBytes = parseInt(i['rx-byte'] ?? '0', 10) || 0
-              const txBytes = parseInt(i['tx-byte'] ?? '0', 10) || 0
-              // Ignora amostras antigas ou de speedtest (contadores parciais)
-              const prev = (prevLogs ?? []).find((p: any) => {
-                if (p.interface_name !== i.name) return false
-                const ageSecs = (now - new Date(p.created_at).getTime()) / 1000
-                if (ageSecs > MAX_AGE_SECS) return false
-                const pRx = Number(p.rx_bytes ?? 0)
-                const pTx = Number(p.tx_bytes ?? 0)
-                // amostra de speedtest: contador muito menor que o acumulado atual
-                if (rxBytes > 0 && pRx < rxBytes * 0.5) return false
-                if (txBytes > 0 && pTx < txBytes * 0.5) return false
-                return true
-              })
-              let rxBps = 0
-              let txBps = 0
-              if (prev) {
-                const secs = Math.max(1, (now - new Date(prev.created_at).getTime()) / 1000)
-                const dRx = rxBytes - Number(prev.rx_bytes ?? 0)
-                const dTx = txBytes - Number(prev.tx_bytes ?? 0)
-                if (dRx >= 0) rxBps = Math.round((dRx * 8) / secs)
-                if (dTx >= 0) txBps = Math.round((dTx * 8) / secs)
-                if (rxBps > MAX_BPS) rxBps = 0
-                if (txBps > MAX_BPS) txBps = 0
-              }
-              return {
-                interface_name: i.name,
-                rx_bps: rxBps,
-                tx_bps: txBps,
-                rx_bytes: rxBytes,
-                tx_bytes: txBytes,
-              }
-            })
-            
-            // Log real-time WAN traffic to wan_logs
-            if (rows.length > 0) {
-              await supabase.from('wan_logs').insert(rows.map(r => ({
-                interface_name: r.interface_name,
-                rx_bps: r.rx_bps,
-                tx_bps: r.tx_bps,
-                rx_bytes: r.rx_bytes,
-                tx_bytes: r.tx_bytes,
-                cpu_load: cpuLoad,
-                free_memory: freeMemory,
-                total_memory: totalMemory,
-                temperature: temperature,
-                created_at: new Date().toISOString()
-              })))
-            }
+        const winner = attempts.find((a) => a.res.ok && a.res.data)
+        if (winner) {
+          connectedHost = host
+          const r = winner.res.data as Record<string, any>
+          restOk = true
+          restPort = winner.port
+          uptime = r.uptime ?? null
+          version = r.version ?? null
+          cpuLoad = r['cpu-load'] !== undefined ? Number(r['cpu-load']) : null
+          freeMemory = r['free-memory'] !== undefined ? Number(r['free-memory']) : null
+          totalMemory = r['total-memory'] !== undefined ? Number(r['total-memory']) : null
 
-            wans = wanInterfaces.map((i) => {
-              const row = rows.find((r) => r.interface_name === i.name)
-              return {
-                name: i.name,
-                type: i.type,
-                running: String(i.running) === 'true' && String(i.disabled) !== 'true',
-                disabled: String(i.disabled) === 'true',
-                rx_bps: row?.rx_bps ?? 0,
-                tx_bps: row?.tx_bps ?? 0,
-              }
-            })
+          const [idty, active, resource, health] = await Promise.all([
+            restCall(winner.base, '/system/identity', auth, 4000),
+            restCall(winner.base, '/ppp/active', auth, 5000),
+            restCall(winner.base, '/interface', auth, 5000),
+            restCall(winner.base, '/system/health', auth, 4000),
+          ])
+          identity = (idty.data as Record<string, string> | null)?.name ?? null
+          
+          if (Array.isArray(health.data)) {
+            const temp = (health.data as any[]).find(h => h.name === 'temperature')
+            if (temp) temperature = Number(temp.value)
+          } else if (health.data && (health.data as any).temperature !== undefined) {
+            temperature = Number((health.data as any).temperature)
+          }
+          
+          const interfaces = Array.isArray(resource.data) ? resource.data as any[] : []
+          const isWanName = (i: any) => /wan|uplink|internet|link/i.test(`${i.name ?? ''} ${i.comment ?? ''}`)
+          const uplinkTypes = ['ether', 'vlan', 'pppoe-out', 'lte', 'wireless', 'wlan']
+          const candidates = interfaces.filter(i => uplinkTypes.includes(String(i.type ?? '').toLowerCase()))
+          const wanNames = ["BrisanetPPoe", "pppoe-out1"]
+          let wanInterfaces = candidates.filter(i => wanNames.includes(i.name) || isWanName(i))
+          
+          if (wanInterfaces.length === 0) {
+            const pppoeOut = candidates.filter(i => String(i.type).toLowerCase() === 'pppoe-out')
+            wanInterfaces = (pppoeOut.length ? pppoeOut : candidates.filter(i => String(i.type).toLowerCase() === 'ether')).slice(0, 4)
+          }
 
-            // Check for status changes (up/down)
-            for (const wan of wanInterfaces) {
-              const isUp = String(wan.running) === 'true' && String(wan.disabled) !== 'true'
-              const { data: lastEvents } = await supabase
-                .from('wan_status_history')
-                .select('status')
-                .eq('interface_name', wan.name)
+          if (wanInterfaces.length > 0) {
+            try {
+              const { data: prevLogs } = await supabase
+                .from('wan_logs')
+                .select('interface_name, rx_bytes, tx_bytes, created_at')
+                .in('interface_name', wanInterfaces.map(i => i.name))
                 .order('created_at', { ascending: false })
-                .limit(1)
+                .limit(wanInterfaces.length * 10)
 
-              const previous = lastEvents?.[0]?.status ?? null
-              const currentStatus = isUp ? 'up' : 'down'
-              if (previous !== currentStatus) {
-                await supabase.from('wan_status_history').insert({
-                  interface_name: wan.name,
-                  status: currentStatus,
-                  reason: isUp
-                    ? 'Interface running e trafegando dados'
-                    : (String(wan.disabled) === 'true' ? 'Interface desabilitada no roteador' : 'Link caiu (running=false)'),
+              const now = Date.now()
+              const MAX_BPS = 1_000_000_000
+              const MAX_AGE_SECS = 300
+              const rows = wanInterfaces.map(i => {
+                const rxBytes = parseInt(i['rx-byte'] ?? '0', 10) || 0
+                const txBytes = parseInt(i['tx-byte'] ?? '0', 10) || 0
+                const prev = (prevLogs ?? []).find((p: any) => {
+                  if (p.interface_name !== i.name) return false
+                  const ageSecs = (now - new Date(p.created_at).getTime()) / 1000
+                  if (ageSecs > MAX_AGE_SECS) return false
+                  const pRx = Number(p.rx_bytes ?? 0)
+                  const pTx = Number(p.tx_bytes ?? 0)
+                  if (rxBytes > 0 && pRx < rxBytes * 0.5) return false
+                  if (txBytes > 0 && pTx < txBytes * 0.5) return false
+                  return true
                 })
+                let rxBps = 0
+                let txBps = 0
+                if (prev) {
+                  const secs = Math.max(1, (now - new Date(prev.created_at).getTime()) / 1000)
+                  const dRx = rxBytes - Number(prev.rx_bytes ?? 0)
+                  const dTx = txBytes - Number(prev.tx_bytes ?? 0)
+                  if (dRx >= 0) rxBps = Math.round((dRx * 8) / secs)
+                  if (dTx >= 0) txBps = Math.round((dTx * 8) / secs)
+                  if (rxBps > MAX_BPS) rxBps = 0
+                  if (txBps > MAX_BPS) txBps = 0
+                }
+                return {
+                  interface_name: i.name,
+                  rx_bps: rxBps,
+                  tx_bps: txBps,
+                  rx_bytes: rxBytes,
+                  tx_bytes: txBytes,
+                }
+              })
+              
+              if (rows.length > 0) {
+                await supabase.from('wan_logs').insert(rows.map(r => ({
+                  interface_name: r.interface_name,
+                  rx_bps: r.rx_bps,
+                  tx_bps: r.tx_bps,
+                  rx_bytes: r.rx_bytes,
+                  tx_bytes: r.tx_bytes,
+                  cpu_load: cpuLoad,
+                  free_memory: freeMemory,
+                  total_memory: totalMemory,
+                  temperature: temperature,
+                  created_at: new Date().toISOString()
+                })))
               }
-            }
-          } catch (e) { console.error('Error logging WAN status:', e) }
-        }
 
+              wans = wanInterfaces.map((i) => {
+                const row = rows.find((r) => r.interface_name === i.name)
+                return {
+                  name: i.name,
+                  type: i.type,
+                  running: String(i.running) === 'true' && String(i.disabled) !== 'true',
+                  disabled: String(i.disabled) === 'true',
+                  rx_bps: row?.rx_bps ?? 0,
+                  tx_bps: row?.tx_bps ?? 0,
+                }
+              })
 
-        if (Array.isArray(active.data)) {
-          const list = active.data as Record<string, string>[]
-          activeUsers = list.length
-          activeList = list.slice(0, 200).map((a) => {
-            // No Mikrotik RouterOS v7 via REST, a interface dinâmica do PPPoE costuma ter o nome do usuário
-            // ou um padrão como <pppoe-usuario>. Tentamos encontrar a interface correspondente para pegar o tráfego.
-            const iface = interfaces.find(i => 
-              i.name === a.name || 
-              i.name === `<pppoe-${a.name}>` || 
-              (i.type === 'pppoe-in' && i.name.includes(a.name))
-            )
-            return {
-              name: a.name,
-              address: a.address,
-              uptime: a.uptime,
-              rx_bytes: iface ? parseInt(iface['rx-byte'] || '0', 10) : 0,
-              tx_bytes: iface ? parseInt(iface['tx-byte'] || '0', 10) : 0,
-            }
-          })
+              for (const wan of wanInterfaces) {
+                const isUp = String(wan.running) === 'true' && String(wan.disabled) !== 'true'
+                const { data: lastEvents } = await supabase
+                  .from('wan_status_history')
+                  .select('status')
+                  .eq('interface_name', wan.name)
+                  .order('created_at', { ascending: false })
+                  .limit(1)
+
+                const previous = lastEvents?.[0]?.status ?? null
+                const currentStatus = isUp ? 'up' : 'down'
+                if (previous !== currentStatus) {
+                  await supabase.from('wan_status_history').insert({
+                    interface_name: wan.name,
+                    status: currentStatus,
+                    reason: isUp
+                      ? 'Interface running e trafegando dados'
+                      : (String(wan.disabled) === 'true' ? 'Interface desabilitada no roteador' : 'Link caiu (running=false)'),
+                  })
+                }
+              }
+            } catch (e) { console.error('Error logging WAN status:', e) }
+          }
+
+          if (Array.isArray(active.data)) {
+            const list = active.data as Record<string, string>[]
+            activeUsers = list.length
+            activeList = list.slice(0, 200).map((a) => {
+              const iface = interfaces.find(i => 
+                i.name === a.name || 
+                i.name === `<pppoe-${a.name}>` || 
+                (i.type === 'pppoe-in' && i.name.includes(a.name))
+              )
+              return {
+                name: a.name,
+                address: a.address,
+                uptime: a.uptime,
+                rx_bytes: iface ? parseInt(iface['rx-byte'] || '0', 10) : 0,
+                tx_bytes: iface ? parseInt(iface['tx-byte'] || '0', 10) : 0,
+              }
+            })
+          }
         }
       }
     }
 
-    const reachable = openPorts.length > 0
     const online = restOk || reachable
 
     let message: string
-    if (restOk) message = `Conectado via API REST (porta ${restPort})`
+    if (restOk) message = `Conectado via API REST no host ${connectedHost} (porta ${restPort})`
     else if (authFailed) message = 'API REST respondeu, mas usuário/senha foram rejeitados (401)'
     else if (reachable) message = 'Host alcançável, mas a API REST não respondeu. Certifique-se de que o serviço REST está habilitado (/ip service enable www) e a porta está liberada no firewall.'
-    else message = 'Não foi possível alcançar o Mikrotik neste IP/portas'
+    else message = 'Não foi possível alcançar o Mikrotik em nenhum dos IPs configurados'
 
     const responseData = {
       online,
-      host,
+      host: connectedHost,
       restApi: restOk,
       restPort,
       lastHttpStatus: lastStatus,
@@ -344,10 +340,9 @@ Deno.serve(async (req) => {
       message,
     }
 
-    // Log status for alert tracking
     try {
       await supabase.from('mikrotik_status_history').insert({
-        host,
+        host: connectedHost || hostPrimary,
         online,
         message
       })
