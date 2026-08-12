@@ -671,7 +671,7 @@ export default function MikrotikPage() {
                 Histórico de Speedtests Realizados
               </CardTitle>
               <CardDescription>
-                Registros das medições de tráfego efetuadas nas interfaces WAN.
+                Registros das medições de tráfego efetuadas nas interfaces WAN. esta gerando a cada minuto ao inves de a cada hora
               </CardDescription>
             </div>
             {wanLogs.length > 0 && (
