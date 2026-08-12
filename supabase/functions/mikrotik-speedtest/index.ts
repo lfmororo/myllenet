@@ -82,7 +82,7 @@ Deno.serve(async (req) => {
       const fetchPayload = {
         url: testUrl,
         "src-address": ip,
-        duration: "3s",
+        duration: "10s",
         "as-value": "true"
       }
 
@@ -95,8 +95,8 @@ Deno.serve(async (req) => {
       if (resFetch.ok) {
         const fetchResult = await resFetch.json()
         const downloaded = parseInt(fetchResult.downloaded || '0')
-        // Duração fixa de 3s conforme o script
-        const mbpsValue = Math.round(((downloaded * 8) / (3 * 1024 * 1024)) * 100) / 100
+        // Duração atualizada para 10s para maior precisão
+        const mbpsValue = Math.round(((downloaded * 8) / (10 * 1024 * 1024)) * 100) / 100
         const mbps = mbpsValue > 0 ? mbpsValue : 0.01; // Ensure non-zero for tests
         
         results.push({

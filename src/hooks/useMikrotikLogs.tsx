@@ -41,7 +41,7 @@ export const useMikrotikLogs = () => {
         let calculatedDownload = rx_bps / 1_000_000;
         
         if (calculatedDownload <= 0 && rx_bytes > 0) {
-          calculatedDownload = (rx_bytes * 8) / (3 * 1024 * 1024);
+          calculatedDownload = (rx_bytes * 8) / (10 * 1024 * 1024);
         }
         
         grouped[time][`${log.interface_name} ↓`] = calculatedDownload;
