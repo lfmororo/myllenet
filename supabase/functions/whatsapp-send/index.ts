@@ -8,8 +8,8 @@ const corsHeaders = {
 
 const UAZAPI_BASE_URL = "https://ipazua.uazapi.com/api"; 
 const BOT_DISCLAIMER = "\n\n🤖 _Esta é uma mensagem automática. Para falar com um atendente, entre em contato: (85) 98680-1458_";
-const UAZAPI_FILE_ENDPOINT = "/send-file"; 
-const UAZAPI_TEXT_ENDPOINT = "/send-text";
+const UAZAPI_FILE_ENDPOINT = "/send/media"; 
+const UAZAPI_TEXT_ENDPOINT = "/send/text";
 
 function getSupabaseAdmin() {
   return createClient(
