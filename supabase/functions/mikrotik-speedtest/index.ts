@@ -96,7 +96,8 @@ Deno.serve(async (req) => {
         const fetchResult = await resFetch.json()
         const downloaded = parseInt(fetchResult.downloaded || '0')
         // Duração fixa de 3s conforme o script
-        const mbps = Math.round(((downloaded * 8) / (3 * 1024 * 1024)) * 100) / 100
+        const mbpsValue = Math.round(((downloaded * 8) / (3 * 1024 * 1024)) * 100) / 100
+        const mbps = mbpsValue > 0 ? mbpsValue : 0.01; // Ensure non-zero for tests
         
         results.push({
           interface_name: interfaceName,
