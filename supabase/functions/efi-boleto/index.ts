@@ -1062,7 +1062,9 @@ async function bulkCheckPayments(req: Request) {
     .from("invoices")
     .select("id, efi_charge_id, status, paid_at, efi_barcode, efi_link, efi_pix_qrcode, efi_pix_copiacola")
     .in("status", ["pending", "waiting", "overdue"])
-    .not("efi_charge_id", "is", null);
+    .not("efi_charge_id", "is", null)
+    .order('vencimento', { ascending: false })
+    .limit(30);
 
   if (error) {
     return new Response(JSON.stringify({ error: "Erro ao buscar faturas" }), {
@@ -1072,15 +1074,15 @@ async function bulkCheckPayments(req: Request) {
   }
 
   if (!pendingInvoices || pendingInvoices.length === 0) {
-    return new Response(JSON.stringify({ checked: 0, updated: 0, reconciled }), {
+    return new Response(JSON.stringify({ checked: 0, updated: 0, reconciled, message: "No pending invoices found for pass 2" }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
-
   let updated = 0;
   let errors = 0;
   const paidInvoiceIds: string[] = [];
+
 
   for (const inv of pendingInvoices) {
     try {
