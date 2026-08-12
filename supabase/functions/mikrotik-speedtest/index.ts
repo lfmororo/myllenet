@@ -13,25 +13,48 @@ Deno.serve(async (req) => {
     const { data: rows } = await supabase
       .from('settings')
       .select('key,value')
-      .in('key', ['mikrotik_host', 'mikrotik_username', 'mikrotik_password', 'mikrotik_rest_port'])
+      .in('key', ['mikrotik_host', 'mikrotik_host_secondary', 'mikrotik_username', 'mikrotik_password', 'mikrotik_rest_port'])
 
     const cfg: Record<string, string> = {}
     for (const r of rows ?? []) cfg[r.key] = r.value ?? ''
 
-    const host = (cfg.mikrotik_host || '').trim()
+    const hosts = [cfg.mikrotik_host, cfg.mikrotik_host_secondary].filter(Boolean)
     const user = cfg.mikrotik_username || 'admin'
     const pass = cfg.mikrotik_password || ''
     const port = cfg.mikrotik_rest_port || '80'
     const auth = btoa(`${user}:${pass}`)
 
-    if (!host) {
+    if (hosts.length === 0) {
       return new Response(JSON.stringify({ error: "Host Mikrotik não configurado" }), { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       })
     }
 
+    // Find active host
+    let activeHost = ""
+    for (const host of hosts) {
+      try {
+        const probe = await fetch(`http://${host}:${port}/rest/system/resource`, {
+          headers: { Authorization: `Basic ${auth}`, Connection: 'close' },
+          signal: AbortController.timeout(4000)
+        })
+        if (probe.ok) {
+          activeHost = host
+          break
+        }
+      } catch (e) {
+        console.error(`Host ${host} failed probe:`, e.message)
+      }
+    }
+
+    if (!activeHost) {
+      return new Response(JSON.stringify({ error: "Nenhum host Mikrotik respondeu" }), { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      })
+    }
+
     // 1. Get WAN interfaces to know which IPs to test from
-    const resInt = await fetch(`http://${host}:${port}/rest/interface`, {
+    const resInt = await fetch(`http://${activeHost}:${port}/rest/interface`, {
       headers: { Authorization: `Basic ${auth}`, Connection: 'close' }
     })
     
@@ -42,7 +65,6 @@ Deno.serve(async (req) => {
     }
 
     const interfaces = await resInt.json()
-    // Identificar WANs conforme o script fornecido
     const wanNames = ["BrisanetPPoe", "pppoe-out1"]
     const wanInterfaces = interfaces.filter((i: any) => wanNames.includes(i.name))
 
@@ -57,8 +79,7 @@ Deno.serve(async (req) => {
 
     for (const wan of wanInterfaces) {
       const interfaceName = wan.name
-      // Pegar o IP da interface (equivalente ao script .rsc)
-      const resAddr = await fetch(`http://${host}:${port}/rest/ip/address?interface=${encodeURIComponent(interfaceName)}`, {
+      const resAddr = await fetch(`http://${activeHost}:${port}/rest/ip/address?interface=${encodeURIComponent(interfaceName)}`, {
         headers: { Authorization: `Basic ${auth}`, Connection: 'close' }
       })
       const addresses = await resAddr.json()
@@ -77,9 +98,6 @@ Deno.serve(async (req) => {
         continue
       }
 
-      // Executar o teste via Tool Fetch (equivalente ao script .rsc)
-      // Nota: A API REST do Mikrotik permite executar comandos via POST /rest/tool/fetch
-      // Executar o script speedteste.rsc no Mikrotik
       console.log(`[Speedtest] Executando comandos na interface ${interfaceName} (IP: ${ip})`)
       
       let mbps = 0
@@ -87,7 +105,6 @@ Deno.serve(async (req) => {
       let status = 'Error'
 
       try {
-        // Definir o payload para o fetch (mesma lógica do script .rsc)
         const fetchPayload = {
           url: testUrl,
           "src-address": ip,
@@ -96,18 +113,7 @@ Deno.serve(async (req) => {
           "as-value": true
         }
 
-        // Tentar rodar o import do script primeiro
-        try {
-          await fetch(`http://${host}:${port}/rest/import`, {
-            method: 'POST',
-            headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json', Connection: 'close' },
-            body: JSON.stringify({ "file-name": "speedteste.rsc" })
-          })
-        } catch (e) {
-          console.log("Import not supported or failed, falling back to tool fetch")
-        }
-
-        const resFetch = await fetch(`http://${host}:${port}/rest/tool/fetch`, {
+        const resFetch = await fetch(`http://${activeHost}:${port}/rest/tool/fetch`, {
           method: 'POST',
           headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json', Connection: 'close' },
           body: JSON.stringify(fetchPayload)
@@ -115,16 +121,12 @@ Deno.serve(async (req) => {
 
         if (resFetch.ok) {
           const fetchResults = await resFetch.json()
-          // Mikrotik with as-value: true returns an array of progress snapshots
-          // We want the last one to get total downloaded bytes
           const lastSnapshot = Array.isArray(fetchResults) 
             ? fetchResults[fetchResults.length - 1] 
             : fetchResults
           
           rx_bytes = parseInt(lastSnapshot.downloaded || '0')
-          // Calculate speed based on actual duration reported by Mikrotik if available
-          const reportedDurationStr = lastSnapshot.duration || '10s'
-          // Extract seconds from duration (e.g., "10s", "0s", "1m2s")
+          const reportedDurationStr = lastSnapshot.duration || '3s'
           let reportedDuration = 3;
           if (reportedDurationStr.includes('s')) {
             const matches = reportedDurationStr.match(/(\d+)s/);
@@ -153,7 +155,6 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Insert into wan_logs
     await supabase.from('wan_logs').insert(results.map(r => ({
       interface_name: r.interface_name,
       rx_bps: Math.round(r.mbps * 1000000),
@@ -162,11 +163,9 @@ Deno.serve(async (req) => {
       created_at: r.created_at
     })))
 
-    // Send WhatsApp Report to Admin
     const ADMIN_PHONE = '85986801458'
     let message = `🚀 *SPEED TEST MIKROTIK (MORORO.TECH)* 🚀\n\n`
     const now = new Date();
-    // Offset for Brazil/Fortaleza (UTC-3)
     const brDate = new Date(now.getTime() - (3 * 3600 * 1000));
     const formattedDate = brDate.toLocaleDateString('pt-BR') + ', ' + brDate.toLocaleTimeString('pt-BR');
     message += `📅 Data: ${formattedDate}\n\n`
@@ -182,10 +181,6 @@ Deno.serve(async (req) => {
       message += `\n`
     }
 
-    // Explicitly append disclaimer here since we are invoking the internal send-text
-    // which normally appends it, but we want to be sure the message matches exactly what the user sees
-    // and the whatsapp-send function's sendText already adds BOT_DISCLAIMER.
-
     await supabase.functions.invoke('whatsapp-send/send-text', {
       body: {
         phone: ADMIN_PHONE,
@@ -197,7 +192,7 @@ Deno.serve(async (req) => {
       }
     })
 
-    return new Response(JSON.stringify({ success: true, processed: results.length }), {
+    return new Response(JSON.stringify({ success: true, processed: results.length, host: activeHost }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (e: any) {
