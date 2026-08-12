@@ -354,6 +354,7 @@ async function sendInvoiceNotification(req: Request) {
           number: formattedPhone,
           type: "document",
           file: pdfUrl,
+          delay: 2000,
           text: `Fatura Mororo.Tech - ${invoice.descricao}`,
           docName: fileName
         });
