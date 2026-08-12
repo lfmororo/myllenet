@@ -308,8 +308,6 @@ async function sendInvoiceNotification(req: Request) {
       const functionUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/generate-invoice-pdf`;
       const pdfLink = `${functionUrl}?invoice_id=${invoice_id}`;
       
-      message += `\n\n📄 *Sua Fatura PDF:* ${pdfLink}`;
-      
       if (invoice.efi_link) message += `\n\n🔗 *Link Alternativo:* ${invoice.efi_link}`;
       if (invoice.efi_pix_copiacola) message += `\n\n📱 *PIX Copia e Cola:*\n${invoice.efi_pix_copiacola}`;
       
@@ -317,8 +315,7 @@ async function sendInvoiceNotification(req: Request) {
       break;
     }
     case "lembrete_vencimento":
-      const reminderPdfLink = `${Deno.env.get("SUPABASE_URL")}/functions/v1/generate-invoice-pdf?invoice_id=${invoice_id}`;
-      message = `Olá ${customer.nome}! 🌐\n\n⏰ Lembrete: sua fatura da *Mororo.Tech* vence em breve!\n\n📋 ${invoice.descricao}\n💰 Valor: ${valor}\n📅 Vencimento: ${vencimento}\n\n📄 *Fatura PDF:* ${reminderPdfLink}`;
+      message = `Olá ${customer.nome}! 🌐\n\n⏰ Lembrete: sua fatura da *Mororo.Tech* vence em breve!\n\n📋 ${invoice.descricao}\n💰 Valor: ${valor}\n📅 Vencimento: ${vencimento}`;
       if (invoice.efi_link) message += `\n\n🔗 *Link Alternativo:* ${invoice.efi_link}`;
       message += "\n\nEvite a suspensão do serviço. Pague em dia! 😊";
       break;
@@ -327,9 +324,6 @@ async function sendInvoiceNotification(req: Request) {
       break;
     case "cobranca_atrasada":
       message = `Olá ${customer.nome}! 🌐\n\n⚠️ Sua fatura da *Mororo.Tech* está vencida!\n\n📋 ${invoice.descricao}\n💰 Valor: ${valor}\n📅 Vencimento: ${vencimento}`;
-      const overdueFunctionUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/generate-invoice-pdf`;
-      const overduePdfLink = `${overdueFunctionUrl}?invoice_id=${invoice_id}`;
-      if (invoice.efi_link) message += `\n\n📄 *Fatura PDF:* ${overduePdfLink}`;
       if (invoice.efi_link) message += `\n\n🔗 *Link Alternativo:* ${invoice.efi_link}`;
       break;
     default:
@@ -339,10 +333,29 @@ async function sendInvoiceNotification(req: Request) {
   try {
     const formattedPhone = formatPhone(customer.telefone);
     const fullMessage = message + BOT_DISCLAIMER;
+    
+    // First send the text message
     const result = await uazapiRequest("/send/text", {
       number: formattedPhone,
       text: fullMessage,
     });
+
+    // If it's a billing notification, send the PDF attachment
+    if (["boleto_gerado", "lembrete_vencimento", "cobranca_atrasada"].includes(notifType)) {
+      const pdfUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/generate-invoice-pdf?invoice_id=${invoice_id}`;
+      const fileName = `Fatura_${invoice.descricao.replace(/\s+/g, '_')}.pdf`;
+      
+      try {
+        await uazapiRequest("/send/file", {
+          number: formattedPhone,
+          url: pdfUrl,
+          caption: "Fatura PDF Mororo.Tech",
+          name: fileName
+        });
+      } catch (fileErr) {
+        console.error("Failed to send PDF attachment:", fileErr);
+      }
+    }
 
     await sendSupportButton(formattedPhone);
 
