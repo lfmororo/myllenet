@@ -337,25 +337,24 @@ async function sendInvoiceNotification(req: Request) {
       const pdfUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/generate-invoice-pdf?invoice_id=${invoice_id}`;
       const fileName = `Fatura_${invoice.descricao.replace(/\s+/g, '_')}.pdf`;
       
-      console.log(`Attempting to send PDF from: ${pdfUrl}`);
+      console.log(`[PDF] Requesting UAZAPI to send PDF from URL: ${pdfUrl}`);
       
       try {
         const fileResult = await uazapiRequest("/send/file", {
           number: formattedPhone,
           url: pdfUrl,
-          caption: `Fatura ${invoice.descricao}`,
+          caption: `Fatura Mororo.Tech - ${invoice.descricao}`,
           name: fileName
         });
-        console.log("PDF attachment sent successfully:", fileResult);
+        console.log("[PDF] UAZAPI response:", fileResult);
       } catch (fileErr) {
-        console.error("Failed to send PDF attachment:", fileErr);
-        // Log this specific failure in the message so admin can see it in notification logs
+        console.error("[PDF] Error attaching PDF:", fileErr);
         await logNotification({
           customer_id: invoice.customer_id,
           customer_name: customer.nome,
           phone: customer.telefone,
           type: `${notifType}_pdf_fail`,
-          message: `Erro ao anexar PDF: ${fileErr.message}`,
+          message: `Erro no anexo PDF: ${fileErr.message}`,
           status: "failed",
           error_message: fileErr.message,
         });
