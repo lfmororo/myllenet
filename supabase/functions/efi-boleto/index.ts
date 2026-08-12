@@ -974,7 +974,8 @@ async function bulkCheckPayments(req: Request) {
             const sameMonth = String(expire).slice(0, 7) === invMonth;
             const value = c.value || c.total || billet.value || 0;
             const diffPercent = Math.abs(Number(value) - Number(inv.valor_centavos)) / Number(inv.valor_centavos);
-            return sameMonth && diffPercent < 0.05; // 5% margin for fines/interest
+            // Relaxed check: match by exact month or exact value if month differs slightly
+            return (sameMonth && diffPercent < 0.10) || (diffPercent < 0.01);
           });
           if (!match) continue;
 
@@ -1071,7 +1072,7 @@ async function bulkCheckPayments(req: Request) {
                 const sameMonth = String(expire).slice(0, 7) === invMonth;
                 const value = c.value || c.total || billet.value || 0;
                 const diffPercent = Math.abs(Number(value) - Number(inv.valor_centavos)) / Number(inv.valor_centavos);
-                return sameMonth && diffPercent < 0.08;
+                return (sameMonth && diffPercent < 0.15) || (diffPercent < 0.02);
               });
 
               if (match) {
