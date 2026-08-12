@@ -37,7 +37,7 @@ Deno.serve(async (req) => {
     const action = (body?.action || 'sync') as Action
 
     if (!customerId || !['sync', 'enable', 'disable', 'remove'].includes(action)) {
-      return json({ success: false, error: 'Parâmetros inválidos (customer_id, action)' }, 400)
+      return json({ success: false, error: `Parâmetros inválidos (id=${customerId}, action=${action})` }, 400)
     }
 
     const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
