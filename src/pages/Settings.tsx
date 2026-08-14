@@ -19,6 +19,8 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useDiagnosticPDF } from "@/hooks/useDiagnosticPDF";
+import { MikrotikAgentCard } from "@/components/MikrotikAgentCard";
+
 
 export default function Settings() {
   const { user, isAdmin, loading: authLoading } = useAuth();
@@ -766,7 +768,12 @@ export default function Settings() {
                 )}
               </CardContent>
             </Card>
+
+            <div className="mt-4">
+              <MikrotikAgentCard />
+            </div>
           </TabsContent>
+
           <TabsContent value="pix" className="mt-4">
             <Card>
               <CardHeader>
