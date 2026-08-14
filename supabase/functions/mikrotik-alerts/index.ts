@@ -192,6 +192,41 @@ Deno.serve(async (req) => {
         }
       }
     }
+
+    // 7. Check Agent Communication Alerts (2 minutes)
+    const twoMinAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString()
+    const { data: offlineAgents } = await supabase
+      .from('agent_tokens')
+      .select('id, name, last_seen_at')
+      .eq('active', true)
+      .lt('last_seen_at', twoMinAgo)
+
+    if (offlineAgents && offlineAgents.length > 0) {
+      for (const agent of offlineAgents) {
+        const alertType = `agent_offline_${agent.id}`
+        const { data: recentAlert } = await supabase
+          .from('customer_alerts_sent')
+          .select('id')
+          .eq('alert_type', alertType)
+          .gt('sent_at', new Date(Date.now() - 60 * 60 * 1000).toISOString())
+          .single()
+
+        if (!recentAlert) {
+          console.log(`ALERT: Agent ${agent.name} is offline (> 2 min)`)
+          const lastSeen = agent.last_seen_at ? new Date(agent.last_seen_at).toLocaleString('pt-BR') : 'Nunca'
+          await supabase.functions.invoke('whatsapp-send/send-text', {
+            body: {
+              phone: ADMIN_PHONE,
+              message: `🤖 *ALERTA DO AGENTE VPS* 🤖\n\nO agente *${agent.name}* está sem comunicação há mais de 2 minutos!\n\nÚltima atividade: ${lastSeen}\n\nPor favor, verifique se o serviço Node.js está rodando na VPS.`
+            }
+          })
+
+          await supabase.from('customer_alerts_sent').insert({
+            alert_type: alertType,
+            sent_at: new Date().toISOString()
+          })
+        }
+      }
     
     // 6. Check WAN Speed Alerts
     const { data: thresholdData } = await supabase
