@@ -14,6 +14,7 @@ import agentPkg from "@/agent-template/package.json?raw";
 import agentReadme from "@/agent-template/README.md?raw";
 import agentInstall from "@/agent-template/install.sh?raw";
 import agentService from "@/agent-template/mikrotik-agent.service?raw";
+import agentWindows from "@/agent-template/WINDOWS.md?raw";
 
 interface AgentToken {
   id: string;
@@ -125,6 +126,7 @@ export function MikrotikAgentCard() {
       folder.file("mikrotik-agent.service", agentService);
       folder.file(".env", env);
       folder.file("env.example", env.replace(agent.token, "SEU_TOKEN_AQUI"));
+      folder.file("WINDOWS.md", agentWindows);
 
       const blob = await zip.generateAsync({ type: "blob" });
       const url = URL.createObjectURL(blob);

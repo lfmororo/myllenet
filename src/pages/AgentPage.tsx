@@ -78,16 +78,52 @@ sudo bash install.sh`}</Code>
   },
   {
     n: 5,
+    title: "Instalação no Windows (Opcional)",
+    body: (
+      <div className="space-y-3">
+        <p className="text-sm text-muted-foreground">
+          Caso prefira rodar o agente em um servidor Windows em vez de Linux:
+        </p>
+        <ul className="list-decimal space-y-2 pl-5 text-sm text-muted-foreground">
+          <li>
+            Instale o <strong>Node.js (LTS)</strong> em{" "}
+            <a
+              href="https://nodejs.org/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary underline"
+            >
+              nodejs.org
+            </a>
+            .
+          </li>
+          <li>Extraia o pacote em uma pasta (ex: <code>C:\mikrotik-agent</code>).</li>
+          <li>
+            Para instalar como serviço, use o utilitário <code>qckwinsvc</code> via prompt de administrador:
+            <Code>{`npm install -g qckwinsvc
+qckwinsvc`}</Code>
+            Aponte para o arquivo <code>agent.js</code> na pasta extraída.
+          </li>
+        </ul>
+        <p className="text-xs text-muted-foreground">
+          Veja o arquivo <strong>WINDOWS.md</strong> dentro do pacote para detalhes completos.
+        </p>
+      </div>
+    ),
+  },
+  {
+    n: 6,
     title: "Valide a coleta",
     body: (
       <div className="space-y-3">
         <p className="text-sm text-muted-foreground">
-          Acompanhe os logs na VPS e confirme no painel abaixo que o agente ficou{" "}
+          Acompanhe os logs (no Linux use <code>journalctl</code>) e confirme no painel abaixo que o agente ficou{" "}
           <Badge className="bg-primary/15 text-primary hover:bg-primary/15">Online</Badge> com a
           data da última coleta. Os dados aparecem na página <strong>Mikrotik</strong> e no
           Dashboard.
         </p>
-        <Code>{`systemctl status mikrotik-agent
+        <Code>{`# No Linux (Systemd):
+systemctl status mikrotik-agent
 journalctl -u mikrotik-agent -f`}</Code>
       </div>
     ),
