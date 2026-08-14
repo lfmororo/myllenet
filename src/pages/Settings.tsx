@@ -19,7 +19,7 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useDiagnosticPDF } from "@/hooks/useDiagnosticPDF";
-import { MikrotikAgentCard } from "@/components/MikrotikAgentCard";
+
 
 
 export default function Settings() {
@@ -769,9 +769,18 @@ export default function Settings() {
               </CardContent>
             </Card>
 
-            <div className="mt-4">
-              <MikrotikAgentCard />
+            <div className="mt-4 rounded-lg border bg-muted/40 p-4 text-sm text-muted-foreground">
+              Para coletar métricas por uma VPS, use a página{" "}
+              <button
+                type="button"
+                className="font-medium text-primary underline"
+                onClick={() => navigate("/agente")}
+              >
+                Agente VPS
+              </button>
+              , com download do pacote pré-configurado e tutorial de instalação.
             </div>
+
           </TabsContent>
 
           <TabsContent value="pix" className="mt-4">
