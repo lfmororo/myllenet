@@ -102,16 +102,18 @@ const collected = [
 ];
 
 export default function AgentPage() {
+  useEffect(() => {
+    document.title = "Agente Mikrotik | Download e Instalação";
+    const desc = document.querySelector('meta[name="description"]');
+    desc?.setAttribute(
+      "content",
+      "Baixe o agente Node.js já configurado para coletar métricas do Mikrotik na sua VPS e siga o tutorial de instalação.",
+    );
+  }, []);
+
   return (
     <div className="space-y-6">
-      <Helmet>
-        <title>Agente de Monitoramento Mikrotik | Download e Instalação</title>
-        <meta
-          name="description"
-          content="Baixe o agente Node.js já configurado para coletar métricas do Mikrotik na sua VPS e siga o tutorial de instalação passo a passo."
-        />
-        <link rel="canonical" href="/agente" />
-      </Helmet>
+
 
       <header className="space-y-1">
         <h1 className="text-2xl font-bold tracking-tight">Agente de Monitoramento Mikrotik</h1>
