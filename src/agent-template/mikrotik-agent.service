@@ -1,0 +1,17 @@
+[Unit]
+Description=Mororo.Tech - Agente de Monitoramento Mikrotik
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=__AGENT_DIR__
+ExecStart=__NODE_BIN__ __AGENT_DIR__/agent.js
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mikrotik-agent
+
+[Install]
+WantedBy=multi-user.target
