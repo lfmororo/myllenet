@@ -12,7 +12,7 @@ Se você ainda não tem o Node.js instalado:
 
 ## 2. Instalar o Agente
 1. Baixe o pacote `.zip` do agente pelo painel do sistema.
-2. Extraia o conteúdo em uma pasta permanente, por exemplo: `C:\mikrotik-agent`.
+2. Extraia o conteúdo em uma pasta permanente, por exemplo: `C:\mikrotik`.
 
 ## 3. Instalar como Serviço (Windows)
 Para que o agente inicie automaticamente com o Windows, recomendamos o uso do `qckwinsvc` ou `nssm`.
@@ -30,13 +30,13 @@ Para que o agente inicie automaticamente com o Windows, recomendamos o uso do `q
 4. Siga as perguntas:
    - Service name: `mikrotik-agent`
    - Service description: `Agente de Monitoramento Mikrotik`
-   - Path to node script: `C:\mikrotik-agent\agent.js` (ajuste para sua pasta)
+   - Path to node script: `C:\mikrotik\agent.js` (ajuste para sua pasta)
 
 ### Usando NSSM (Robusto):
 1. Baixe o [nssm.cc](https://nssm.cc/download) e extraia o executável.
 2. No Prompt como Administrador:
    ```cmd
-   nssm install mikrotik-agent "C:\Program Files\nodejs\node.exe" "C:\mikrotik-agent\agent.js"
+   nssm install mikrotik-agent "C:\Program Files\nodejs\node.exe" "C:\mikrotik\agent.js"
    nssm start mikrotik-agent
    ```
 
@@ -46,3 +46,17 @@ Os logs serão exibidos no console se você rodar manualmente:
 node agent.js
 ```
 Se estiver rodando como serviço, verifique o Visualizador de Eventos do Windows ou o arquivo de log gerado pelo utilitário escolhido.
+
+### Dica de Erro: Cannot find module
+Se ao rodar `node agent.js` você receber o erro `MODULE_NOT_FOUND`, verifique se você está na pasta onde o arquivo `agent.js` foi extraído.
+```cmd
+PS C:\mikrotik> node agent.js
+
+node:internal/modules/cjs/loader:1520
+  throw err;
+  ^
+Error: Cannot find module 'C:\mikrotik\agent.js'
+...
+Node.js v24.19.0
+```
+Certifique-se de que o caminho 'C:\mikrotik\agent.js' está correto e que o arquivo existe.
