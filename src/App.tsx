@@ -16,6 +16,8 @@ import EfiLogsPage from "./pages/EfiLogsPage";
 import Settings from "./pages/Settings";
 import MikrotikPage from "./pages/MikrotikPage";
 import InvoiceView from "./pages/InvoiceView";
+import AgentPage from "./pages/AgentPage";
+
 
 const queryClient = new QueryClient();
 
@@ -37,6 +39,8 @@ const App = () => (
               <Route path="/notificacoes" element={<NotificationsPage />} />
               <Route path="/logs-efi" element={<EfiLogsPage />} />
               <Route path="/mikrotik" element={<MikrotikPage />} />
+              <Route path="/agente" element={<AgentPage />} />
+
               <Route path="/settings" element={<Settings />} />
             </Route>
             <Route path="*" element={<NotFound />} />
