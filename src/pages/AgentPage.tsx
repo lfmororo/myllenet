@@ -182,7 +182,7 @@ export default function AgentPage() {
           <CardTitle className="flex items-center gap-2 text-lg">
             <Terminal className="h-5 w-5" /> Tutorial de instalação
           </CardTitle>
-          <CardDescription>Cinco passos, cerca de 5 minutos.</CardDescription>
+          <CardDescription>O sistema enviará um alerta via WhatsApp caso o agente fique mais de 2 minutos sem se comunicar.</CardDescription>
         </CardHeader>
         <CardContent>
           <Accordion type="single" collapsible defaultValue="step-1" className="w-full">
