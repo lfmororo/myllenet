@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      agent_tokens: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          last_ip: string | null
+          last_seen_at: string | null
+          name: string
+          token: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          last_ip?: string | null
+          last_seen_at?: string | null
+          name: string
+          token: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          last_ip?: string | null
+          last_seen_at?: string | null
+          name?: string
+          token?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       block_alerts_sent: {
         Row: {
           created_at: string | null
