@@ -190,7 +190,7 @@ export default function DashboardHome() {
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold tracking-tight">Dashboard</h2>
-        <p className="text-muted-foreground">Visão geral do sistema Mororo.Tech</p>
+        <p className="text-muted-foreground">verifique se as notificacoes de alerta e de desconecxoes via whatsapp nao estao sendo enviadas</p>
       </div>
 
       {/* KPI Cards */}
