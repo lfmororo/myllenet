@@ -24,7 +24,8 @@ import {
   Loader2,
   ShieldAlert,
   Router,
-  GitCompare,
+  Server,
+
 } from "lucide-react";
 import logoImg from "@/assets/logo.png";
 
@@ -34,6 +35,8 @@ const navItems = [
   { title: "Cobranças", url: "/cobrancas", icon: FileText },
   { title: "Notificações", url: "/notificacoes", icon: Bell },
   { title: "Mikrotik", url: "/mikrotik", icon: Router },
+  { title: "Agente VPS", url: "/agente", icon: Server },
+
   { title: "Logs EFI", url: "/logs-efi", icon: AlertTriangle },
   { title: "Configurações", url: "/settings", icon: Settings },
 ];
