@@ -1,0 +1,13 @@
+{
+  "name": "mororo-mikrotik-agent",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Agente Node para coleta de metricas Mikrotik e envio ao sistema Mororo.Tech",
+  "main": "agent.js",
+  "scripts": {
+    "start": "node agent.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
