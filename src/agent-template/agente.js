@@ -93,9 +93,19 @@ async function rest(host, endpoint) {
 /** Retorna o primeiro host que responde (preferencial primeiro). */
 async function pickHost() {
   for (const host of CFG.hosts) {
+    const start = Date.now();
     const probe = await rest(host, "/system/resource");
-    if (probe.ok) return { host, resource: probe.data };
-    log(`Host ${host} indisponível: ${probe.error}`);
+    const duration = Date.now() - start;
+    if (probe.ok) return { host, resource: probe.data, duration };
+    log(`Host ${host} indisponível: ${probe.error} (${duration}ms)`);
+    // Se falhar, enviamos o erro individual para o histórico
+    await flush({
+      host,
+      online: false,
+      collected_at: new Date().toISOString(),
+      message: `Agente VPS: erro ao conectar em ${host}: ${probe.error}`,
+      diagnostics: { duration, error: probe.error, status: probe.status }
+    });
   }
   return null;
 }
@@ -180,6 +190,7 @@ async function collect(host, resourceRaw) {
     online: true,
     collected_at: new Date().toISOString(),
     message: `Agente VPS: OK (${wan.length} WAN, ${pppoe.length} sessões PPPoE)`,
+    diagnostics: { duration: resourceRaw.duration },
     resource: {
       cpu_load: resource["cpu-load"] != null ? Number(resource["cpu-load"]) : null,
       free_memory: freeMemory,

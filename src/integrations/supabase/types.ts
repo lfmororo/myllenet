@@ -364,6 +364,7 @@ export type Database = {
       }
       mikrotik_status_history: {
         Row: {
+          diagnostics: Json | null
           host: string
           id: string
           logged_at: string | null
@@ -371,6 +372,7 @@ export type Database = {
           online: boolean
         }
         Insert: {
+          diagnostics?: Json | null
           host: string
           id?: string
           logged_at?: string | null
@@ -378,6 +380,7 @@ export type Database = {
           online: boolean
         }
         Update: {
+          diagnostics?: Json | null
           host?: string
           id?: string
           logged_at?: string | null
