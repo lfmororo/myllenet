@@ -30,20 +30,20 @@ Para que o agente inicie automaticamente com o Windows, recomendamos o uso do `q
 4. Siga as perguntas:
    - Service name: `mikrotik-agent`
    - Service description: `Agente de Monitoramento Mikrotik`
-   - Path to node script: `C:\mikrotik\agent.js` (ajuste para sua pasta)
+   - Path to node script: `C:\mikrotik\agente.js` (ajuste para sua pasta)
 
 ### Usando NSSM (Robusto):
 1. Baixe o [nssm.cc](https://nssm.cc/download) e extraia o executável.
 2. No Prompt como Administrador:
    ```cmd
-   nssm install mikrotik-agent "C:\Program Files\nodejs\node.exe" "C:\mikrotik\agent.js"
+   nssm install mikrotik-agent "C:\Program Files\nodejs\node.exe" "C:\mikrotik\agente.js"
    nssm start mikrotik-agent
    ```
 
 ## 4. Verificar Logs
 Os logs serão exibidos no console se você rodar manualmente:
 ```cmd
-node agent.js
+node agente.js
 ```
 Se estiver rodando como serviço, verifique o Visualizador de Eventos do Windows ou o arquivo de log gerado pelo utilitário escolhido.
 
