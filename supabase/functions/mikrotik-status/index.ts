@@ -130,7 +130,6 @@ Deno.serve(async (req) => {
 
       const currentOpenPorts = probePorts.filter((p) => openMap.get(p))
       
-      // Only proceed with this host if it has open ports OR if it's the primary host (to report unreachable if all fail)
       if (currentOpenPorts.length === 0 && host !== hosts[0]) continue
 
       if (openMap.get(apiPort)) apiOpen = true
@@ -207,7 +206,6 @@ Deno.serve(async (req) => {
                 .limit(wanInterfaces.length * 10)
 
               const now = Date.now()
-              const MAX_BPS = 1_000_000_000
               const MAX_AGE_SECS = 300
               const rows = wanInterfaces.map(i => {
                 const rxBytes = parseInt(i['rx-byte'] ?? '0', 10) || 0
@@ -311,20 +309,20 @@ Deno.serve(async (req) => {
               }
             })
           }
+        }
+        
+        let updateAvailable = false
+        let latestVersion = null
+        if (updates.ok && updates.data) {
+          const u = updates.data as Record<string, any>
+          if (u.status === 'New version is available' || (u['latest-version'] && u['latest-version'] !== version)) {
+            updateAvailable = true
+            latestVersion = u['latest-version']
           }
-          
-          let updateAvailable = false
-          let latestVersion = null
-          if (updates.ok && updates.data) {
-            const u = updates.data as Record<string, any>
-            if (u.status === 'New version is available' || (u['latest-version'] && u['latest-version'] !== version)) {
-              updateAvailable = true
-              latestVersion = u['latest-version']
-            }
-          }
+        }
+      }
     }
 
-    // --- FALLBACK: Check if there is an active VPS agent if direct connection failed ---
     let online = restOk || reachable
     let source: 'direct' | 'agent' | 'offline' = online ? 'direct' : 'offline'
 
@@ -340,8 +338,6 @@ Deno.serve(async (req) => {
       if (activeAgents && activeAgents.length > 0) {
         online = true
         source = 'agent'
-        const agent = activeAgents[0]
-        // Try to get the latest metrics from wan_logs to fill the status
         const { data: latestMetrics } = await supabase
           .from('wan_logs')
           .select('*')
@@ -356,10 +352,9 @@ Deno.serve(async (req) => {
           temperature = m.temperature
         }
         
-        // Count active PPPoE from pppoe_logs (approximate from latest check)
         const { data: activePppoe } = await supabase
           .from('pppoe_logs')
-          .select('usuario_pppoe', { count: 'exact', head: true })
+          .select('usuario_pppoe')
           .gt('logged_at', twoMinAgo)
           
         activeUsers = activePppoe?.length || 0
