@@ -24,7 +24,7 @@ export const useMikrotikLogs = () => {
       .from('wan_logs' as any)
       .select('*')
       .order('created_at', { ascending: false })
-      .limit(240);
+      .limit(1000);
     
     if (!error && data) {
       const grouped: Record<string, any> = {};
@@ -66,7 +66,7 @@ export const useMikrotikLogs = () => {
       
       // Ordenar por data e pegar os últimos 60 pontos
       const sorted = Object.values(grouped).sort((a: any, b: any) => a.fullDate.getTime() - b.fullDate.getTime());
-      setWanLogs(sorted.slice(-60));
+      setWanLogs(sorted);
     }
     setLoading(false);
   };

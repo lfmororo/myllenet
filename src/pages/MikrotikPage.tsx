@@ -192,10 +192,14 @@ export default function MikrotikPage() {
 
   // Calculate hourly aggregation for speedtest results
   const hourlyData = filteredLogs.reduce((acc: any[], log: any) => {
-    const hour = log.time.split(':')[0] + ':00';
-    let existing = acc.find(a => a.hour === hour);
+    // Group by Date + Hour to avoid mixing different days in the same hour slot
+    const dateStr = format(log.fullDate, 'yyyy-MM-dd');
+    const hourStr = log.time.split(':')[0] + ':00';
+    const dayHourKey = `${dateStr} ${hourStr}`;
+    
+    let existing = acc.find(a => a.dayHourKey === dayHourKey);
     if (!existing) {
-      existing = { hour };
+      existing = { dayHourKey, hour: hourStr, date: dateStr };
       acc.push(existing);
     }
     
@@ -208,16 +212,15 @@ export default function MikrotikPage() {
     });
     return acc;
   }, []).map(item => {
-    const result = { hour: item.hour };
+    const result = { ...item };
     Object.keys(item).forEach(key => {
-      if (key !== 'hour' && !key.endsWith('_count')) {
-        // Only average if we have counts
+      if (key !== 'dayHourKey' && key !== 'hour' && key !== 'date' && !key.endsWith('_count')) {
         const count = item[`${key}_count`];
         result[key] = count > 0 ? item[key] / count : 0;
       }
     });
     return result;
-  });
+  }).sort((a, b) => new Date(a.dayHourKey).getTime() - new Date(b.dayHourKey).getTime());
 
   const allEntries = wanLogs.flatMap(log => {
     const interfaces = Object.keys(log).filter(k => k !== 'time' && k !== 'fullDate' && k.endsWith('↓'));
@@ -586,7 +589,7 @@ export default function MikrotikPage() {
             <ResponsiveContainer width="100%" height={320}>
               <BarChart data={hourlyData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" vertical={false} />
-                <XAxis dataKey="hour" className="text-xs" />
+                <XAxis dataKey={dateRange === "today" ? "hour" : "dayHourKey"} className="text-xs" tickFormatter={(v) => dateRange === "today" ? v : format(new Date(v), "dd/MM HH:mm")} />
                 <YAxis
                   className="text-xs"
                   width={64}
