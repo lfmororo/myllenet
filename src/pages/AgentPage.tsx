@@ -249,7 +249,7 @@ journalctl -u mikrotik-agent -n 50 # últimas 50 linhas de log`}</Code>
           </div>
           <Separator />
           <div className="space-y-1">
-            <p className="font-medium text-foreground">Se algo não funcionar</p>
+            <p className="font-medium text-foreground">verificar o motivo do agente nao conseguir conectar o mikrotik</p>
             <ul className="list-disc space-y-1 pl-5">
               <li>
                 <strong>Nenhum host respondeu</strong>: verifique se o serviço <code>www</code> está habilitado no Mikrotik (<code>/ip service enable www</code>) e se a porta está correta (padrão 80).
