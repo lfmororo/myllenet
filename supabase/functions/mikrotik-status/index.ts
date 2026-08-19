@@ -309,15 +309,15 @@ Deno.serve(async (req) => {
               }
             })
           }
-        }
         
-        let updateAvailable = false
-        let latestVersion = null
-        if (updates.ok && updates.data) {
-          const u = updates.data as Record<string, any>
-          if (u.status === 'New version is available' || (u['latest-version'] && u['latest-version'] !== version)) {
-            updateAvailable = true
-            latestVersion = u['latest-version']
+          let updateAvailable = false
+          let latestVersion = null
+          if (updates.ok && updates.data) {
+            const u = updates.data as Record<string, any>
+            if (u.status === 'New version is available' || (u['latest-version'] && u['latest-version'] !== version)) {
+              updateAvailable = true
+              latestVersion = u['latest-version']
+            }
           }
         }
       }
@@ -391,8 +391,8 @@ Deno.serve(async (req) => {
       activeUsers,
       activeList,
       wans,
-      updateAvailable,
-      latestVersion,
+      // updateAvailable, // Not used in this response type context
+      // latestVersion,  // Not used in this response type context
       message,
     }
 

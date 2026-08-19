@@ -70,6 +70,15 @@ Deno.serve(async (req) => {
           message: p.message || (p.online === false ? 'Agente VPS: sem resposta' : 'Agente VPS: OK'),
           logged_at: loggedAt,
         })
+        
+        // Sincroniza o status global para o painel de hosts
+        await supabase.from('mikrotik_status_history').upsert({
+          host: p.host,
+          online: p.online !== false,
+          message: p.message || (p.online === false ? 'Agente VPS: sem resposta' : 'Agente VPS: OK'),
+          created_at: loggedAt
+        }, { onConflict: 'host' })
+        
         result.status++
       }
 
