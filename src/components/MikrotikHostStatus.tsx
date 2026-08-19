@@ -29,16 +29,17 @@ export function MikrotikHostStatus() {
 
   const fetchData = async () => {
     try {
-      // 1. Fetch latest status per host for the main view
-      const { data: latestData, error: latestError } = await supabase
+      // 1. Fetch history for all hosts
+      const { data, error } = await supabase
         .from("mikrotik_status_history")
         .select("host, online, logged_at, message")
         .order("logged_at", { ascending: false })
-        .limit(100);
+        .limit(200);
 
-      if (latestError) throw latestError;
+      if (error) throw error;
 
-      const latestByHost = latestData?.reduce((acc: HostStatus[], curr) => {
+      // Filter for latest status per host
+      const latestByHost = data?.reduce((acc: HostStatus[], curr) => {
         if (!acc.find((h) => h.host === curr.host)) {
           acc.push(curr);
         }
@@ -46,17 +47,7 @@ export function MikrotikHostStatus() {
       }, []);
 
       setLatestStatuses(latestByHost || []);
-
-      // 2. Fetch recent history for the evolution view
-      const { data: historyData, error: historyError } = await supabase
-        .from("mikrotik_status_history")
-        .select("host, online, logged_at, message")
-        .order("logged_at", { ascending: false })
-        .limit(50);
-
-      if (historyError) throw historyError;
-      setHistory(historyData || []);
-
+      setHistory(data || []);
     } catch (err) {
       console.error("Erro ao buscar status dos hosts:", err);
     } finally {
