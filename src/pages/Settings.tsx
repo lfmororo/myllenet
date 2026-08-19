@@ -737,9 +737,35 @@ export default function Settings() {
                         placeholder="15"
                       />
                       <p className="text-xs text-muted-foreground">
-                        Permita que eu configure quantos dias após o vencimento o cliente deve ser bloqueado, por exemplo 15 dias, diretamente no painel de configurações.
+                        Configure quantos dias após o vencimento o cliente deve ser bloqueado.
                       </p>
                     </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="alert_offline_minutes">Minutos Offline p/ Alerta</Label>
+                        <Input
+                          id="alert_offline_minutes"
+                          type="number"
+                          min="1"
+                          value={alertOfflineMinutes}
+                          onChange={(e) => setAlertOfflineMinutes(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="alert_failure_count">Qtd. Falhas p/ Alerta</Label>
+                        <Input
+                          id="alert_failure_count"
+                          type="number"
+                          min="1"
+                          value={alertFailureCount}
+                          onChange={(e) => setAlertFailureCount(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      O sistema enviará alertas no WhatsApp se o Mikrotik ficar offline por este tempo ou atingir esta quantidade de falhas consecutivas.
+                    </p>
 
                     <Button
                       onClick={async () => {
@@ -752,10 +778,11 @@ export default function Settings() {
                           await upsertSetting("mikrotik_api_port", mikrotikApiPort);
                           await upsertSetting("mikrotik_rest_port", mikrotikRestPort);
                           await upsertSetting("blocking_days", blockingDays);
+                          await upsertSetting("mikrotik_alert_offline_minutes", alertOfflineMinutes);
+                          await upsertSetting("mikrotik_alert_failure_count", alertFailureCount);
                           toast.success("Configurações Mikrotik salvas!");
                         } catch (err: any) {
                           toast.error("Erro ao salvar: " + (err.message || "Erro desconhecido"));
-
                         }
                         setSavingMikrotik(false);
                       }}
