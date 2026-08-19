@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Download, Loader2, RefreshCw, Router, Wifi, WifiOff, FileCode, BookOpen, Activity, History, ArrowUpCircle, ArrowDownCircle, Info, Calendar, Clock, Network, Filter, BarChart3 } from "lucide-react";
+import { Download, Loader2, RefreshCw, Router, Wifi, WifiOff, FileCode, BookOpen, Activity, History, ArrowUpCircle, ArrowDownCircle, Info, Calendar, Clock, Network, Filter, BarChart3, Server } from "lucide-react";
+import { MikrotikHostStatus } from "@/components/MikrotikHostStatus";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useCustomers } from "@/hooks/useCustomers";
@@ -389,6 +390,8 @@ export default function MikrotikPage() {
           </CardContent>
         </Card>
       </div>
+
+      <MikrotikHostStatus />
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-2">

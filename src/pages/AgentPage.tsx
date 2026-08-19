@@ -4,7 +4,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Activity, Cpu, HardDrive, ShieldCheck, Terminal, Wifi } from "lucide-react";
+import { Activity, Cpu, HardDrive, ShieldCheck, Terminal, Wifi, Server } from "lucide-react";
+import { MikrotikHostStatus } from "@/components/MikrotikHostStatus";
 
 function Code({ children }: { children: React.ReactNode }) {
   return (
@@ -171,6 +172,7 @@ export default function AgentPage() {
 
   return (
     <div className="space-y-6">
+      <MikrotikHostStatus />
 
 
       <header className="space-y-1">
