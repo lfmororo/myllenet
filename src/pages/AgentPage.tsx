@@ -250,12 +250,13 @@ journalctl -u mikrotik-agent -n 50 # últimas 50 linhas de log`}</Code>
             <p className="font-medium text-foreground">Se algo não funcionar</p>
             <ul className="list-disc space-y-1 pl-5">
               <li>
-                <strong>Nenhum host respondeu</strong>: verifique o serviço www no RouterOS e a
-                liberação da porta para o IP da VPS.
+                <strong>Nenhum host respondeu</strong>: verifique se o serviço <code>www</code> está habilitado no Mikrotik (<code>/ip service enable www</code>) e se a porta está correta (padrão 80).
               </li>
               <li>
-                <strong>Token inválido</strong>: o agente foi revogado no sistema — baixe um novo
-                pacote.
+                <strong>Timeout / Indisponível</strong>: certifique-se de que o Mikrotik é acessível a partir da VPS ou do computador onde o agente está rodando. O Winbox usa uma porta diferente da API REST.
+              </li>
+              <li>
+                <strong>Token inválido</strong>: o agente foi revogado no sistema — baixe um novo pacote.
               </li>
               <li>
                 <strong>Sem sessões PPPoE</strong>: o usuário PPPoE do Mikrotik precisa ser igual ao

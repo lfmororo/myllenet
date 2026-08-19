@@ -69,13 +69,22 @@ async function rest(host, endpoint) {
   const timer = setTimeout(() => ac.abort(), CFG.requestTimeoutMs);
   try {
     const res = await fetch(url, {
-      headers: { Authorization: authHeader, Accept: "application/json", Connection: "close" },
+      headers: { 
+        Authorization: authHeader, 
+        Accept: "application/json", 
+        Connection: "close" 
+      },
       signal: ac.signal,
     });
-    if (!res.ok) return { ok: false, status: res.status, error: `HTTP ${res.status}` };
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      return { ok: false, status: res.status, error: `HTTP ${res.status}: ${body.slice(0, 100)}` };
+    }
     return { ok: true, data: await res.json() };
   } catch (e) {
-    return { ok: false, status: 0, error: e.message };
+    let err = e.message;
+    if (e.name === 'AbortError') err = `Timeout (${CFG.requestTimeoutMs}ms)`;
+    return { ok: false, status: 0, error: err };
   } finally {
     clearTimeout(timer);
   }
