@@ -24,7 +24,7 @@ export const useMikrotikLogs = () => {
       .from('wan_logs' as any)
       .select('*')
       .order('created_at', { ascending: false })
-      .limit(240);
+      .limit(1000);
     
     if (!error && data) {
       const grouped: Record<string, any> = {};
