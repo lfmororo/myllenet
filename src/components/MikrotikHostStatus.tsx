@@ -51,8 +51,8 @@ export function MikrotikHostStatus() {
         return acc;
       }, []);
 
-      setLatestStatuses(latestByHost || []);
-      setHistory(data || []);
+      setLatestStatuses((latestByHost as unknown as HostStatus[]) || []);
+      setHistory((data as unknown as HostStatus[]) || []);
     } catch (err) {
       console.error("Erro ao buscar status dos hosts:", err);
     } finally {
