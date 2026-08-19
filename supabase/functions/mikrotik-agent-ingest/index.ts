@@ -69,6 +69,7 @@ Deno.serve(async (req) => {
           online: p.online !== false,
           message: p.message || (p.online === false ? 'Agente VPS: sem resposta' : 'Agente VPS: OK'),
           logged_at: loggedAt,
+          diagnostics: p.diagnostics || null,
         })
         
         // Sincroniza o status global para o painel de hosts
@@ -76,7 +77,8 @@ Deno.serve(async (req) => {
           host: p.host,
           online: p.online !== false,
           message: p.message || (p.online === false ? 'Agente VPS: sem resposta' : 'Agente VPS: OK'),
-          created_at: loggedAt
+          created_at: loggedAt,
+          diagnostics: p.diagnostics || null,
         }, { onConflict: 'host' })
         
         result.status++

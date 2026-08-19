@@ -14,6 +14,11 @@ interface HostStatus {
   online: boolean;
   logged_at: string;
   message: string;
+  diagnostics?: {
+    duration?: number;
+    error?: string;
+    status?: number;
+  };
   created_at?: string;
 }
 
@@ -32,7 +37,7 @@ export function MikrotikHostStatus() {
       // 1. Fetch history for all hosts
       const { data, error } = await supabase
         .from("mikrotik_status_history")
-        .select("host, online, logged_at, message")
+        .select("host, online, logged_at, message, diagnostics")
         .order("logged_at", { ascending: false })
         .limit(200);
 
@@ -212,6 +217,9 @@ export function MikrotikHostStatus() {
                           {!s.online && <AlertCircle className="h-3 w-3 text-destructive shrink-0 mt-0.5" />}
                           <span className={s.online ? "text-muted-foreground" : "text-destructive font-medium"}>
                             {s.message || (s.online ? "Conexão estável" : "Falha na resposta")}
+                            {s.diagnostics?.duration && (
+                              <span className="ml-2 opacity-70">({s.diagnostics.duration}ms)</span>
+                            )}
                           </span>
                         </div>
                       </TableCell>
@@ -252,6 +260,7 @@ export function MikrotikHostStatus() {
                         </TableCell>
                         <TableCell className="text-[10px] text-muted-foreground truncate max-w-[200px]">
                           {h.message}
+                          {h.diagnostics?.duration && <span className="ml-1 opacity-60">({h.diagnostics.duration}ms)</span>}
                         </TableCell>
                       </TableRow>
                     ))
