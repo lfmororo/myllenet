@@ -46,17 +46,21 @@ export function MikrotikHostStatus() {
 
   useEffect(() => {
     fetchStatus();
-    const sub = supabase
+    const channel = supabase
       .channel("host-status-changes")
       .on(
         "postgres_changes",
-        { event: "INSERT", table: "mikrotik_status_history" },
+        { 
+          event: "INSERT", 
+          table: "mikrotik_status_history",
+          schema: "public"
+        },
         () => fetchStatus()
       )
       .subscribe();
 
     return () => {
-      supabase.removeChannel(sub);
+      supabase.removeChannel(channel);
     };
   }, []);
 
