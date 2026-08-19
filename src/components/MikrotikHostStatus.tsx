@@ -44,7 +44,7 @@ export function MikrotikHostStatus() {
       if (error) throw error;
 
       // Filter for latest status per host
-      const latestByHost = data?.reduce((acc: HostStatus[], curr) => {
+      const latestByHost = data?.reduce((acc: any[], curr) => {
         if (!acc.find((h) => h.host === curr.host)) {
           acc.push(curr);
         }
