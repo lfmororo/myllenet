@@ -48,15 +48,15 @@ node agent.js
 Se estiver rodando como serviço, verifique o Visualizador de Eventos do Windows ou o arquivo de log gerado pelo utilitário escolhido.
 
 ### Dica de Erro: Cannot find module
-Se ao rodar `node agent.js` você receber o erro `MODULE_NOT_FOUND`, verifique se você está na pasta onde o arquivo `agent.js` foi extraído.
+Se ao rodar `node agente.js` você receber o erro `MODULE_NOT_FOUND`, verifique se você está na pasta onde o arquivo `agente.js` foi extraído.
 ```cmd
-PS C:\mikrotik> node agent.js
+PS C:\mikrotik> node agente.js
 
 node:internal/modules/cjs/loader:1520
   throw err;
   ^
-Error: Cannot find module 'C:\mikrotik\agent.js'
+Error: Cannot find module 'C:\mikrotik\agente.js'
 ...
 Node.js v24.19.0
 ```
-Certifique-se de que o caminho 'C:\mikrotik\agent.js' está correto e que o arquivo existe.
+Certifique-se de que o caminho 'C:\mikrotik\agente.js' está correto e que o arquivo existe.

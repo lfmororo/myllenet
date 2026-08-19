@@ -103,13 +103,13 @@ sudo bash install.sh`}</Code>
             <Code>{`node agent.js`}</Code>
           </li>
           <li>
-            <strong>Dica de Erro:</strong> Se encontrar o erro <code>MODULE_NOT_FOUND</code>, certifique-se de que está na pasta correta e que o arquivo <code>agent.js</code> existe nela.
-            <Code>{`PS C:\\mikrotik> node agent.js
+            <strong>Dica de Erro:</strong> Se encontrar o erro <code>MODULE_NOT_FOUND</code>, certifique-se de que está na pasta correta e que o arquivo <code>agente.js</code> existe nela.
+            <Code>{`PS C:\\mikrotik> node agente.js
 
 node:internal/modules/cjs/loader:1520
   throw err;
   ^
-Error: Cannot find module 'C:\\mikrotik\\agent.js'
+Error: Cannot find module 'C:\\mikrotik\\agente.js'
 ...
 Node.js v24.19.0`}</Code>
           </li>
