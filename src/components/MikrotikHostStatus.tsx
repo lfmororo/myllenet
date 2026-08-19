@@ -3,10 +3,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Wifi, WifiOff, Clock, AlertCircle, History } from "lucide-react";
-import { format } from "date-fns";
+import { Wifi, WifiOff, Clock, AlertCircle, History, BarChart2 } from "lucide-react";
+import { format, subHours, isAfter } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell } from "recharts";
 
 interface HostStatus {
   host: string;
@@ -16,6 +17,11 @@ interface HostStatus {
   created_at?: string;
 }
 
+interface UptimePoint {
+  time: string;
+  online: number;
+}
+
 export function MikrotikHostStatus() {
   const [latestStatuses, setLatestStatuses] = useState<HostStatus[]>([]);
   const [history, setHistory] = useState<HostStatus[]>([]);
@@ -23,15 +29,17 @@ export function MikrotikHostStatus() {
 
   const fetchData = async () => {
     try {
-      // 1. Fetch latest status per host for the main view
-      const { data: latestData, error: latestError } = await supabase
+      // 1. Fetch history for all hosts
+      const { data, error } = await supabase
         .from("mikrotik_status_history")
         .select("host, online, logged_at, message")
-        .order("logged_at", { ascending: false });
+        .order("logged_at", { ascending: false })
+        .limit(200);
 
-      if (latestError) throw latestError;
+      if (error) throw error;
 
-      const latestByHost = latestData?.reduce((acc: HostStatus[], curr) => {
+      // Filter for latest status per host
+      const latestByHost = data?.reduce((acc: HostStatus[], curr) => {
         if (!acc.find((h) => h.host === curr.host)) {
           acc.push(curr);
         }
@@ -39,17 +47,7 @@ export function MikrotikHostStatus() {
       }, []);
 
       setLatestStatuses(latestByHost || []);
-
-      // 2. Fetch recent history for the evolution view
-      const { data: historyData, error: historyError } = await supabase
-        .from("mikrotik_status_history")
-        .select("host, online, logged_at, message")
-        .order("logged_at", { ascending: false })
-        .limit(50);
-
-      if (historyError) throw historyError;
-      setHistory(historyData || []);
-
+      setHistory(data || []);
     } catch (err) {
       console.error("Erro ao buscar status dos hosts:", err);
     } finally {
@@ -95,15 +93,73 @@ export function MikrotikHostStatus() {
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="current" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-4">
+          <TabsList className="grid w-full grid-cols-3 mb-4">
             <TabsTrigger value="current" className="flex items-center gap-2">
               <Wifi className="h-4 w-4" /> Status Atual
             </TabsTrigger>
+            <TabsTrigger value="uptime" className="flex items-center gap-2">
+              <BarChart2 className="h-4 w-4" /> Evolução de Uptime
+            </TabsTrigger>
             <TabsTrigger value="history" className="flex items-center gap-2">
-              <History className="h-4 w-4" /> Histórico de Verificações
+              <History className="h-4 w-4" /> Histórico
             </TabsTrigger>
           </TabsList>
           
+          <TabsContent value="uptime" className="space-y-6">
+            {latestStatuses.map((s) => {
+              const hostHistory = history
+                .filter(h => h.host === s.host)
+                .slice(0, 40)
+                .reverse()
+                .map(h => ({
+                  time: format(new Date(h.logged_at), "HH:mm", { locale: ptBR }),
+                  online: h.online ? 1 : 0,
+                  fullTime: format(new Date(h.logged_at), "HH:mm:ss", { locale: ptBR }),
+                  message: h.message
+                }));
+
+              return (
+                <div key={s.host} className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold flex items-center gap-2">
+                      <span className={`h-2 w-2 rounded-full ${s.online ? 'bg-success' : 'bg-destructive'}`} />
+                      {s.host}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">Últimas verificações</span>
+                  </div>
+                  <div className="h-16 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={hostHistory}>
+                        <Tooltip 
+                          content={({ active, payload }) => {
+                            if (active && payload && payload.length) {
+                              const data = payload[0].payload;
+                              return (
+                                <div className="bg-background border rounded p-2 shadow-sm text-[10px]">
+                                  <p className="font-bold">{data.fullTime}</p>
+                                  <p className={data.online ? "text-success" : "text-destructive"}>
+                                    {data.online ? "Online" : "Offline"}
+                                  </p>
+                                  <p className="text-muted-foreground max-w-[150px] truncate">{data.message}</p>
+                                </div>
+                              );
+                            }
+                            return null;
+                          }}
+                        />
+                        <Bar dataKey="online" radius={[2, 2, 0, 0]}>
+                          {hostHistory.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.online ? "#10b981" : "#ef4444"} fillOpacity={0.8} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              );
+            })}
+          </TabsContent>
+
           <TabsContent value="current">
             <Table>
               <TableHeader>
