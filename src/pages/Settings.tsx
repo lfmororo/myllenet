@@ -52,6 +52,8 @@ export default function Settings() {
   const [mikrotikApiPort, setMikrotikApiPort] = useState("8728");
   const [mikrotikRestPort, setMikrotikRestPort] = useState("80");
   const [blockingDays, setBlockingDays] = useState("15");
+  const [alertOfflineMinutes, setAlertOfflineMinutes] = useState("5");
+  const [alertFailureCount, setAlertFailureCount] = useState("3");
 
   const [savingMikrotik, setSavingMikrotik] = useState(false);
   const [generatingReport, setGeneratingReport] = useState(false);
@@ -177,7 +179,7 @@ export default function Settings() {
     const { data } = await supabase
       .from("settings")
       .select("key, value")
-      .in("key", ["efi_client_id", "efi_client_secret", "efi_certificate_path", "uazapi_token", "mikrotik_host", "mikrotik_host_secondary", "mikrotik_username", "mikrotik_password", "mikrotik_api_port", "mikrotik_rest_port", "blocking_days", "pix_key", "pix_name", "pix_city"]);
+      .in("key", ["efi_client_id", "efi_client_secret", "efi_certificate_path", "uazapi_token", "mikrotik_host", "mikrotik_host_secondary", "mikrotik_username", "mikrotik_password", "mikrotik_api_port", "mikrotik_rest_port", "blocking_days", "pix_key", "pix_name", "pix_city", "mikrotik_alert_offline_minutes", "mikrotik_alert_failure_count"]);
 
     if (data) {
       for (const row of data) {
@@ -195,6 +197,8 @@ export default function Settings() {
         if (row.key === "pix_key") setPixKey(row.value || "");
         if (row.key === "pix_name") setPixName(row.value || "");
         if (row.key === "pix_city") setPixCity(row.value || "");
+        if (row.key === "mikrotik_alert_offline_minutes") setAlertOfflineMinutes(row.value || "5");
+        if (row.key === "mikrotik_alert_failure_count") setAlertFailureCount(row.value || "3");
       }
     }
 
@@ -733,9 +737,35 @@ export default function Settings() {
                         placeholder="15"
                       />
                       <p className="text-xs text-muted-foreground">
-                        Permita que eu configure quantos dias após o vencimento o cliente deve ser bloqueado, por exemplo 15 dias, diretamente no painel de configurações.
+                        Configure quantos dias após o vencimento o cliente deve ser bloqueado.
                       </p>
                     </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="alert_offline_minutes">Minutos Offline p/ Alerta</Label>
+                        <Input
+                          id="alert_offline_minutes"
+                          type="number"
+                          min="1"
+                          value={alertOfflineMinutes}
+                          onChange={(e) => setAlertOfflineMinutes(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="alert_failure_count">Qtd. Falhas p/ Alerta</Label>
+                        <Input
+                          id="alert_failure_count"
+                          type="number"
+                          min="1"
+                          value={alertFailureCount}
+                          onChange={(e) => setAlertFailureCount(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      O sistema enviará alertas no WhatsApp se o Mikrotik ficar offline por este tempo ou atingir esta quantidade de falhas consecutivas.
+                    </p>
 
                     <Button
                       onClick={async () => {
@@ -748,10 +778,11 @@ export default function Settings() {
                           await upsertSetting("mikrotik_api_port", mikrotikApiPort);
                           await upsertSetting("mikrotik_rest_port", mikrotikRestPort);
                           await upsertSetting("blocking_days", blockingDays);
+                          await upsertSetting("mikrotik_alert_offline_minutes", alertOfflineMinutes);
+                          await upsertSetting("mikrotik_alert_failure_count", alertFailureCount);
                           toast.success("Configurações Mikrotik salvas!");
                         } catch (err: any) {
                           toast.error("Erro ao salvar: " + (err.message || "Erro desconhecido"));
-
                         }
                         setSavingMikrotik(false);
                       }}

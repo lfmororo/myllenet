@@ -18,23 +18,59 @@ Deno.serve(async (req) => {
 
     const ADMIN_PHONE = '85986801458'
 
-    // 1. Check Mikrotik Connection Alerts (3 minutes)
+    // 1. Check Mikrotik Connection Alerts with custom settings
+    const { data: thresholdData } = await supabase
+      .from('settings')
+      .select('value')
+      .eq('key', 'mikrotik_alert_offline_minutes')
+      .single()
+    
+    const { data: countData } = await supabase
+      .from('settings')
+      .select('value')
+      .eq('key', 'mikrotik_alert_failure_count')
+      .single()
+
+    const alertMinutes = parseInt(thresholdData?.value || '5')
+    const failureThreshold = parseInt(countData?.value || '3')
+    const timeThreshold = new Date(Date.now() - alertMinutes * 60 * 1000).toISOString()
+
     const { data: recentHistory } = await supabase
       .from('mikrotik_status_history')
       .select('*')
       .order('logged_at', { ascending: false })
-      .limit(5)
+      .limit(Math.max(10, failureThreshold))
 
-    if (recentHistory && recentHistory.length >= 3) {
-      const allOffline = recentHistory.slice(0, 3).every(h => !h.online)
-      if (allOffline) {
-        console.log("ALERT: Mikrotik Offline for > 3 minutes")
-        await supabase.functions.invoke('whatsapp-send/send-text', {
-          body: {
-            phone: ADMIN_PHONE,
-            message: `🚨 *ALERTA DE MONITORAMENTO* 🚨\n\nO servidor Mikrotik está *OFF-LINE* em todos os endereços configurados há mais de 3 minutos!\n\nÚltimo erro: ${recentHistory[0].message}`
+    if (recentHistory && recentHistory.length >= failureThreshold) {
+      const failures = recentHistory.slice(0, failureThreshold).filter(h => !h.online)
+      
+      if (failures.length >= failureThreshold) {
+        const firstFailure = recentHistory[failures.length - 1]
+        const isPersistent = new Date(firstFailure.logged_at).getTime() <= new Date(timeThreshold).getTime()
+
+        if (isPersistent) {
+          const alertType = 'mikrotik_global_offline'
+          const { data: alreadyAlerted } = await supabase
+            .from('customer_alerts_sent')
+            .select('id')
+            .eq('alert_type', alertType)
+            .gt('sent_at', new Date(Date.now() - 60 * 60 * 1000).toISOString())
+            .single()
+
+          if (!alreadyAlerted) {
+            console.log(`ALERT: Mikrotik Offline for > ${alertMinutes} minutes and ${failureThreshold} failures`)
+            await supabase.functions.invoke('whatsapp-send/send-text', {
+              body: {
+                phone: ADMIN_PHONE,
+                message: `🚨 *ALERTA DE MONITORAMENTO* 🚨\n\nO servidor Mikrotik está *OFF-LINE* há mais de ${alertMinutes} minutos e atingiu ${failureThreshold} falhas consecutivas!\n\nÚltimo erro: ${recentHistory[0].message}`
+              }
+            })
+            await supabase.from('customer_alerts_sent').insert({
+              alert_type: alertType,
+              sent_at: new Date().toISOString()
+            })
           }
-        })
+        }
       }
     }
 
@@ -227,6 +263,7 @@ Deno.serve(async (req) => {
           })
         }
       }
+    }
     
     // 6. Check WAN Speed Alerts
     const { data: thresholdData } = await supabase
