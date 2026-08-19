@@ -103,6 +103,13 @@ sudo bash install.sh`}</Code>
             <Code>{`node agente.js`}</Code>
           </li>
           <li>
+            <strong>Exemplo de log de sucesso:</strong>
+            <Code>{`PS C:\\mikrotik> node agente.js
+
+[2026-08-19T17:57:19.793Z] Agente iniciado. Hosts: 206.42.25.226, 91620999d805.sn.mynetname.net | intervalo: 30s
+[2026-08-19T17:57:34.027Z] Enviado (1 amostra(s)) → {"success":true,"agent":"vps-monitoramento","wan":2,"pppoe":39,"status":1,"unknown_pppoe":[]}`}</Code>
+          </li>
+          <li>
             <strong>Dica de Erro:</strong> Se encontrar o erro <code>MODULE_NOT_FOUND</code>, certifique-se de que está na pasta correta e que o arquivo <code>agente.js</code> existe nela.
             <Code>{`PS C:\\mikrotik> node agente.js
 
