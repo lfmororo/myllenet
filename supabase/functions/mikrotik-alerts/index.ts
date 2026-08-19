@@ -263,6 +263,7 @@ Deno.serve(async (req) => {
           })
         }
       }
+    }
     
     // 6. Check WAN Speed Alerts
     const { data: thresholdData } = await supabase
