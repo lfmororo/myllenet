@@ -14,11 +14,7 @@ interface HostStatus {
   online: boolean;
   logged_at: string;
   message: string;
-  diagnostics?: {
-    duration?: number;
-    error?: string;
-    status?: number;
-  };
+  diagnostics?: any;
   created_at?: string;
 }
 
