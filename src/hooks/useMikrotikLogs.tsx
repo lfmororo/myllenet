@@ -66,7 +66,7 @@ export const useMikrotikLogs = () => {
       
       // Ordenar por data e pegar os últimos 60 pontos
       const sorted = Object.values(grouped).sort((a: any, b: any) => a.fullDate.getTime() - b.fullDate.getTime());
-      setWanLogs(sorted.slice(-60));
+      setWanLogs(sorted);
     }
     setLoading(false);
   };
