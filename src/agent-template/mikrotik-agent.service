@@ -6,7 +6,7 @@ Wants=network-online.target
 [Service]
 Type=simple
 WorkingDirectory=__AGENT_DIR__
-ExecStart=__NODE_BIN__ __AGENT_DIR__/agent.js
+ExecStart=__NODE_BIN__ __AGENT_DIR__/agente.js
 Restart=always
 RestartSec=10
 StandardOutput=journal
