@@ -30,9 +30,13 @@ export const useMikrotikLogs = () => {
       const grouped: Record<string, any> = {};
       data.forEach((log: any) => {
         const dateObj = new Date(log.created_at);
-        const time = dateObj.toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        // Usamos uma chave de tempo com precisão de 30 segundos para agrupar logs do agente que podem variar ligeiramente
+        const seconds = dateObj.getSeconds();
+        const roundedSeconds = seconds < 30 ? "00" : "30";
+        const timeKey = dateObj.toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit' }) + ":" + roundedSeconds;
+        const displayTime = dateObj.toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         
-        if (!grouped[time]) grouped[time] = { time, fullDate: dateObj };
+        if (!grouped[timeKey]) grouped[timeKey] = { time: displayTime, fullDate: dateObj };
         
         // Limite de sanidade: descarta picos irreais (>2 Gbps) vindos de contadores resetados ou erro de relatório
         const clamp = (mbps: number) => (!isFinite(mbps) || mbps < 0 || mbps > 2000 ? 0 : mbps);
@@ -49,8 +53,15 @@ export const useMikrotikLogs = () => {
         }
         
         const iface = log.interface_name;
-        grouped[time][`${iface} ↓`] = clamp(calculatedDownload);
-        grouped[time][`${iface} ↑`] = clamp(Number(log.tx_bps || 0) / 1_000_000);
+        // Prioritize data: if we already have a value for this interface in this time slot, don't overwrite if it's 0
+        const currentDownload = grouped[timeKey][`${iface} ↓`] || 0;
+        const currentUpload = grouped[timeKey][`${iface} ↑`] || 0;
+
+        const newDownload = clamp(calculatedDownload);
+        const newUpload = clamp(Number(log.tx_bps || 0) / 1_000_000);
+
+        if (newDownload > currentDownload) grouped[timeKey][`${iface} ↓`] = newDownload;
+        if (newUpload > currentUpload) grouped[timeKey][`${iface} ↑`] = newUpload;
       });
       
       // Ordenar por data e pegar os últimos 60 pontos

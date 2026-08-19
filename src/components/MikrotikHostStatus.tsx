@@ -73,7 +73,7 @@ export function MikrotikHostStatus() {
           <Wifi className="h-5 w-5" /> Status dos Hosts (Agente VPS)
         </CardTitle>
         <CardDescription>
-          Status de conectividade em tempo real reportado pelo agente para cada host configurado.
+          Logs recentes de conectividade reportados pela nuvem ou pelo Agente VPS.
         </CardDescription>
       </CardHeader>
       <CardContent>
