@@ -52,6 +52,8 @@ export default function Settings() {
   const [mikrotikApiPort, setMikrotikApiPort] = useState("8728");
   const [mikrotikRestPort, setMikrotikRestPort] = useState("80");
   const [blockingDays, setBlockingDays] = useState("15");
+  const [alertOfflineMinutes, setAlertOfflineMinutes] = useState("5");
+  const [alertFailureCount, setAlertFailureCount] = useState("3");
 
   const [savingMikrotik, setSavingMikrotik] = useState(false);
   const [generatingReport, setGeneratingReport] = useState(false);
