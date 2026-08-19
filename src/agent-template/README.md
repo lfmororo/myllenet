@@ -32,7 +32,7 @@ systemctl restart mikrotik-agent     # reiniciar após editar o .env
 ## Teste manual
 
 ```bash
-node agent.js
+node agente.js
 ```
 
 ## Configuração (.env)
