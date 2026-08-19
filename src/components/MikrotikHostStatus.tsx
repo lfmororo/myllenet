@@ -95,8 +95,15 @@ export function MikrotikHostStatus() {
               </TableRow>
             ) : (
               statuses.map((s) => (
-                <TableRow key={s.host}>
-                  <TableCell className="font-medium">{s.host}</TableCell>
+                <TableRow key={s.host + s.logged_at} className={s.message?.includes('Agente') ? "bg-primary/5" : ""}>
+                  <TableCell className="font-medium flex items-center gap-2">
+                    {s.host}
+                    {s.message?.includes('Agente') && (
+                      <Badge variant="outline" className="text-[9px] h-4 py-0 bg-primary/10 text-primary border-primary/20">
+                        VPS
+                      </Badge>
+                    )}
+                  </TableCell>
                   <TableCell>
                     {s.online ? (
                       <Badge className="bg-success/15 text-success hover:bg-success/15 flex w-fit items-center gap-1">
