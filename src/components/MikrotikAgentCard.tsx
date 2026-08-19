@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Download, Plus, Trash2, Server, RefreshCw } from "lucide-react";
 
-import agentJs from "@/agent-template/agent.js?raw";
+import agentJs from "@/agent-template/agente.js?raw";
 import agentPkg from "@/agent-template/package.json?raw";
 import agentReadme from "@/agent-template/README.md?raw";
 import agentInstall from "@/agent-template/install.sh?raw";
@@ -119,7 +119,7 @@ export function MikrotikAgentCard() {
 
       const zip = new JSZip();
       const folder = zip.folder("mikrotik-agent")!;
-      folder.file("agent.js", agentJs);
+      folder.file("agente.js", agentJs);
       folder.file("package.json", agentPkg);
       folder.file("README.md", agentReadme);
       folder.file("install.sh", agentInstall);

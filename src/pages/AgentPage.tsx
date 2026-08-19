@@ -100,16 +100,16 @@ sudo bash install.sh`}</Code>
           <li>Extraia o pacote em uma pasta (ex: <code>C:\mikrotik</code>).</li>
           <li>
             Abra o <strong>PowerShell</strong> como Administrador, navegue até a pasta e execute:
-            <Code>{`node agent.js`}</Code>
+            <Code>{`node agente.js`}</Code>
           </li>
           <li>
-            <strong>Dica de Erro:</strong> Se encontrar o erro <code>MODULE_NOT_FOUND</code>, certifique-se de que está na pasta correta e que o arquivo <code>agent.js</code> existe nela.
-            <Code>{`PS C:\\mikrotik> node agent.js
+            <strong>Dica de Erro:</strong> Se encontrar o erro <code>MODULE_NOT_FOUND</code>, certifique-se de que está na pasta correta e que o arquivo <code>agente.js</code> existe nela.
+            <Code>{`PS C:\\mikrotik> node agente.js
 
 node:internal/modules/cjs/loader:1520
   throw err;
   ^
-Error: Cannot find module 'C:\\mikrotik\\agent.js'
+Error: Cannot find module 'C:\\mikrotik\\agente.js'
 ...
 Node.js v24.19.0`}</Code>
           </li>
@@ -117,7 +117,7 @@ Node.js v24.19.0`}</Code>
             Para instalar como serviço permanente, use o utilitário <code>qckwinsvc</code>:
             <Code>{`npm install -g qckwinsvc
 qckwinsvc`}</Code>
-            Aponte para o arquivo <code>agent.js</code> na pasta extraída.
+            Aponte para o arquivo <code>agente.js</code> na pasta extraída.
           </li>
         </ul>
         <p className="text-xs text-muted-foreground">
