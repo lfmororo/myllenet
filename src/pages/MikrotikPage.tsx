@@ -589,7 +589,7 @@ export default function MikrotikPage() {
             <ResponsiveContainer width="100%" height={320}>
               <BarChart data={hourlyData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" vertical={false} />
-                <XAxis dataKey="hour" className="text-xs" />
+                <XAxis dataKey={dateRange === "today" ? "hour" : "dayHourKey"} className="text-xs" tickFormatter={(v) => dateRange === "today" ? v : format(new Date(v), "dd/MM HH:mm")} />
                 <YAxis
                   className="text-xs"
                   width={64}
