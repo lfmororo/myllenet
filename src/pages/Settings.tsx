@@ -197,6 +197,8 @@ export default function Settings() {
         if (row.key === "pix_key") setPixKey(row.value || "");
         if (row.key === "pix_name") setPixName(row.value || "");
         if (row.key === "pix_city") setPixCity(row.value || "");
+        if (row.key === "mikrotik_alert_offline_minutes") setAlertOfflineMinutes(row.value || "5");
+        if (row.key === "mikrotik_alert_failure_count") setAlertFailureCount(row.value || "3");
       }
     }
 
