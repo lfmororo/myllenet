@@ -240,7 +240,9 @@ export default function MikrotikPage() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Mikrotik - Gestão</h2>
-          <p className="text-muted-foreground">O Mikrotik realiza testes de velocidade e monitoramento das WANs periodicamente. Se houver falha de conexão, verifique se o serviço WWW está habilitado e as portas liberadas no firewall.</p>
+          <p className="text-sm text-muted-foreground">
+            O Mikrotik é monitorado via Cloud (Direto) ou através do Agente VPS instalado no seu servidor.
+          </p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={downloadMikrotikScript} disabled={exporting}>
@@ -274,7 +276,19 @@ export default function MikrotikPage() {
       <div className="grid gap-6 md:grid-cols-5">
         <Card className={`border-l-4 ${status?.online ? "border-l-success" : "border-l-destructive"}`}>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Status do IP Externo</CardTitle>
+            <CardTitle className="text-sm font-medium flex items-center justify-between">
+              Status Geral
+              {status?.source === 'agent' && (
+                <Badge variant="outline" className="text-[10px] h-5 bg-primary/5 text-primary border-primary/20">
+                  Via Agente
+                </Badge>
+              )}
+              {status?.source === 'direct' && (
+                <Badge variant="outline" className="text-[10px] h-5 bg-success/5 text-success border-success/20">
+                  Nuvem Direta
+                </Badge>
+              )}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-2">
@@ -283,17 +297,12 @@ export default function MikrotikPage() {
               </span>
             </div>
             {status?.message && (
-              <p className="text-xs text-muted-foreground mt-2">{status.message}</p>
+              <p className="text-[10px] text-muted-foreground mt-2 leading-tight">{status.message}</p>
             )}
-            {status?.updateAvailable && (
-              <div className="mt-3 p-2 bg-warning/10 border border-warning/20 rounded-md">
-                <p className="text-[10px] font-bold text-warning flex items-center gap-1">
-                  <ArrowUpCircle className="h-3 w-3" />
-                  Atualização Disponível: {status.latestVersion}
-                </p>
-                <p className="text-[9px] text-muted-foreground mt-1">
-                  Firmware atual: {status.version}
-                </p>
+            {status?.source === 'agent' && !loading && (
+              <div className="mt-2 flex items-center gap-1 text-[9px] text-primary font-medium">
+                <Server className="h-3 w-3" />
+                Métricas fornecidas pelo Agente VPS
               </div>
             )}
           </CardContent>
@@ -348,7 +357,7 @@ export default function MikrotikPage() {
           <CardContent>
             <div className="flex flex-col gap-1">
               <span className="text-2xl font-bold">{status?.activeUsers ?? "—"}</span>
-              <p className="text-[10px] text-muted-foreground">{customers.filter(c => c.ativo).length} cadastrados</p>
+              <p className="text-[10px] text-muted-foreground">{customers.filter(c => c.ativo).length} cadastrados {status?.source === 'agent' ? '(Agente)' : ''}</p>
             </div>
           </CardContent>
         </Card>

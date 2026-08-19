@@ -130,7 +130,6 @@ Deno.serve(async (req) => {
 
       const currentOpenPorts = probePorts.filter((p) => openMap.get(p))
       
-      // Only proceed with this host if it has open ports OR if it's the primary host (to report unreachable if all fail)
       if (currentOpenPorts.length === 0 && host !== hosts[0]) continue
 
       if (openMap.get(apiPort)) apiOpen = true
@@ -207,7 +206,6 @@ Deno.serve(async (req) => {
                 .limit(wanInterfaces.length * 10)
 
               const now = Date.now()
-              const MAX_BPS = 1_000_000_000
               const MAX_AGE_SECS = 300
               const rows = wanInterfaces.map(i => {
                 const rxBytes = parseInt(i['rx-byte'] ?? '0', 10) || 0
@@ -311,8 +309,7 @@ Deno.serve(async (req) => {
               }
             })
           }
-          }
-          
+        
           let updateAvailable = false
           let latestVersion = null
           if (updates.ok && updates.data) {
@@ -322,19 +319,62 @@ Deno.serve(async (req) => {
               latestVersion = u['latest-version']
             }
           }
+        }
       }
     }
 
-    const online = restOk || reachable
+    let online = restOk || reachable
+    let source: 'direct' | 'agent' | 'offline' = online ? 'direct' : 'offline'
+
+    if (!online) {
+      const twoMinAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString()
+      const { data: activeAgents } = await supabase
+        .from('agent_tokens')
+        .select('name, last_seen_at')
+        .eq('active', true)
+        .gt('last_seen_at', twoMinAgo)
+        .limit(1)
+
+      if (activeAgents && activeAgents.length > 0) {
+        online = true
+        source = 'agent'
+        const { data: latestMetrics } = await supabase
+          .from('wan_logs')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(1)
+
+        if (latestMetrics && latestMetrics.length > 0) {
+          const m = latestMetrics[0]
+          cpuLoad = m.cpu_load
+          freeMemory = m.free_memory
+          totalMemory = m.total_memory
+          temperature = m.temperature
+        }
+        
+        const { data: activePppoe } = await supabase
+          .from('pppoe_logs')
+          .select('usuario_pppoe')
+          .gt('logged_at', twoMinAgo)
+          
+        activeUsers = activePppoe?.length || 0
+      }
+    }
 
     let message: string
-    if (restOk) message = `Conectado via API REST no host ${connectedHost} (porta ${restPort})`
-    else if (authFailed) message = 'API REST respondeu, mas usuário/senha foram rejeitados (401)'
-    else if (reachable) message = 'A API REST do Mikrotik não respondeu.'
-    else message = 'Não foi possível alcançar o Mikrotik em nenhum dos IPs configurados'
+    if (source === 'direct') {
+      if (restOk) message = `Conectado via API REST no host ${connectedHost} (porta ${restPort})`
+      else if (authFailed) message = 'API REST respondeu, mas usuário/senha foram rejeitados (401)'
+      else message = 'Conectado (apenas Ping/TCP), API REST não respondeu'
+    } else if (source === 'agent') {
+      message = 'Conectado via Agente VPS (Conexão direta indisponível)'
+    } else {
+      message = 'Não foi possível alcançar o Mikrotik (Direto ou Agente)'
+    }
 
     const responseData = {
       online,
+      source,
       host: connectedHost,
       restApi: restOk,
       restPort,
@@ -351,8 +391,8 @@ Deno.serve(async (req) => {
       activeUsers,
       activeList,
       wans,
-      updateAvailable,
-      latestVersion,
+      // updateAvailable, // Not used in this response type context
+      // latestVersion,  // Not used in this response type context
       message,
     }
 
