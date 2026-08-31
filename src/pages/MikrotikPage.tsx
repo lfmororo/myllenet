@@ -149,6 +149,57 @@ export default function MikrotikPage() {
           script += `:if ([:len [/ppp secret find name="${customer.usuario_pppoe}"]] = 0) do={ add name="${customer.usuario_pppoe}" password="${customer.senha_pppoe}" profile="${planName}" service=pppoe comment="${customer.nome} - CPF: ${customer.cpf}" }\n`;
         }
       });
+
+      // ===== Balanceamento PCC + Anti-Bufferbloat (CAKE) =====
+      script += `
+# ========================================================
+# 1. LISTAS DE ENDERECOS LOCAIS (BYPASS)
+# ========================================================
+/ip firewall address-list
+:if ([:len [find list=REDE_LOCAL address=10.10.10.0/24]] = 0) do={ add address=10.10.10.0/24 list=REDE_LOCAL }
+:if ([:len [find list=REDE_LOCAL address=192.168.0.0/16]] = 0) do={ add address=192.168.0.0/16 list=REDE_LOCAL }
+:if ([:len [find list=REDE_LOCAL address=10.0.0.0/8]] = 0) do={ add address=10.0.0.0/8 list=REDE_LOCAL }
+
+# ========================================================
+# 2. BALANCEAMENTO PCC OTIMIZADO (PERSISTENCIA POR IP)
+# ========================================================
+# src-address evita quebra de sessoes em CDN de streaming e bancos
+# Ajuste os nomes das interfaces se necessario (bridge-lan / pppoe-out1 / pppoe-out2)
+/ip firewall mangle
+:if ([:len [find comment="MYLLENET-PCC-LOCAL"]] = 0) do={ add chain=prerouting dst-address-list=REDE_LOCAL action=accept comment="MYLLENET-PCC-LOCAL" }
+:if ([:len [find comment="MYLLENET-PCC-IN1"]] = 0) do={ add chain=prerouting in-interface=pppoe-out1 connection-state=new action=mark-connection new-connection-mark=WAN1_CONN passthrough=yes comment="MYLLENET-PCC-IN1" }
+:if ([:len [find comment="MYLLENET-PCC-IN2"]] = 0) do={ add chain=prerouting in-interface=pppoe-out2 connection-state=new action=mark-connection new-connection-mark=WAN2_CONN passthrough=yes comment="MYLLENET-PCC-IN2" }
+:if ([:len [find comment="MYLLENET-PCC-CL1"]] = 0) do={ add chain=prerouting in-interface=bridge-lan connection-state=new dst-address-type=!local dst-address-list=!REDE_LOCAL per-connection-classifier=src-address:2/0 action=mark-connection new-connection-mark=WAN1_CONN passthrough=yes comment="MYLLENET-PCC-CL1" }
+:if ([:len [find comment="MYLLENET-PCC-CL2"]] = 0) do={ add chain=prerouting in-interface=bridge-lan connection-state=new dst-address-type=!local dst-address-list=!REDE_LOCAL per-connection-classifier=src-address:2/1 action=mark-connection new-connection-mark=WAN2_CONN passthrough=yes comment="MYLLENET-PCC-CL2" }
+:if ([:len [find comment="MYLLENET-PCC-RT1"]] = 0) do={ add chain=prerouting in-interface=bridge-lan connection-mark=WAN1_CONN action=mark-routing new-routing-mark=to_WAN1 passthrough=yes comment="MYLLENET-PCC-RT1" }
+:if ([:len [find comment="MYLLENET-PCC-RT2"]] = 0) do={ add chain=prerouting in-interface=bridge-lan connection-mark=WAN2_CONN action=mark-routing new-routing-mark=to_WAN2 passthrough=yes comment="MYLLENET-PCC-RT2" }
+:if ([:len [find comment="MYLLENET-PCC-OUT1"]] = 0) do={ add chain=output connection-mark=WAN1_CONN action=mark-routing new-routing-mark=to_WAN1 passthrough=yes comment="MYLLENET-PCC-OUT1" }
+:if ([:len [find comment="MYLLENET-PCC-OUT2"]] = 0) do={ add chain=output connection-mark=WAN2_CONN action=mark-routing new-routing-mark=to_WAN2 passthrough=yes comment="MYLLENET-PCC-OUT2" }
+
+# ========================================================
+# 3. CONTROLE ANTI-BUFFERBLOAT COM CAKE (ROUTEROS v7)
+# ========================================================
+/queue type
+:if ([:len [find name=cake-download]] = 0) do={ add name=cake-download kind=cake cake-flowmode=dual-dsthost cake-memlimit=32M cake-nat=yes }
+:if ([:len [find name=cake-upload]] = 0) do={ add name=cake-upload kind=cake cake-flowmode=dual-srchost cake-memlimit=32M cake-nat=yes }
+
+# Substitua os max-limit pela velocidade REAL de cada link (~95% do contratado)
+/queue tree
+:if ([:len [find name=Q-Download-WAN1]] = 0) do={ add name=Q-Download-WAN1 parent=bridge-lan packet-mark="" queue=cake-download max-limit=95M }
+:if ([:len [find name=Q-Upload-WAN1]] = 0) do={ add name=Q-Upload-WAN1 parent=pppoe-out1 packet-mark="" queue=cake-upload max-limit=48M }
+:if ([:len [find name=Q-Download-WAN2]] = 0) do={ add name=Q-Download-WAN2 parent=bridge-lan packet-mark="" queue=cake-download max-limit=95M }
+:if ([:len [find name=Q-Upload-WAN2]] = 0) do={ add name=Q-Upload-WAN2 parent=pppoe-out2 packet-mark="" queue=cake-upload max-limit=48M }
+
+# ========================================================
+# 4. CONTROLE DE BANDA INDIVIDUAL POR PERFIL PPPOE
+# ========================================================
+`;
+      plans.forEach(plan => {
+        const speed = plan.nome.match(/\d+/)?.[0] || "10";
+        const up = Math.max(1, Math.round(Number(speed) / 2));
+        script += `/ppp profile set [find name="${plan.nome}"] rate-limit=${speed}M/${up}M\n`;
+      });
+
       const blob = new Blob([script], { type: "text/plain" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
