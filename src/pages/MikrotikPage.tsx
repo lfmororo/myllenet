@@ -133,20 +133,30 @@ export default function MikrotikPage() {
         return;
       }
       let script = "# Mikrotik Import Script - Myllenet\n";
-      script += "# Generated on: " + new Date().toLocaleString() + "\n\n";
-      script += "/ip pool\n:if ([:len [/ip pool find name=pppoe-pool]] = 0) do={ add name=pppoe-pool ranges=10.0.0.10-10.0.3.254 }\n\n";
-      script += "/ip dns\nset servers=8.8.8.8,8.8.4.4 allow-remote-requests=yes\n\n";
-      script += "/ppp profile\n:if ([:len [/ppp profile find name=myllenet-default]] = 0) do={ add name=myllenet-default local-address=10.0.0.1 remote-address=pppoe-pool dns-server=8.8.8.8,8.8.4.4 }\n\n";
-      script += "/interface pppoe-server server\n:if ([:len [/interface pppoe-server server find service-name=pppoe-myllenet]] = 0) do={ add authentication=pap,chap,mschap1,mschap2 disabled=no interface=ether2 service-name=pppoe-myllenet one-session-per-host=yes }\n\n";
+      script += "# Generated on: " + new Date().toLocaleString() + "\n";
+      script += "# Cole linha por linha no terminal ou importe com: /import file=arquivo.rsc\n\n";
+
+      script += "# ========================================================\n";
+      script += "# 0. POOL / DNS / PERFIS / SERVIDOR PPPOE\n";
+      script += "# ========================================================\n";
+      script += ':if ([:len [/ip pool find name=pppoe-pool]] = 0) do={ /ip pool add name=pppoe-pool ranges=10.0.0.10-10.0.3.254 }\n';
+      script += "/ip dns set servers=8.8.8.8,8.8.4.4 allow-remote-requests=yes\n";
+      script += ':if ([:len [/ppp profile find name="myllenet-default"]] = 0) do={ /ppp profile add name="myllenet-default" local-address=10.0.0.1 remote-address=pppoe-pool dns-server=8.8.8.8,8.8.4.4 }\n';
       plans.forEach(plan => {
         const speed = plan.nome.match(/\d+/)?.[0] || "10";
-        script += `:if ([:len [/ppp profile find name="${plan.nome}"]] = 0) do={ add name="${plan.nome}" local-address=10.0.0.1 remote-address=pppoe-pool rate-limit="${speed}M/${speed}M" dns-server=8.8.8.8,8.8.4.4 }\n`;
+        const up = Math.max(1, Math.round(Number(speed) / 2));
+        script += `:if ([:len [/ppp profile find name="${plan.nome}"]] = 0) do={ /ppp profile add name="${plan.nome}" local-address=10.0.0.1 remote-address=pppoe-pool rate-limit="${speed}M/${up}M" dns-server=8.8.8.8,8.8.4.4 } else={ /ppp profile set [/ppp profile find name="${plan.nome}"] rate-limit="${speed}M/${up}M" }\n`;
       });
-      script += "\n/ppp secret\n";
+      script += '\n# Servidor PPPoE (ajuste a interface se necessario)\n';
+      script += ':if ([:len [/interface pppoe-server server find service-name="pppoe-myllenet"]] = 0) do={ /interface pppoe-server server add authentication=pap,chap,mschap1,mschap2 disabled=no interface=ether2 service-name="pppoe-myllenet" one-session-per-host=yes default-profile="myllenet-default" }\n';
+
+      script += "\n# ========================================================\n";
+      script += "# 0.1 USUARIOS PPPOE (CLIENTES ATIVOS)\n";
+      script += "# ========================================================\n";
       customers.forEach(customer => {
         if (customer.ativo && customer.usuario_pppoe) {
           const planName = plans.find(p => p.id === customer.plan_id)?.nome || "myllenet-default";
-          script += `:if ([:len [/ppp secret find name="${customer.usuario_pppoe}"]] = 0) do={ add name="${customer.usuario_pppoe}" password="${customer.senha_pppoe}" profile="${planName}" service=pppoe comment="${customer.nome} - CPF: ${customer.cpf}" }\n`;
+          script += `:if ([:len [/ppp secret find name="${customer.usuario_pppoe}"]] = 0) do={ /ppp secret add name="${customer.usuario_pppoe}" password="${customer.senha_pppoe}" profile="${planName}" service=pppoe comment="${customer.nome} - CPF: ${customer.cpf}" }\n`;
         }
       });
 
@@ -155,50 +165,36 @@ export default function MikrotikPage() {
 # ========================================================
 # 1. LISTAS DE ENDERECOS LOCAIS (BYPASS)
 # ========================================================
-/ip firewall address-list
-:if ([:len [find list=REDE_LOCAL address=10.10.10.0/24]] = 0) do={ add address=10.10.10.0/24 list=REDE_LOCAL }
-:if ([:len [find list=REDE_LOCAL address=192.168.0.0/16]] = 0) do={ add address=192.168.0.0/16 list=REDE_LOCAL }
-:if ([:len [find list=REDE_LOCAL address=10.0.0.0/8]] = 0) do={ add address=10.0.0.0/8 list=REDE_LOCAL }
+:if ([:len [/ip firewall address-list find list=REDE_LOCAL address=10.10.10.0/24]] = 0) do={ /ip firewall address-list add address=10.10.10.0/24 list=REDE_LOCAL }
+:if ([:len [/ip firewall address-list find list=REDE_LOCAL address=192.168.0.0/16]] = 0) do={ /ip firewall address-list add address=192.168.0.0/16 list=REDE_LOCAL }
+:if ([:len [/ip firewall address-list find list=REDE_LOCAL address=10.0.0.0/8]] = 0) do={ /ip firewall address-list add address=10.0.0.0/8 list=REDE_LOCAL }
 
 # ========================================================
 # 2. BALANCEAMENTO PCC OTIMIZADO (PERSISTENCIA POR IP)
 # ========================================================
-# src-address evita quebra de sessoes em CDN de streaming e bancos
 # Ajuste os nomes das interfaces se necessario (bridge-lan / pppoe-out1 / pppoe-out2)
-/ip firewall mangle
-:if ([:len [find comment="MYLLENET-PCC-LOCAL"]] = 0) do={ add chain=prerouting dst-address-list=REDE_LOCAL action=accept comment="MYLLENET-PCC-LOCAL" }
-:if ([:len [find comment="MYLLENET-PCC-IN1"]] = 0) do={ add chain=prerouting in-interface=pppoe-out1 connection-state=new action=mark-connection new-connection-mark=WAN1_CONN passthrough=yes comment="MYLLENET-PCC-IN1" }
-:if ([:len [find comment="MYLLENET-PCC-IN2"]] = 0) do={ add chain=prerouting in-interface=pppoe-out2 connection-state=new action=mark-connection new-connection-mark=WAN2_CONN passthrough=yes comment="MYLLENET-PCC-IN2" }
-:if ([:len [find comment="MYLLENET-PCC-CL1"]] = 0) do={ add chain=prerouting in-interface=bridge-lan connection-state=new dst-address-type=!local dst-address-list=!REDE_LOCAL per-connection-classifier=src-address:2/0 action=mark-connection new-connection-mark=WAN1_CONN passthrough=yes comment="MYLLENET-PCC-CL1" }
-:if ([:len [find comment="MYLLENET-PCC-CL2"]] = 0) do={ add chain=prerouting in-interface=bridge-lan connection-state=new dst-address-type=!local dst-address-list=!REDE_LOCAL per-connection-classifier=src-address:2/1 action=mark-connection new-connection-mark=WAN2_CONN passthrough=yes comment="MYLLENET-PCC-CL2" }
-:if ([:len [find comment="MYLLENET-PCC-RT1"]] = 0) do={ add chain=prerouting in-interface=bridge-lan connection-mark=WAN1_CONN action=mark-routing new-routing-mark=to_WAN1 passthrough=yes comment="MYLLENET-PCC-RT1" }
-:if ([:len [find comment="MYLLENET-PCC-RT2"]] = 0) do={ add chain=prerouting in-interface=bridge-lan connection-mark=WAN2_CONN action=mark-routing new-routing-mark=to_WAN2 passthrough=yes comment="MYLLENET-PCC-RT2" }
-:if ([:len [find comment="MYLLENET-PCC-OUT1"]] = 0) do={ add chain=output connection-mark=WAN1_CONN action=mark-routing new-routing-mark=to_WAN1 passthrough=yes comment="MYLLENET-PCC-OUT1" }
-:if ([:len [find comment="MYLLENET-PCC-OUT2"]] = 0) do={ add chain=output connection-mark=WAN2_CONN action=mark-routing new-routing-mark=to_WAN2 passthrough=yes comment="MYLLENET-PCC-OUT2" }
+:if ([:len [/ip firewall mangle find comment="MYLLENET-PCC-LOCAL"]] = 0) do={ /ip firewall mangle add chain=prerouting dst-address-list=REDE_LOCAL action=accept comment="MYLLENET-PCC-LOCAL" }
+:if ([:len [/ip firewall mangle find comment="MYLLENET-PCC-IN1"]] = 0) do={ /ip firewall mangle add chain=prerouting in-interface=pppoe-out1 connection-state=new action=mark-connection new-connection-mark=WAN1_CONN passthrough=yes comment="MYLLENET-PCC-IN1" }
+:if ([:len [/ip firewall mangle find comment="MYLLENET-PCC-IN2"]] = 0) do={ /ip firewall mangle add chain=prerouting in-interface=pppoe-out2 connection-state=new action=mark-connection new-connection-mark=WAN2_CONN passthrough=yes comment="MYLLENET-PCC-IN2" }
+:if ([:len [/ip firewall mangle find comment="MYLLENET-PCC-CL1"]] = 0) do={ /ip firewall mangle add chain=prerouting in-interface=bridge-lan connection-state=new dst-address-type=!local dst-address-list=!REDE_LOCAL per-connection-classifier=src-address:2/0 action=mark-connection new-connection-mark=WAN1_CONN passthrough=yes comment="MYLLENET-PCC-CL1" }
+:if ([:len [/ip firewall mangle find comment="MYLLENET-PCC-CL2"]] = 0) do={ /ip firewall mangle add chain=prerouting in-interface=bridge-lan connection-state=new dst-address-type=!local dst-address-list=!REDE_LOCAL per-connection-classifier=src-address:2/1 action=mark-connection new-connection-mark=WAN2_CONN passthrough=yes comment="MYLLENET-PCC-CL2" }
+:if ([:len [/ip firewall mangle find comment="MYLLENET-PCC-RT1"]] = 0) do={ /ip firewall mangle add chain=prerouting in-interface=bridge-lan connection-mark=WAN1_CONN action=mark-routing new-routing-mark=to_WAN1 passthrough=yes comment="MYLLENET-PCC-RT1" }
+:if ([:len [/ip firewall mangle find comment="MYLLENET-PCC-RT2"]] = 0) do={ /ip firewall mangle add chain=prerouting in-interface=bridge-lan connection-mark=WAN2_CONN action=mark-routing new-routing-mark=to_WAN2 passthrough=yes comment="MYLLENET-PCC-RT2" }
+:if ([:len [/ip firewall mangle find comment="MYLLENET-PCC-OUT1"]] = 0) do={ /ip firewall mangle add chain=output connection-mark=WAN1_CONN action=mark-routing new-routing-mark=to_WAN1 passthrough=yes comment="MYLLENET-PCC-OUT1" }
+:if ([:len [/ip firewall mangle find comment="MYLLENET-PCC-OUT2"]] = 0) do={ /ip firewall mangle add chain=output connection-mark=WAN2_CONN action=mark-routing new-routing-mark=to_WAN2 passthrough=yes comment="MYLLENET-PCC-OUT2" }
 
 # ========================================================
 # 3. CONTROLE ANTI-BUFFERBLOAT COM CAKE (ROUTEROS v7)
 # ========================================================
-/queue type
-:if ([:len [find name=cake-download]] = 0) do={ add name=cake-download kind=cake cake-flowmode=dual-dsthost cake-memlimit=32M cake-nat=yes }
-:if ([:len [find name=cake-upload]] = 0) do={ add name=cake-upload kind=cake cake-flowmode=dual-srchost cake-memlimit=32M cake-nat=yes }
+:if ([:len [/queue type find name=cake-download]] = 0) do={ /queue type add name=cake-download kind=cake cake-flowmode=dual-dsthost cake-memlimit=32M cake-nat=yes }
+:if ([:len [/queue type find name=cake-upload]] = 0) do={ /queue type add name=cake-upload kind=cake cake-flowmode=dual-srchost cake-memlimit=32M cake-nat=yes }
 
 # Substitua os max-limit pela velocidade REAL de cada link (~95% do contratado)
-/queue tree
-:if ([:len [find name=Q-Download-WAN1]] = 0) do={ add name=Q-Download-WAN1 parent=bridge-lan packet-mark="" queue=cake-download max-limit=95M }
-:if ([:len [find name=Q-Upload-WAN1]] = 0) do={ add name=Q-Upload-WAN1 parent=pppoe-out1 packet-mark="" queue=cake-upload max-limit=48M }
-:if ([:len [find name=Q-Download-WAN2]] = 0) do={ add name=Q-Download-WAN2 parent=bridge-lan packet-mark="" queue=cake-download max-limit=95M }
-:if ([:len [find name=Q-Upload-WAN2]] = 0) do={ add name=Q-Upload-WAN2 parent=pppoe-out2 packet-mark="" queue=cake-upload max-limit=48M }
-
-# ========================================================
-# 4. CONTROLE DE BANDA INDIVIDUAL POR PERFIL PPPOE
-# ========================================================
+:if ([:len [/queue tree find name=Q-Download-WAN1]] = 0) do={ /queue tree add name=Q-Download-WAN1 parent=bridge-lan packet-mark="" queue=cake-download max-limit=95M }
+:if ([:len [/queue tree find name=Q-Upload-WAN1]] = 0) do={ /queue tree add name=Q-Upload-WAN1 parent=pppoe-out1 packet-mark="" queue=cake-upload max-limit=48M }
+:if ([:len [/queue tree find name=Q-Download-WAN2]] = 0) do={ /queue tree add name=Q-Download-WAN2 parent=bridge-lan packet-mark="" queue=cake-download max-limit=95M }
+:if ([:len [/queue tree find name=Q-Upload-WAN2]] = 0) do={ /queue tree add name=Q-Upload-WAN2 parent=pppoe-out2 packet-mark="" queue=cake-upload max-limit=48M }
 `;
-      plans.forEach(plan => {
-        const speed = plan.nome.match(/\d+/)?.[0] || "10";
-        const up = Math.max(1, Math.round(Number(speed) / 2));
-        script += `/ppp profile set [find name="${plan.nome}"] rate-limit=${speed}M/${up}M\n`;
-      });
 
       const blob = new Blob([script], { type: "text/plain" });
       const url = URL.createObjectURL(blob);
