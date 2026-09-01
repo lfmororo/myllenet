@@ -1,4 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
+import { waSendText, waSendDocument, waSendSupportButton, waTestConnection, getWhatsAppConfig } from "../_shared/whatsapp.ts";
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -52,68 +54,25 @@ async function verifyAdmin(authHeader: string | null) {
   return userId;
 }
 
-async function getUazapiToken(): Promise<string> {
-  const supabase = getSupabaseAdmin();
-  const { data } = await supabase
-    .from("settings")
-    .select("value")
-    .eq("key", "uazapi_token")
-    .maybeSingle();
-
-  if (data?.value) return data.value;
-
-  const envToken = Deno.env.get("UAZAPI_TOKEN");
-  if (envToken) return envToken;
-
-  throw new Error("Token WhatsApp não configurado. Acesse Configurações > WhatsApp.");
-}
-
-async function uazapiRequest(endpoint: string, body: unknown) {
-  const token = await getUazapiToken();
-  const url = `${UAZAPI_BASE_URL}${endpoint}`;
-  
-  // UAZAPI /send/file accepts POST but some endpoints or configurations might be picky.
-  // The user received a 405 Method Not Allowed. 
-  // Let's verify if we should use another method or if the URL is slightly different.
-  // Standard UAZAPI for files is usually POST.
-  
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "token": token,
-    },
-    body: JSON.stringify(body),
-  });
-
-  const responseText = await response.text();
-  console.log(`UAZAPI [${endpoint}] response:`, response.status, responseText.slice(0, 500));
-
-  let data;
-  try { data = JSON.parse(responseText); } catch { data = { raw: responseText }; }
-
-  if (!response.ok) {
-    throw new Error(`UAZAPI error [${response.status}]: ${JSON.stringify(data)}`);
+// Dispatcher: envia pelo provedor escolhido em Configurações > WhatsApp
+// (uazapi ou Evolution API), mantendo a assinatura antiga por compatibilidade.
+async function uazapiRequest(endpoint: string, body: any) {
+  if (endpoint === UAZAPI_TEXT_ENDPOINT || endpoint === "/send/text") {
+    return await waSendText(body.number, body.text);
   }
-
-  return data;
+  if (endpoint === UAZAPI_FILE_ENDPOINT || endpoint === "/send/media") {
+    return await waSendDocument(body.number, body.file, body.docName || "documento.pdf", body.text || "");
+  }
+  if (endpoint === "/send/menu") {
+    return await waSendSupportButton(body.number);
+  }
+  throw new Error(`Endpoint WhatsApp não suportado: ${endpoint}`);
 }
 
 async function sendSupportButton(phone: string) {
-  try {
-    await uazapiRequest("/send/menu", {
-      number: phone,
-      type: "button",
-      text: "Precisa de Suporte?",
-      choices: [
-        "Falar com Suporte|https://wa.me/5585986801458?text=Preciso%20de%20Suporte"
-      ],
-      footerText: "Escolha uma opção",
-    });
-  } catch (err) {
-    console.error("Failed to send support button:", err);
-  }
+  await waSendSupportButton(phone);
 }
+
 
 function formatPhone(phone: string): string {
   let digits = phone.replace(/\D/g, "");
@@ -472,6 +431,21 @@ Deno.serve(async (req) => {
         return await sendInvoiceNotification(req);
       case "resend-paid":
         return await resendPaidNotifications(req);
+      case "test": {
+        await verifyAdmin(req.headers.get("Authorization"));
+        const cfg = await getWhatsAppConfig();
+        try {
+          const result = await waTestConnection();
+          return new Response(JSON.stringify({ success: true, provider: cfg.provider, ...result }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        } catch (err) {
+          return new Response(JSON.stringify({ success: false, provider: cfg.provider, error: err.message }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      }
+
       default:
         return new Response(JSON.stringify({ error: "Endpoint não encontrado" }), {
           status: 404,

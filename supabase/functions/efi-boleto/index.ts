@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { waSendText } from "../_shared/whatsapp.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -854,35 +855,18 @@ async function sendPaymentNotification(supabase: any, invoiceId: string) {
     const valor = (invoice.valor_centavos / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
     const message = `Olá ${customer.nome}! 🌐\n\n✅ Pagamento confirmado!\n\n📋 ${invoice.descricao}\n💰 Valor: ${valor}\n\nObrigado por manter sua internet em dia! 🚀`;
 
-    const UAZAPI_BASE_URL = "https://ipazua.uazapi.com";
-    let token = "";
-    const { data: tokenData } = await supabase.from("settings").select("value").eq("key", "uazapi_token").maybeSingle();
-    token = tokenData?.value || Deno.env.get("UAZAPI_TOKEN") || "";
-
-    if (!token) {
-      await supabase.from("notification_logs").insert({
-        customer_id: invoice.customer_id,
-        customer_name: customer.nome,
-        phone: customer.telefone,
-        type: "pagamento_confirmado",
-        message,
-        status: "failed",
-        error_message: "Token WhatsApp não configurado",
-      });
-      return;
+    let sendOk = true;
+    let sendError: string | null = null;
+    try {
+      await waSendText(customer.telefone, message);
+    } catch (err) {
+      sendOk = false;
+      sendError = (err as Error).message?.slice(0, 500) || "Erro ao enviar WhatsApp";
+      console.error("Payment notification error:", err);
     }
 
-    let digits = customer.telefone.replace(/\D/g, "");
-    if (!digits.startsWith("55")) digits = "55" + digits;
 
-    const response = await fetch(`${UAZAPI_BASE_URL}/send/text`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", token },
-      body: JSON.stringify({ number: digits, text: message }),
-    });
 
-    const responseText = await response.text();
-    console.log("Payment notification sent:", response.status, responseText.slice(0, 200));
 
     await supabase.from("notification_logs").insert({
       customer_id: invoice.customer_id,
@@ -890,8 +874,8 @@ async function sendPaymentNotification(supabase: any, invoiceId: string) {
       phone: customer.telefone,
       type: "pagamento_confirmado",
       message,
-      status: response.ok ? "sent" : "failed",
-      error_message: response.ok ? null : responseText.slice(0, 500),
+      status: sendOk ? "sent" : "failed",
+      error_message: sendError,
     });
   } catch (err) {
     console.error("Payment notification error:", err);
