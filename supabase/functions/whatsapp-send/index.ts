@@ -431,6 +431,21 @@ Deno.serve(async (req) => {
         return await sendInvoiceNotification(req);
       case "resend-paid":
         return await resendPaidNotifications(req);
+      case "test": {
+        await verifyAdmin(req.headers.get("Authorization"));
+        const cfg = await getWhatsAppConfig();
+        try {
+          const result = await waTestConnection();
+          return new Response(JSON.stringify({ success: true, provider: cfg.provider, ...result }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        } catch (err) {
+          return new Response(JSON.stringify({ success: false, provider: cfg.provider, error: err.message }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      }
+
       default:
         return new Response(JSON.stringify({ error: "Endpoint não encontrado" }), {
           status: 404,
