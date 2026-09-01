@@ -865,29 +865,8 @@ async function sendPaymentNotification(supabase: any, invoiceId: string) {
       console.error("Payment notification error:", err);
     }
 
-    await supabase.from("notification_logs").insert({
-        customer_id: invoice.customer_id,
-        customer_name: customer.nome,
-        phone: customer.telefone,
-        type: "pagamento_confirmado",
-        message,
-        status: "failed",
-        error_message: "Token WhatsApp não configurado",
-      });
-      return;
-    }
 
-    let digits = customer.telefone.replace(/\D/g, "");
-    if (!digits.startsWith("55")) digits = "55" + digits;
 
-    const response = await fetch(`${UAZAPI_BASE_URL}/send/text`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", token },
-      body: JSON.stringify({ number: digits, text: message }),
-    });
-
-    const responseText = await response.text();
-    console.log("Payment notification sent:", response.status, responseText.slice(0, 200));
 
     await supabase.from("notification_logs").insert({
       customer_id: invoice.customer_id,
