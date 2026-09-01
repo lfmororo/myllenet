@@ -185,7 +185,7 @@ export default function Settings() {
     const { data } = await supabase
       .from("settings")
       .select("key, value")
-      .in("key", ["efi_client_id", "efi_client_secret", "efi_certificate_path", "uazapi_token", "mikrotik_host", "mikrotik_host_secondary", "mikrotik_username", "mikrotik_password", "mikrotik_api_port", "mikrotik_rest_port", "blocking_days", "pix_key", "pix_name", "pix_city", "mikrotik_alert_offline_minutes", "mikrotik_alert_failure_count"]);
+      .in("key", ["efi_client_id", "efi_client_secret", "efi_certificate_path", "uazapi_token", "whatsapp_provider", "evolution_base_url", "evolution_api_key", "evolution_instance", "mikrotik_host", "mikrotik_host_secondary", "mikrotik_username", "mikrotik_password", "mikrotik_api_port", "mikrotik_rest_port", "blocking_days", "pix_key", "pix_name", "pix_city", "mikrotik_alert_offline_minutes", "mikrotik_alert_failure_count"]);
 
     if (data) {
       for (const row of data) {
@@ -193,6 +193,10 @@ export default function Settings() {
         if (row.key === "efi_client_secret") setClientSecret(row.value || "");
         if (row.key === "efi_certificate_path") setCertUploaded(!!row.value);
         if (row.key === "uazapi_token") setUazapiToken(row.value || "");
+        if (row.key === "whatsapp_provider") setWhatsappProvider(row.value || "uazapi");
+        if (row.key === "evolution_base_url") setEvolutionBaseUrl(row.value || "");
+        if (row.key === "evolution_api_key") setEvolutionApiKey(row.value || "");
+        if (row.key === "evolution_instance") setEvolutionInstance(row.value || "");
         if (row.key === "mikrotik_host") setMikrotikHost(row.value || "");
         if (row.key === "mikrotik_host_secondary") setMikrotikHostSecondary(row.value || "");
         if (row.key === "mikrotik_username") setMikrotikUser(row.value || "");
