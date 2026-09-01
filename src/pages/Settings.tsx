@@ -544,9 +544,9 @@ export default function Settings() {
           <TabsContent value="whatsapp" className="mt-4">
             <Card>
               <CardHeader>
-                <CardTitle>WhatsApp (uazapi)</CardTitle>
+                <CardTitle>WhatsApp</CardTitle>
                 <CardDescription>
-                  Configure o token de acesso à API do servidor uazapi para envio de notificações via WhatsApp.
+                  Escolha qual API será usada para o envio das notificações: uazapi ou Evolution API.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -557,43 +557,135 @@ export default function Settings() {
                 ) : (
                   <div className="space-y-5">
                     <div className="space-y-2">
-                      <Label htmlFor="uazapi_token">Token da API</Label>
-                      <Input
-                        id="uazapi_token"
-                        type="password"
-                        value={uazapiToken}
-                        onChange={(e) => setUazapiToken(e.target.value)}
-                        placeholder="Informe o token do servidor uazapi"
-                      />
+                      <Label htmlFor="whatsapp_provider">API em uso</Label>
+                      <Select value={whatsappProvider} onValueChange={setWhatsappProvider}>
+                        <SelectTrigger id="whatsapp_provider">
+                          <SelectValue placeholder="Selecione a API" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="uazapi">uazapi</SelectItem>
+                          <SelectItem value="evolution">Evolution API</SelectItem>
+                        </SelectContent>
+                      </Select>
                       <p className="text-xs text-muted-foreground">
-                        Servidor: https://ipazua.uazapi.com
+                        Todas as notificações (faturas, lembretes, alertas) usarão a API selecionada.
                       </p>
                     </div>
 
-                    <Button
-                      onClick={async () => {
-                        setSavingWhatsapp(true);
-                        try {
-                          await upsertSetting("uazapi_token", uazapiToken);
-                          toast.success("Token WhatsApp salvo!");
-                        } catch (err: any) {
-                          toast.error("Erro ao salvar: " + (err.message || "Erro desconhecido"));
-                        }
-                        setSavingWhatsapp(false);
-                      }}
-                      disabled={savingWhatsapp}
-                    >
-                      {savingWhatsapp ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      ) : (
-                        <Save className="mr-2 h-4 w-4" />
-                      )}
-                      Salvar Token
-                    </Button>
+                    {whatsappProvider === "uazapi" ? (
+                      <div className="space-y-2">
+                        <Label htmlFor="uazapi_token">Token da API (uazapi)</Label>
+                        <Input
+                          id="uazapi_token"
+                          type="password"
+                          value={uazapiToken}
+                          onChange={(e) => setUazapiToken(e.target.value)}
+                          placeholder="Informe o token do servidor uazapi"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Servidor: https://ipazua.uazapi.com
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="evolution_base_url">URL do servidor</Label>
+                          <Input
+                            id="evolution_base_url"
+                            value={evolutionBaseUrl}
+                            onChange={(e) => setEvolutionBaseUrl(e.target.value)}
+                            placeholder="https://sua-evolution-api.com"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="evolution_api_key">API Key (apikey)</Label>
+                          <Input
+                            id="evolution_api_key"
+                            type="password"
+                            value={evolutionApiKey}
+                            onChange={(e) => setEvolutionApiKey(e.target.value)}
+                            placeholder="Chave global ou da instância"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="evolution_instance">Nome da instância</Label>
+                          <Input
+                            id="evolution_instance"
+                            value={evolutionInstance}
+                            onChange={(e) => setEvolutionInstance(e.target.value)}
+                            placeholder="ex: myllenet"
+                          />
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Endpoints usados: /message/sendText, /message/sendMedia, /message/sendButtons e
+                          /instance/connectionState.
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        onClick={async () => {
+                          setSavingWhatsapp(true);
+                          try {
+                            await upsertSetting("whatsapp_provider", whatsappProvider);
+                            if (whatsappProvider === "uazapi") {
+                              await upsertSetting("uazapi_token", uazapiToken);
+                            } else {
+                              await upsertSetting("evolution_base_url", evolutionBaseUrl.replace(/\/+$/, ""));
+                              await upsertSetting("evolution_api_key", evolutionApiKey);
+                              await upsertSetting("evolution_instance", evolutionInstance);
+                            }
+                            toast.success("Configurações do WhatsApp salvas!");
+                          } catch (err: any) {
+                            toast.error("Erro ao salvar: " + (err.message || "Erro desconhecido"));
+                          }
+                          setSavingWhatsapp(false);
+                        }}
+                        disabled={savingWhatsapp}
+                      >
+                        {savingWhatsapp ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <Save className="mr-2 h-4 w-4" />
+                        )}
+                        Salvar
+                      </Button>
+
+                      <Button
+                        variant="outline"
+                        onClick={async () => {
+                          setTestingWhatsapp(true);
+                          try {
+                            const headers = await getAuthHeaders();
+                            if (!headers) { setTestingWhatsapp(false); return; }
+                            const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+                            const res = await fetch(`https://${projectId}.supabase.co/functions/v1/whatsapp-send/test`, {
+                              method: "POST", headers,
+                            });
+                            const result = await res.json();
+                            if (result.success) toast.success(`Conexão OK (${result.provider}) - ${result.state ?? "ativo"}`);
+                            else toast.error("Falha: " + (result.error || "Erro desconhecido"));
+                          } catch (err: any) {
+                            toast.error("Erro ao testar: " + (err.message || "Erro desconhecido"));
+                          }
+                          setTestingWhatsapp(false);
+                        }}
+                        disabled={testingWhatsapp}
+                      >
+                        {testingWhatsapp ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <Zap className="mr-2 h-4 w-4" />
+                        )}
+                        Testar Conexão
+                      </Button>
+                    </div>
                   </div>
                 )}
               </CardContent>
             </Card>
+
           </TabsContent>
 
           {/* Users Tab */}
