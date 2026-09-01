@@ -35,8 +35,14 @@ export default function Settings() {
   const [testing, setTesting] = useState(false);
 
   // WhatsApp settings
+  const [whatsappProvider, setWhatsappProvider] = useState("uazapi");
   const [uazapiToken, setUazapiToken] = useState("");
+  const [evolutionBaseUrl, setEvolutionBaseUrl] = useState("");
+  const [evolutionApiKey, setEvolutionApiKey] = useState("");
+  const [evolutionInstance, setEvolutionInstance] = useState("");
   const [savingWhatsapp, setSavingWhatsapp] = useState(false);
+  const [testingWhatsapp, setTestingWhatsapp] = useState(false);
+
 
   // PIX settings
   const [pixKey, setPixKey] = useState("");
