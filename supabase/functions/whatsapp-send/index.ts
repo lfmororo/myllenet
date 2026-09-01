@@ -1,4 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
+import { waSendText, waSendDocument, waSendSupportButton, waTestConnection, getWhatsAppConfig } from "../_shared/whatsapp.ts";
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
