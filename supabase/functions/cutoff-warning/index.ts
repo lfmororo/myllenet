@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { waSendText, waSendSupportButton, formatPhone } from "../_shared/whatsapp.ts";
+import { waSendText, waSendSupportButton } from "../_shared/whatsapp.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -7,7 +7,6 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const UAZAPI_BASE_URL = "https://ipazua.uazapi.com";
 const BOT_DISCLAIMER = "\n\n🤖 _Esta é uma mensagem automática. Para falar com um atendente, entre em contato: (85) 98680-1458_";
 const DAYS_OVERDUE_THRESHOLD = 15;
 const DAYS_UNTIL_CUTOFF = 5;

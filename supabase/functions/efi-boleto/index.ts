@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { waSendText } from "../_shared/whatsapp.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -854,13 +855,17 @@ async function sendPaymentNotification(supabase: any, invoiceId: string) {
     const valor = (invoice.valor_centavos / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
     const message = `Olá ${customer.nome}! 🌐\n\n✅ Pagamento confirmado!\n\n📋 ${invoice.descricao}\n💰 Valor: ${valor}\n\nObrigado por manter sua internet em dia! 🚀`;
 
-    const UAZAPI_BASE_URL = "https://ipazua.uazapi.com";
-    let token = "";
-    const { data: tokenData } = await supabase.from("settings").select("value").eq("key", "uazapi_token").maybeSingle();
-    token = tokenData?.value || Deno.env.get("UAZAPI_TOKEN") || "";
+    let sendOk = true;
+    let sendError: string | null = null;
+    try {
+      await waSendText(customer.telefone, message);
+    } catch (err) {
+      sendOk = false;
+      sendError = (err as Error).message?.slice(0, 500) || "Erro ao enviar WhatsApp";
+      console.error("Payment notification error:", err);
+    }
 
-    if (!token) {
-      await supabase.from("notification_logs").insert({
+    await supabase.from("notification_logs").insert({
         customer_id: invoice.customer_id,
         customer_name: customer.nome,
         phone: customer.telefone,
@@ -890,8 +895,8 @@ async function sendPaymentNotification(supabase: any, invoiceId: string) {
       phone: customer.telefone,
       type: "pagamento_confirmado",
       message,
-      status: response.ok ? "sent" : "failed",
-      error_message: response.ok ? null : responseText.slice(0, 500),
+      status: sendOk ? "sent" : "failed",
+      error_message: sendError,
     });
   } catch (err) {
     console.error("Payment notification error:", err);
