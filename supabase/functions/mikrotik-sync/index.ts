@@ -192,7 +192,7 @@ Deno.serve(async (req) => {
             : `✅ *Sinal Liberado:* Olá ${customer.nome}, seu pagamento foi identificado e seu sinal já foi liberado no sistema. Obrigado!`
 
         try {
-          await supabase.functions.invoke('whatsapp-send', {
+          const { data: sendData, error: sendError } = await supabase.functions.invoke('whatsapp-send/send-text', {
             body: {
               phone: customer.telefone,
               message,
@@ -201,6 +201,10 @@ Deno.serve(async (req) => {
               type: 'block_alert',
             },
           })
+          if (sendError || (sendData && (sendData as any).error)) {
+            console.error('WhatsApp block alert failed:', sendError?.message || (sendData as any)?.error)
+            continue // não marca como processado; será tentado novamente
+          }
           await supabase.from('block_alerts_sent' as any).update({ processed: true } as any).eq('id', alert.id)
           stats.alerts++
         } catch (e) {

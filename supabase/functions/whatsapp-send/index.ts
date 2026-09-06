@@ -423,6 +423,8 @@ Deno.serve(async (req) => {
     const path = url.pathname.split("/").pop();
 
     switch (path) {
+      // chamada sem sub-rota (functions.invoke('whatsapp-send')) => envio de texto
+      case "whatsapp-send":
       case "send-text":
         return await sendText(req);
       case "send-bulk":
