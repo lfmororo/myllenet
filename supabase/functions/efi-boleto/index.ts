@@ -1026,8 +1026,9 @@ async function bulkCheckPayments(req: Request) {
         .select("id, customer_id, valor_centavos, vencimento, status, customers(cpf)")
         .eq("status", "overdue")
         .is("efi_charge_id", null)
-        .order('vencimento', { ascending: false })
+        .order('updated_at', { ascending: true })
         .limit(10);
+
 
 
       if (overdueOrphans && overdueOrphans.length > 0) {
