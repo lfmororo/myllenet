@@ -1261,6 +1261,92 @@ async function settleCharge(req: Request) {
   }
 }
 
+// ===== TESTE: busca cobranças pagas (boleto + carnê) na Efí e compara com o sistema =====
+async function scanPaidCharges(req: Request) {
+  const authHeader = req.headers.get("Authorization");
+  if (!isInternalCron(req)) {
+    await verifyAdmin(authHeader);
+  }
+
+  const url = new URL(req.url);
+  const months = Math.min(Number(url.searchParams.get("months") || 11), 11);
+  const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const now = new Date();
+  const begin = new Date(now); begin.setMonth(begin.getMonth() - months);
+  const bd = fmt(begin);
+  const ed = fmt(now);
+
+  const supabase = getSupabaseAdmin();
+  const byType: Record<string, { total: number; statuses: Record<string, number> }> = {};
+  const paidCharges: any[] = [];
+
+  for (const cType of ["billet", "carnet"]) {
+    byType[cType] = { total: 0, statuses: {} };
+    let offset = 0;
+    const limit = 100;
+    let hasMore = true;
+    while (hasMore) {
+      const resp = await efiRequest(
+        `/v1/charges?charge_type=${cType}&begin_date=${bd}&end_date=${ed}&limit=${limit}&offset=${offset}`,
+        "GET", undefined, "scan_paid"
+      );
+      const page = resp.data || resp || [];
+      if (!Array.isArray(page)) { hasMore = false; break; }
+      for (const c of page) {
+        const st = String(c.status || "unknown");
+        byType[cType].total++;
+        byType[cType].statuses[st] = (byType[cType].statuses[st] || 0) + 1;
+        if (st === "paid" || st === "settled") {
+          paidCharges.push({
+            charge_type: cType,
+            charge_id: c.charge_id || c.id,
+            value: c.value || c.total || 0,
+            status: st,
+            customer_document: (c.customer?.cpf || c.customer?.juridical_person?.corporate_number || "").replace(/\D/g, ""),
+            expire_at: c.payment?.banking_billet?.expire_at || c.expire_at || null,
+            created_at: c.created_at || null,
+          });
+        }
+      }
+      hasMore = page.length === limit;
+      offset += limit;
+    }
+  }
+
+  // Compara com o sistema
+  const ids = paidCharges.map((p) => p.charge_id).filter(Boolean);
+  const found = new Map<number, any>();
+  for (let i = 0; i < ids.length; i += 200) {
+    const slice = ids.slice(i, i + 200);
+    const { data } = await supabase
+      .from("invoices")
+      .select("id, efi_charge_id, status, vencimento, valor_centavos, customers(nome, cpf)")
+      .in("efi_charge_id", slice);
+    for (const inv of data || []) found.set(Number(inv.efi_charge_id), inv);
+  }
+
+  const alreadyPaid: any[] = [];
+  const pendingInSystem: any[] = [];
+  const notLinked: any[] = [];
+  for (const p of paidCharges) {
+    const inv = found.get(Number(p.charge_id));
+    if (!inv) { notLinked.push(p); continue; }
+    if (inv.status === "paid") alreadyPaid.push({ ...p, invoice_id: inv.id, cliente: (inv as any).customers?.nome });
+    else pendingInSystem.push({ ...p, invoice_id: inv.id, status_sistema: inv.status, cliente: (inv as any).customers?.nome });
+  }
+
+  return new Response(JSON.stringify({
+    periodo: { begin_date: bd, end_date: ed },
+    resumo_efi: byType,
+    pagos_na_efi: paidCharges.length,
+    ja_baixados_no_sistema: alreadyPaid.length,
+    pagos_na_efi_mas_abertos_no_sistema: pendingInSystem,
+    pagos_na_efi_sem_fatura_vinculada: notLinked.slice(0, 50),
+    total_sem_vinculo: notLinked.length,
+  }, null, 2), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+}
+
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
