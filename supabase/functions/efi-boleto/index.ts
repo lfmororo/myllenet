@@ -882,10 +882,16 @@ async function sendPaymentNotification(supabase: any, invoiceId: string) {
   }
 }
 
+function isInternalCron(req: Request): boolean {
+  const cronSecret = Deno.env.get("CRON_SECRET");
+  const provided = req.headers.get("x-cron-secret");
+  return !!cronSecret && !!provided && provided === cronSecret;
+}
+
 async function bulkCheckPayments(req: Request) {
   const authHeader = req.headers.get("Authorization");
-  // Check if it's a cron job (via service role key) or a logged-in admin
-  if (authHeader) {
+  // Check if it's a cron job (via cron secret / service role key) or a logged-in admin
+  if (!isInternalCron(req) && authHeader) {
     try {
       await verifyAdmin(authHeader);
     } catch (e) {
@@ -897,18 +903,23 @@ async function bulkCheckPayments(req: Request) {
     }
   }
 
+
   const supabase = getSupabaseAdmin();
 
   // ===== PASS 1: Reconcile invoices WITHOUT efi_charge_id by querying EFI by CPF =====
   let reconciled = 0;
   try {
+    const today = new Date().toISOString().slice(0, 10);
     const { data: orphanInvoices } = await supabase
       .from("invoices")
-      .select("id, customer_id, valor_centavos, vencimento, status, customers(cpf)")
+      .select("id, customer_id, valor_centavos, vencimento, status, paid_at, updated_at, customers(cpf)")
       .in("status", ["pending", "waiting", "overdue"])
       .is("efi_charge_id", null)
-      .order('vencimento', { ascending: false })
-      .limit(10); // Reduzido de 15 para 10 para evitar timeouts
+      // Somente faturas já vencidas/vencendo e em rodízio (as verificadas há mais tempo primeiro)
+      .lte('vencimento', today)
+      .order('updated_at', { ascending: true })
+      .limit(15);
+
 
 
 
@@ -997,6 +1008,16 @@ async function bulkCheckPayments(req: Request) {
       await new Promise(r => setTimeout(r, 200));
     }
 
+    // Marca as faturas analisadas para que a próxima rodada verifique outras (rodízio)
+    if (orphanInvoices && orphanInvoices.length > 0) {
+      await supabase
+        .from("invoices")
+        .update({ updated_at: new Date().toISOString() })
+        .in("id", orphanInvoices.map((i: any) => i.id));
+    }
+
+
+
 
     // ===== PASS 1.5: Deep Reconciliation for Overdue Orphans =====
     try {
@@ -1005,8 +1026,9 @@ async function bulkCheckPayments(req: Request) {
         .select("id, customer_id, valor_centavos, vencimento, status, customers(cpf)")
         .eq("status", "overdue")
         .is("efi_charge_id", null)
-        .order('vencimento', { ascending: false })
+        .order('updated_at', { ascending: true })
         .limit(10);
+
 
 
       if (overdueOrphans && overdueOrphans.length > 0) {
@@ -1103,8 +1125,11 @@ async function bulkCheckPayments(req: Request) {
     .select("id, efi_charge_id, status, paid_at, efi_barcode, efi_link, efi_pix_qrcode, efi_pix_copiacola")
     .in("status", ["pending", "waiting", "overdue"])
     .not("efi_charge_id", "is", null)
-    .order('vencimento', { ascending: false })
-    .limit(10); // Reduzido de 30 para 10 para evitar timeouts
+    // Rotativo: sempre verifica as faturas checadas há mais tempo,
+    // garantindo que TODAS (inclusive antigas) sejam consultadas na Efí.
+    .order('updated_at', { ascending: true })
+    .limit(40);
+
 
   if (error) {
     return new Response(JSON.stringify({ error: "Erro ao buscar faturas" }), {
@@ -1137,11 +1162,14 @@ async function bulkCheckPayments(req: Request) {
       let newStatus = inv.status;
       let paidAt = inv.paid_at;
 
-      if (efiStatus === "paid" || efiStatus === "settled") {
+      const paidStatuses = ["paid", "settled", "finalized", "received", "liquidado"];
+      if (paidStatuses.includes(efiStatus)) {
         newStatus = "paid";
         paidAt = paidAt || new Date().toISOString();
+      } else if (inv.paid_at) {
+        // Já constava como pago no sistema: nunca reverter para vencido
+        newStatus = "paid";
       } else if (efiStatus === "link" || efiStatus === "active") {
-        // Just link/active, not necessarily paid yet
         newStatus = "pending";
       } else if (efiStatus === "canceled" || efiStatus === "refunded") {
         newStatus = "cancelled";
@@ -1151,27 +1179,30 @@ async function bulkCheckPayments(req: Request) {
 
       // Extract billet data (link, barcode, pix)
       const billet = chargeData.payment?.banking_billet || {};
-      const updatePayload: Record<string, any> = { status: newStatus, paid_at: paidAt };
-      
+      const updatePayload: Record<string, any> = {
+        status: newStatus,
+        paid_at: paidAt,
+        // Marca a verificação para o rodízio de checagem
+        updated_at: new Date().toISOString(),
+      };
+
       if (billet.barcode && !inv.efi_barcode) updatePayload.efi_barcode = billet.barcode;
       if (billet.pix?.qrcode && !inv.efi_pix_qrcode) updatePayload.efi_pix_qrcode = billet.pix.qrcode;
       if (billet.pix?.qrcode && !inv.efi_pix_copiacola) updatePayload.efi_pix_copiacola = billet.pix.qrcode;
       if ((billet.link || billet.pdf?.charge) && !inv.efi_link) updatePayload.efi_link = billet.link || billet.pdf?.charge;
 
-      const hasBilletUpdates = Object.keys(updatePayload).length > 2;
+      await supabase
+        .from("invoices")
+        .update(updatePayload)
+        .eq("id", inv.id);
 
-      if (newStatus !== inv.status || hasBilletUpdates) {
-        await supabase
-          .from("invoices")
-          .update(updatePayload)
-          .eq("id", inv.id);
+      if (newStatus !== inv.status) {
         updated++;
-
-        // Track paid invoices for notification
         if (newStatus === "paid") {
           paidInvoiceIds.push(inv.id);
         }
       }
+
     } catch (e) {
       console.error(`Error checking charge ${inv.efi_charge_id}:`, e);
       errors++;
@@ -1237,12 +1268,13 @@ Deno.serve(async (req) => {
         return await checkPayment(req);
       case "bulk-check": {
         const authHeader = req.headers.get("Authorization");
-        if (!authHeader) {
+        if (!authHeader && !isInternalCron(req)) {
           return new Response(JSON.stringify({ error: "Missing authorization header" }), {
             status: 401,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
+
         return await bulkCheckPayments(req);
       }
       case "import":
