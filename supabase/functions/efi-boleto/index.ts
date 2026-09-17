@@ -933,7 +933,7 @@ async function bulkCheckPayments(req: Request) {
     }
 
     const now = new Date();
-    const beginDate = new Date(now); beginDate.setFullYear(beginDate.getFullYear() - 1); // 12 months for better coverage
+    const beginDate = new Date(now); beginDate.setMonth(beginDate.getMonth() - 11); // Efí aceita no máximo 1 ano por consulta
     const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     const bd = fmt(beginDate);
     const ed = fmt(now);
@@ -1042,33 +1042,42 @@ async function bulkCheckPayments(req: Request) {
           }
         }
 
-        const longAgo = new Date();
-        longAgo.setFullYear(longAgo.getFullYear() - 2); 
-        const bdDeep = fmt(longAgo);
-        const edDeep = fmt(now);
+        // A Efí limita a busca a intervalos de no máximo 1 ano.
+        // Dividimos os últimos 2 anos em duas janelas de ~11 meses.
+        const w1End = new Date(now);
+        const w1Start = new Date(now); w1Start.setMonth(w1Start.getMonth() - 11);
+        const w2End = new Date(w1Start); w2End.setDate(w2End.getDate() - 1);
+        const w2Start = new Date(w2End); w2Start.setMonth(w2Start.getMonth() - 11);
+        const deepWindows = [
+          { bd: fmt(w1Start), ed: fmt(w1End) },
+          { bd: fmt(w2Start), ed: fmt(w2End) },
+        ];
 
         for (const [cpf, group] of byCpf) {
           try {
             let charges: any[] = [];
             
             // Search both billet and carnet types in deep pass
-            for (const cType of ["billet", "carnet"]) {
-              let offset = 0;
-              const limit = 100;
-              let hasMore = true;
-              while (hasMore) {
-                const resp = await efiRequest(
-                  `/v1/charges?charge_type=${cType}&customer_document=${cpf}&begin_date=${bdDeep}&end_date=${edDeep}&limit=${limit}&offset=${offset}`,
-                  "GET", undefined, "bulk_check_deep"
-                );
-                const page = resp.data || resp || [];
-                if (Array.isArray(page)) {
-                  charges = charges.concat(page);
-                  hasMore = page.length === limit;
-                } else { hasMore = false; }
-                offset += limit;
+            for (const win of deepWindows) {
+              for (const cType of ["billet", "carnet"]) {
+                let offset = 0;
+                const limit = 100;
+                let hasMore = true;
+                while (hasMore) {
+                  const resp = await efiRequest(
+                    `/v1/charges?charge_type=${cType}&customer_document=${cpf}&begin_date=${win.bd}&end_date=${win.ed}&limit=${limit}&offset=${offset}`,
+                    "GET", undefined, "bulk_check_deep"
+                  );
+                  const page = resp.data || resp || [];
+                  if (Array.isArray(page)) {
+                    charges = charges.concat(page);
+                    hasMore = page.length === limit;
+                  } else { hasMore = false; }
+                  offset += limit;
+                }
               }
             }
+
 
             for (const inv of group) {
               const invMonth = String(inv.vencimento).slice(0, 7);
