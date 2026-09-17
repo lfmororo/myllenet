@@ -933,7 +933,7 @@ async function bulkCheckPayments(req: Request) {
     }
 
     const now = new Date();
-    const beginDate = new Date(now); beginDate.setFullYear(beginDate.getFullYear() - 1); // 12 months for better coverage
+    const beginDate = new Date(now); beginDate.setMonth(beginDate.getMonth() - 11); // Efí aceita no máximo 1 ano por consulta
     const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     const bd = fmt(beginDate);
     const ed = fmt(now);
