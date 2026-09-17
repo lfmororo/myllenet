@@ -1372,7 +1372,10 @@ Deno.serve(async (req) => {
 
         return await bulkCheckPayments(req);
       }
+      case "scan-paid":
+        return await scanPaidCharges(req);
       case "import":
+
         return await importFromEfi(req);
       case "cancel":
         return await cancelCharge(req);
