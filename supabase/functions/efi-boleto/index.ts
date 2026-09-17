@@ -1008,6 +1008,16 @@ async function bulkCheckPayments(req: Request) {
       await new Promise(r => setTimeout(r, 200));
     }
 
+    // Marca as faturas analisadas para que a próxima rodada verifique outras (rodízio)
+    if (orphanInvoices && orphanInvoices.length > 0) {
+      await supabase
+        .from("invoices")
+        .update({ updated_at: new Date().toISOString() })
+        .in("id", orphanInvoices.map((i: any) => i.id));
+    }
+
+
+
 
     // ===== PASS 1.5: Deep Reconciliation for Overdue Orphans =====
     try {
