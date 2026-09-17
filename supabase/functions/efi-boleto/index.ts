@@ -909,13 +909,17 @@ async function bulkCheckPayments(req: Request) {
   // ===== PASS 1: Reconcile invoices WITHOUT efi_charge_id by querying EFI by CPF =====
   let reconciled = 0;
   try {
+    const today = new Date().toISOString().slice(0, 10);
     const { data: orphanInvoices } = await supabase
       .from("invoices")
-      .select("id, customer_id, valor_centavos, vencimento, status, customers(cpf)")
+      .select("id, customer_id, valor_centavos, vencimento, status, paid_at, updated_at, customers(cpf)")
       .in("status", ["pending", "waiting", "overdue"])
       .is("efi_charge_id", null)
-      .order('vencimento', { ascending: false })
-      .limit(10); // Reduzido de 15 para 10 para evitar timeouts
+      // Somente faturas já vencidas/vencendo e em rodízio (as verificadas há mais tempo primeiro)
+      .lte('vencimento', today)
+      .order('updated_at', { ascending: true })
+      .limit(15);
+
 
 
 
