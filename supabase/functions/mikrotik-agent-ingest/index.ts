@@ -146,6 +146,16 @@ Deno.serve(async (req) => {
               .filter(Boolean),
           ),
         ];
+        const { data: previousSnapshot } = pppoeCollectionOk
+          ? await supabase
+              .from("mikrotik_pppoe_snapshots")
+              .select("usernames")
+              .eq("host", String(p.host || "desconhecido"))
+              .eq("collection_ok", true)
+              .order("collected_at", { ascending: false })
+              .limit(1)
+              .maybeSingle()
+          : { data: null };
         const { error: snapshotError } = await supabase
           .from("mikrotik_pppoe_snapshots")
           .insert({
@@ -159,6 +169,59 @@ Deno.serve(async (req) => {
             "mikrotik_pppoe_snapshots insert error",
             snapshotError.message,
           );
+
+        if (pppoeCollectionOk && previousSnapshot) {
+          const previousNames = new Set(
+            (previousSnapshot.usernames || []).map((name: unknown) =>
+              String(name).trim().toLowerCase(),
+            ),
+          );
+          const currentNames = new Set(snapshotNames);
+          const sessionsByName = new Map(
+            p.pppoe.map((session: any) => [
+              String(session.usuario_pppoe || "").trim().toLowerCase(),
+              session,
+            ]),
+          );
+          const sessionEvents: any[] = [];
+
+          for (const username of currentNames) {
+            if (previousNames.has(username)) continue;
+            const customerId = customerMap.get(username);
+            const session = sessionsByName.get(username);
+            if (!customerId || !session) continue;
+            sessionEvents.push({
+              customer_id: customerId,
+              usuario_pppoe: session.usuario_pppoe,
+              event_type: "connected",
+              ip_address: session.ip_address || null,
+              uptime: session.uptime || null,
+              logged_at: loggedAt,
+            });
+          }
+
+          for (const username of previousNames) {
+            if (currentNames.has(username)) continue;
+            const customerId = customerMap.get(username);
+            if (!customerId) continue;
+            sessionEvents.push({
+              customer_id: customerId,
+              usuario_pppoe: username,
+              event_type: "disconnected",
+              ip_address: null,
+              uptime: null,
+              logged_at: loggedAt,
+            });
+          }
+
+          if (sessionEvents.length > 0) {
+            const { error: eventError } = await supabase
+              .from("pppoe_logs")
+              .insert(sessionEvents);
+            if (eventError)
+              console.error("pppoe session events insert error", eventError.message);
+          }
+        }
       }
 
       if (pppoeCollectionOk && Array.isArray(p.pppoe) && p.pppoe.length > 0) {
