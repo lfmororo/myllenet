@@ -22,16 +22,33 @@ function getSupabaseAdmin() {
 
 // Helper removed as we prefer verifyAdmin to use admin client with passed token directly.
 
+function tokenRole(token: string): string | null {
+  try {
+    const payload = token.split(".")[1];
+    if (!payload) return null;
+    const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized + "=".repeat((4 - (normalized.length % 4)) % 4);
+    const decoded = JSON.parse(atob(padded));
+    return typeof decoded?.role === "string" ? decoded.role : null;
+  } catch {
+    return null;
+  }
+}
+
 async function verifyAdmin(authHeader: string | null) {
   if (!authHeader?.startsWith("Bearer ")) {
     throw new Error("Unauthorized");
   }
-  const token = authHeader.replace("Bearer ", "");
+  const token = authHeader.replace("Bearer ", "").trim();
 
-  // Allow service role key for server-to-server calls
-  if (token === Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")) {
+  // Allow service role key (or any service-role token) for server-to-server calls
+  if (
+    token === Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ||
+    tokenRole(token) === "service_role"
+  ) {
     return "service_role";
   }
+
 
   const adminClient = getSupabaseAdmin();
   const { data: { user }, error } = await adminClient.auth.getUser(token);
