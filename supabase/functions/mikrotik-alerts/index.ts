@@ -606,48 +606,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 2. Check Customer Disconnection Alerts (5 minutes)
-    const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-    const { data: disconnections } = await supabase.rpc(
-      "get_recent_disconnections",
-      {
-        since_time: fiveMinAgo,
-      },
-    );
-
-    if (disconnections && disconnections.length > 0) {
-      for (const disc of disconnections) {
-        const { data: customer } = await supabase
-          .from("customers")
-          .select("alert_on_disconnect, nome")
-          .eq("id", disc.customer_id)
-          .single();
-
-        if (customer?.alert_on_disconnect) {
-          const { data: recentAlert } = await supabase
-            .from("customer_alerts_sent")
-            .select("id")
-            .eq("customer_id", disc.customer_id)
-            .eq("alert_type", "disconnect")
-            .gt("sent_at", new Date(Date.now() - 30 * 60 * 1000).toISOString())
-            .single();
-
-          if (!recentAlert) {
-            console.log(`ALERT: Customer ${disc.usuario_pppoe} Offline`);
-            await supabase.functions.invoke("whatsapp-send/send-text", {
-              body: {
-                phone: ADMIN_PHONE,
-                message: `⚠️ *ALERTA DE DESCONEXÃO* ⚠️\n\nO cliente *${disc.nome}* (${disc.usuario_pppoe}) está off-line há mais de 5 minutos!\n\nÚltima atividade: ${new Date(disc.last_seen).toLocaleString("pt-BR")}`,
-              },
-            });
-            await supabase.from("customer_alerts_sent").insert({
-              customer_id: disc.customer_id,
-              alert_type: "disconnect",
-            });
-          }
-        }
-      }
-    }
+    // 2. Alertas de desconexão/reconexão são tratados em processCustomerDisconnections
 
     // 3. Check for Frequent Drops
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
