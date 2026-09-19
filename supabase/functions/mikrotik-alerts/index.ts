@@ -1,5 +1,128 @@
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors'
 import { createClient } from 'npm:@supabase/supabase-js@2'
+import { getWhatsAppConfig, waSendText } from '../_shared/whatsapp.ts'
+
+const ADMIN_PHONE = '85986801458'
+
+async function processBlockAlerts(supabase: any) {
+  const { data: alerts, error } = await supabase
+    .from('block_alerts_sent')
+    .select('id, customer_id, invoice_id, new_status, customers(nome, telefone)')
+    .or('processed.eq.false,processed.is.null')
+    .order('created_at', { ascending: true })
+    .limit(30)
+
+  if (error) throw error
+  const cfg = await getWhatsAppConfig()
+  let sent = 0
+
+  for (const alert of alerts || []) {
+    const customer = alert.customers
+    if (!customer?.telefone) {
+      console.error(`Block alert ${alert.id}: cliente sem telefone`)
+      continue
+    }
+
+    const message = alert.new_status === 'blocked'
+      ? `⚠️ *Aviso de Bloqueio*\n\nOlá ${customer.nome}, seu acesso à internet foi bloqueado por pendência financeira. Entre em contato com o atendimento para regularizar a situação.`
+      : `✅ *Sinal Liberado*\n\nOlá ${customer.nome}, seu acesso à internet foi liberado novamente. Obrigado!`
+
+    try {
+      await waSendText(customer.telefone, message, cfg)
+      await supabase.from('notification_logs').insert({
+        customer_id: alert.customer_id,
+        customer_name: customer.nome,
+        phone: customer.telefone,
+        type: alert.new_status === 'blocked' ? 'cliente_bloqueado' : 'cliente_desbloqueado',
+        message,
+        status: 'sent',
+      })
+      await supabase.from('block_alerts_sent').update({ processed: true }).eq('id', alert.id)
+      sent++
+    } catch (sendError) {
+      const errorMessage = (sendError as Error).message
+      console.error(`Block alert ${alert.id} failed:`, errorMessage)
+      await supabase.from('notification_logs').insert({
+        customer_id: alert.customer_id,
+        customer_name: customer.nome,
+        phone: customer.telefone,
+        type: alert.new_status === 'blocked' ? 'cliente_bloqueado' : 'cliente_desbloqueado',
+        message,
+        status: 'failed',
+        error_message: errorMessage,
+      })
+    }
+  }
+
+  return sent
+}
+
+async function processCustomerDisconnections(supabase: any) {
+  const now = Date.now()
+  const recentCutoff = new Date(now - 2 * 60 * 1000).toISOString()
+  const comparisonStart = new Date(now - 10 * 60 * 1000).toISOString()
+  const fiveMinutesAgo = now - 5 * 60 * 1000
+  const { data: snapshots, error } = await supabase
+    .from('mikrotik_pppoe_snapshots')
+    .select('host, collected_at, usernames')
+    .eq('collection_ok', true)
+    .gt('collected_at', comparisonStart)
+    .order('collected_at', { ascending: false })
+    .limit(100)
+
+  if (error) throw error
+  const latest = snapshots?.find((row: any) => row.collected_at >= recentCutoff)
+  if (!latest) return 0
+  const baseline = snapshots?.find((row: any) =>
+    row.host === latest.host && new Date(row.collected_at).getTime() <= fiveMinutesAgo
+  )
+  if (!baseline) return 0
+
+  const currentNames = new Set((latest.usernames || []).map((name: unknown) => String(name).toLowerCase()))
+  const disconnectedNames = [...new Set(
+    (baseline.usernames || [])
+      .map((name: unknown) => String(name).toLowerCase())
+      .filter((name: string) => !currentNames.has(name)),
+  )]
+  if (disconnectedNames.length === 0) return 0
+
+  const { data: customers } = await supabase
+    .from('customers')
+    .select('id, nome, usuario_pppoe, alert_on_disconnect')
+    .eq('ativo', true)
+    .neq('block_status', 'blocked')
+    .eq('alert_on_disconnect', true)
+
+  const customerMap = new Map(
+    (customers || []).map((customer: any) => [String(customer.usuario_pppoe || '').toLowerCase(), customer]),
+  )
+  const cfg = await getWhatsAppConfig()
+  let sent = 0
+
+  for (const username of disconnectedNames) {
+    const customer = customerMap.get(username)
+    if (!customer) continue
+    const { data: previousAlert } = await supabase
+      .from('customer_alerts_sent')
+      .select('id')
+      .eq('customer_id', customer.id)
+      .eq('alert_type', 'disconnect')
+      .gt('sent_at', new Date(now - 30 * 60 * 1000).toISOString())
+      .maybeSingle()
+    if (previousAlert) continue
+
+    const message = `⚠️ *ALERTA DE DESCONEXÃO* ⚠️\n\nO cliente *${customer.nome}* (${username}) está desconectado há pelo menos 5 minutos.\n\nÚltima presença confirmada: ${new Date(baseline.collected_at).toLocaleString('pt-BR')}`
+    try {
+      await waSendText(ADMIN_PHONE, message, cfg)
+      await supabase.from('customer_alerts_sent').insert({ customer_id: customer.id, alert_type: 'disconnect' })
+      sent++
+    } catch (sendError) {
+      console.error(`Disconnect alert ${username} failed:`, (sendError as Error).message)
+    }
+  }
+
+  return sent
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
@@ -16,10 +139,11 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     )
 
-    const ADMIN_PHONE = '85986801458'
+    const blockAlertsSent = await processBlockAlerts(supabase)
+    const disconnectAlertsSent = await processCustomerDisconnections(supabase)
 
     // 1. Check Mikrotik Connection Alerts with custom settings
-    const { data: thresholdData } = await supabase
+    const { data: speedThresholdData } = await supabase
       .from('settings')
       .select('value')
       .eq('key', 'mikrotik_alert_offline_minutes')
@@ -278,7 +402,7 @@ Deno.serve(async (req) => {
       .eq('key', 'mikrotik_alert_interval_minutes')
       .single()
 
-    const speedThresholdMbps = parseFloat(thresholdData?.value || '10')
+    const speedThresholdMbps = parseFloat(speedThresholdData?.value || '10')
     const alertIntervalMinutes = parseInt(intervalData?.value || '30')
     const intervalAgo = new Date(Date.now() - alertIntervalMinutes * 60 * 1000).toISOString()
     
@@ -323,7 +447,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    return json({ success: true })
+    return json({ success: true, block_alerts_sent: blockAlertsSent, disconnect_alerts_sent: disconnectAlertsSent })
   } catch (e) {
     return json({ error: (e as Error).message }, 500)
   }
