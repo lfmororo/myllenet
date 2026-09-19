@@ -184,19 +184,17 @@ async function processAgentCommunicationAlerts(supabase: any) {
     if (!referenceTime) continue;
 
     const isOffline = now - new Date(referenceTime).getTime() > thresholdMs;
-    const offlineType = `agent_offline_${agent.id}`;
-    const recoveryType = `agent_recovered_${agent.id}`;
-    const { data: latestAlerts, error: latestAlertError } = await supabase
-      .from("customer_alerts_sent")
-      .select("alert_type, sent_at")
-      .in("alert_type", [offlineType, recoveryType])
-      .order("sent_at", { ascending: false })
-      .limit(1);
+    const stateKey = `agent_communication_state_${agent.id}`;
+    const { data: stateRow, error: stateError } = await supabase
+      .from("settings")
+      .select("value")
+      .eq("key", stateKey)
+      .maybeSingle();
 
-    if (latestAlertError) throw latestAlertError;
-    const latestType = latestAlerts?.[0]?.alert_type;
+    if (stateError) throw stateError;
+    const previousState = stateRow?.value;
 
-    if (isOffline && latestType !== offlineType) {
+    if (isOffline && previousState !== "offline") {
       const lastSeen = agent.last_seen_at
         ? new Date(agent.last_seen_at).toLocaleString("pt-BR")
         : "Nunca se comunicou";
@@ -204,10 +202,11 @@ async function processAgentCommunicationAlerts(supabase: any) {
 
       try {
         await waSendText(ADMIN_PHONE, message + BOT_DISCLAIMER, cfg);
-        const { error: insertError } = await supabase
-          .from("customer_alerts_sent")
-          .insert({ alert_type: offlineType, sent_at: new Date().toISOString() });
-        if (insertError) throw insertError;
+        const { error: saveError } = await supabase.from("settings").upsert(
+          { key: stateKey, value: "offline" },
+          { onConflict: "key" },
+        );
+        if (saveError) throw saveError;
         offlineSent++;
       } catch (sendError) {
         console.error(
@@ -215,15 +214,16 @@ async function processAgentCommunicationAlerts(supabase: any) {
           (sendError as Error).message,
         );
       }
-    } else if (!isOffline && latestType === offlineType) {
+    } else if (!isOffline && previousState === "offline") {
       const message = `✅ *AGENTE RECONECTADO* ✅\n\nO agente *${agent.name}* voltou a se comunicar normalmente.\n\nAtividade confirmada: ${new Date(referenceTime).toLocaleString("pt-BR")}`;
 
       try {
         await waSendText(ADMIN_PHONE, message + BOT_DISCLAIMER, cfg);
-        const { error: insertError } = await supabase
-          .from("customer_alerts_sent")
-          .insert({ alert_type: recoveryType, sent_at: new Date().toISOString() });
-        if (insertError) throw insertError;
+        const { error: saveError } = await supabase.from("settings").upsert(
+          { key: stateKey, value: "online" },
+          { onConflict: "key" },
+        );
+        if (saveError) throw saveError;
         recoverySent++;
       } catch (sendError) {
         console.error(
@@ -231,6 +231,12 @@ async function processAgentCommunicationAlerts(supabase: any) {
           (sendError as Error).message,
         );
       }
+    } else if (!isOffline && !previousState) {
+      const { error: saveError } = await supabase.from("settings").upsert(
+        { key: stateKey, value: "online" },
+        { onConflict: "key" },
+      );
+      if (saveError) throw saveError;
     }
   }
 
