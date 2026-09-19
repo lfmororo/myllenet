@@ -51,6 +51,8 @@ node agente.js
 | `COLLECT_PPPOE` | `true` para coletar sessões PPPoE dos clientes |
 | `REQUEST_TIMEOUT_MS` | Timeout de cada chamada ao Mikrotik |
 
+O agente executa a cada 30 minutos os dois testes de download OVH configurados no sistema e envia as velocidades para o histórico do menu Mikrotik.
+
 ## Segurança
 
 - O token identifica somente este agente e pode ser revogado no sistema

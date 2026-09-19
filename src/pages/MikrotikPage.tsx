@@ -1054,8 +1054,7 @@ export default function MikrotikPage() {
                 Histórico de Speedtests Realizados
               </CardTitle>
               <CardDescription>
-                Registros das medições de tráfego efetuadas nas interfaces WAN.
-                esta gerando a cada minuto ao inves de a cada hora
+                Testes de download executados pelo agente a cada 30 minutos.
               </CardDescription>
             </div>
             {speedtestHistory.length > 0 && (
