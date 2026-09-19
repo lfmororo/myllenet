@@ -17,6 +17,8 @@ import Settings from "./pages/Settings";
 import MikrotikPage from "./pages/MikrotikPage";
 import InvoiceView from "./pages/InvoiceView";
 import AgentPage from "./pages/AgentPage";
+import SatisfactionPage from "./pages/SatisfactionPage";
+import FeedbackPage from "./pages/FeedbackPage";
 
 
 const queryClient = new QueryClient();
@@ -32,6 +34,7 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/fatura/:id" element={<InvoiceView />} />
+            <Route path="/satisfacao" element={<SatisfactionPage />} />
             <Route element={<AppLayout />}>
               <Route path="/dashboard" element={<DashboardHome />} />
               <Route path="/clientes" element={<CustomersPage />} />
@@ -40,6 +43,7 @@ const App = () => (
               <Route path="/logs-efi" element={<EfiLogsPage />} />
               <Route path="/mikrotik" element={<MikrotikPage />} />
               <Route path="/agente" element={<AgentPage />} />
+              <Route path="/avaliacoes" element={<FeedbackPage />} />
 
               <Route path="/settings" element={<Settings />} />
             </Route>
