@@ -3,6 +3,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2'
 import { getWhatsAppConfig, waSendText } from '../_shared/whatsapp.ts'
 
 const ADMIN_PHONE = '85986801458'
+const BOT_DISCLAIMER = '\n\n🤖 _Esta é uma mensagem automática. Para falar com um atendente, entre em contato: (85) 98680-1458_'
 
 async function processBlockAlerts(supabase: any) {
   const { data: alerts, error } = await supabase
@@ -28,7 +29,7 @@ async function processBlockAlerts(supabase: any) {
       : `✅ *Sinal Liberado*\n\nOlá ${customer.nome}, seu acesso à internet foi liberado novamente. Obrigado!`
 
     try {
-      await waSendText(customer.telefone, message, cfg)
+      await waSendText(customer.telefone, message + BOT_DISCLAIMER, cfg)
       await supabase.from('notification_logs').insert({
         customer_id: alert.customer_id,
         customer_name: customer.nome,
@@ -119,7 +120,7 @@ async function processCustomerDisconnections(supabase: any) {
 
     const message = `⚠️ *ALERTA DE DESCONEXÃO* ⚠️\n\nO cliente *${customer.nome}* (${username}) está desconectado há pelo menos 5 minutos.\n\nÚltima presença confirmada: ${new Date(baseline.collected_at).toLocaleString('pt-BR')}`
     try {
-      await waSendText(ADMIN_PHONE, message, cfg)
+      await waSendText(ADMIN_PHONE, message + BOT_DISCLAIMER, cfg)
       await supabase.from('customer_alerts_sent').insert({ customer_id: customer.id, alert_type: 'disconnect' })
       sent++
     } catch (sendError) {
