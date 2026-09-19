@@ -25,6 +25,7 @@ import {
   ShieldAlert,
   Router,
   Server,
+  Star,
 
 } from "lucide-react";
 import logoImg from "@/assets/logo.png";
@@ -36,6 +37,7 @@ const navItems = [
   { title: "Notificações", url: "/notificacoes", icon: Bell },
   { title: "Mikrotik", url: "/mikrotik", icon: Router },
   { title: "Agente VPS", url: "/agente", icon: Server },
+  { title: "Avaliações", url: "/avaliacoes", icon: Star },
 
   { title: "Logs EFI", url: "/logs-efi", icon: AlertTriangle },
   { title: "Configurações", url: "/settings", icon: Settings },
@@ -47,6 +49,7 @@ const pageTitles: Record<string, string> = {
   "/cobrancas": "Cobranças",
   "/notificacoes": "Notificações",
   "/mikrotik": "Mikrotik - Gestão",
+  "/avaliacoes": "Avaliações de Clientes",
   "/logs-efi": "Logs EFI",
   "/settings": "Configurações",
 };
