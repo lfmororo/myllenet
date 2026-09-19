@@ -82,7 +82,13 @@ async function processCustomerDisconnections(supabase: any) {
   const disconnectedNames = [...new Set(
     (baseline.usernames || [])
       .map((name: unknown) => String(name).toLowerCase())
-      .filter((name: string) => !currentNames.has(name)),
+      .filter((name: string) => {
+        if (currentNames.has(name)) return false
+        const lastPresence = snapshots.find((row: any) =>
+          (row.usernames || []).some((seen: unknown) => String(seen).toLowerCase() === name)
+        )
+        return lastPresence && new Date(lastPresence.collected_at).getTime() <= fiveMinutesAgo
+      }),
   )]
   if (disconnectedNames.length === 0) return 0
 

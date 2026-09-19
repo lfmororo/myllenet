@@ -104,7 +104,7 @@ Deno.serve(async (req) => {
       }
 
       // 3. PPPoE sessions per customer
-      const pppoeCollectionOk = p.diagnostics?.pppoe_collection_ok !== false
+      const pppoeCollectionOk = p.diagnostics?.pppoe_collection_ok === true
       if (p.online !== false && Array.isArray(p.pppoe)) {
         const snapshotNames = [...new Set(
           p.pppoe
