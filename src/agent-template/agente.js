@@ -159,6 +159,8 @@ async function pickHost() {
 
 // ---------- Coleta ----------
 const prevCounters = new Map(); // interface -> { rx, tx, ts }
+const seenRouterLogIds = new Set();
+let routerLogsInitialized = false;
 
 function isWan(name, comment) {
   if (CFG.wanFilter.length > 0)
@@ -180,13 +182,43 @@ async function collect(host, resourceRaw, connectionDuration) {
     ? resourceRaw[0]
     : resourceRaw || {};
 
-  const [healthRes, ifaceRes, activeRes] = await Promise.all([
+  const [healthRes, ifaceRes, activeRes, logRes] = await Promise.all([
     rest(host, "/system/health"),
     rest(host, "/interface"),
     CFG.collectPppoe
       ? rest(host, "/ppp/active")
       : Promise.resolve({ ok: true, data: [] }),
+    rest(host, "/log"),
   ]);
+
+  const routerLogErrors = [];
+  if (logRes.ok && Array.isArray(logRes.data)) {
+    const relevantLogs = logRes.data.filter((entry) =>
+      /error|critical|warning|authentication|login|failure|failed|invalid/i.test(
+        `${entry.topics || ""} ${entry.message || ""}`,
+      ),
+    );
+    for (const entry of relevantLogs) {
+      const id = String(entry[".id"] || `${entry.time || ""}:${entry.message || ""}`);
+      if (routerLogsInitialized && !seenRouterLogIds.has(id)) {
+        routerLogErrors.push({
+          id,
+          time: entry.time || null,
+          topics: entry.topics || null,
+          message: entry.message || "Erro sem descrição",
+        });
+      }
+      seenRouterLogIds.add(id);
+    }
+    routerLogsInitialized = true;
+    if (seenRouterLogIds.size > 1000) {
+      const recentIds = relevantLogs.slice(-500).map((entry) =>
+        String(entry[".id"] || `${entry.time || ""}:${entry.message || ""}`),
+      );
+      seenRouterLogIds.clear();
+      recentIds.forEach((id) => seenRouterLogIds.add(id));
+    }
+  }
 
   // Temperatura (formato varia entre versões do RouterOS)
   let temperature = null;
@@ -270,6 +302,17 @@ async function collect(host, resourceRaw, connectionDuration) {
         ? null
         : activeRes.error || `HTTP ${activeRes.status || 0}`,
       pppoe_count: pppoe.length,
+      interface_collection_ok: ifaceRes.ok,
+      interface_error: ifaceRes.ok
+        ? null
+        : ifaceRes.error || `HTTP ${ifaceRes.status || 0}`,
+      health_collection_ok: healthRes.ok,
+      health_error: healthRes.ok
+        ? null
+        : healthRes.error || `HTTP ${healthRes.status || 0}`,
+      log_collection_ok: logRes.ok,
+      log_error: logRes.ok ? null : logRes.error || `HTTP ${logRes.status || 0}`,
+      router_log_errors: routerLogErrors,
     },
     resource: {
       cpu_load:
