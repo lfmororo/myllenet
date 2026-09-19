@@ -41,6 +41,7 @@ import {
 } from "lucide-react";
 import { MikrotikHostStatus } from "@/components/MikrotikHostStatus";
 import { RecentPppoeConnections } from "@/components/RecentPppoeConnections";
+import { MikrotikCommandQueue } from "@/components/MikrotikCommandQueue";
 import {
   Dialog,
   DialogContent,
