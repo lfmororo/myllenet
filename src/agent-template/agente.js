@@ -199,7 +199,9 @@ async function collect(host, resourceRaw, connectionDuration) {
       ),
     );
     for (const entry of relevantLogs) {
-      const id = String(entry[".id"] || `${entry.time || ""}:${entry.message || ""}`);
+      const id = String(
+        entry[".id"] || `${entry.time || ""}:${entry.message || ""}`,
+      );
       if (routerLogsInitialized && !seenRouterLogIds.has(id)) {
         routerLogErrors.push({
           id,
@@ -212,9 +214,11 @@ async function collect(host, resourceRaw, connectionDuration) {
     }
     routerLogsInitialized = true;
     if (seenRouterLogIds.size > 1000) {
-      const recentIds = relevantLogs.slice(-500).map((entry) =>
-        String(entry[".id"] || `${entry.time || ""}:${entry.message || ""}`),
-      );
+      const recentIds = relevantLogs
+        .slice(-500)
+        .map((entry) =>
+          String(entry[".id"] || `${entry.time || ""}:${entry.message || ""}`),
+        );
       seenRouterLogIds.clear();
       recentIds.forEach((id) => seenRouterLogIds.add(id));
     }
@@ -311,7 +315,9 @@ async function collect(host, resourceRaw, connectionDuration) {
         ? null
         : healthRes.error || `HTTP ${healthRes.status || 0}`,
       log_collection_ok: logRes.ok,
-      log_error: logRes.ok ? null : logRes.error || `HTTP ${logRes.status || 0}`,
+      log_error: logRes.ok
+        ? null
+        : logRes.error || `HTTP ${logRes.status || 0}`,
       router_log_errors: routerLogErrors,
     },
     resource: {

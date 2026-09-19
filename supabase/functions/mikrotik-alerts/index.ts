@@ -202,10 +202,9 @@ async function processAgentCommunicationAlerts(supabase: any) {
 
       try {
         await waSendText(ADMIN_PHONE, message + BOT_DISCLAIMER, cfg);
-        const { error: saveError } = await supabase.from("settings").upsert(
-          { key: stateKey, value: "offline" },
-          { onConflict: "key" },
-        );
+        const { error: saveError } = await supabase
+          .from("settings")
+          .upsert({ key: stateKey, value: "offline" }, { onConflict: "key" });
         if (saveError) throw saveError;
         offlineSent++;
       } catch (sendError) {
@@ -219,10 +218,9 @@ async function processAgentCommunicationAlerts(supabase: any) {
 
       try {
         await waSendText(ADMIN_PHONE, message + BOT_DISCLAIMER, cfg);
-        const { error: saveError } = await supabase.from("settings").upsert(
-          { key: stateKey, value: "online" },
-          { onConflict: "key" },
-        );
+        const { error: saveError } = await supabase
+          .from("settings")
+          .upsert({ key: stateKey, value: "online" }, { onConflict: "key" });
         if (saveError) throw saveError;
         recoverySent++;
       } catch (sendError) {
@@ -232,10 +230,9 @@ async function processAgentCommunicationAlerts(supabase: any) {
         );
       }
     } else if (!isOffline && !previousState) {
-      const { error: saveError } = await supabase.from("settings").upsert(
-        { key: stateKey, value: "online" },
-        { onConflict: "key" },
-      );
+      const { error: saveError } = await supabase
+        .from("settings")
+        .upsert({ key: stateKey, value: "online" }, { onConflict: "key" });
       if (saveError) throw saveError;
     }
   }
@@ -283,7 +280,11 @@ async function processMikrotikErrorAlerts(supabase: any) {
 
     const collectionErrors = [
       ["PPPoE", diagnostics.pppoe_collection_ok, diagnostics.pppoe_error],
-      ["interfaces WAN", diagnostics.interface_collection_ok, diagnostics.interface_error],
+      [
+        "interfaces WAN",
+        diagnostics.interface_collection_ok,
+        diagnostics.interface_error,
+      ],
       ["hardware", diagnostics.health_collection_ok, diagnostics.health_error],
       ["logs", diagnostics.log_collection_ok, diagnostics.log_error],
     ];
@@ -313,7 +314,8 @@ async function processMikrotikErrorAlerts(supabase: any) {
   let sent = 0;
 
   for (const candidate of candidates) {
-    const normalized = `${candidate.host}|${candidate.category}|${candidate.detail}`.toLowerCase();
+    const normalized =
+      `${candidate.host}|${candidate.category}|${candidate.detail}`.toLowerCase();
     const alertType = `mikrotik_error_${errorFingerprint(normalized)}`;
     if (processed.has(alertType)) continue;
     processed.add(alertType);
