@@ -165,6 +165,78 @@ async function processCustomerDisconnections(supabase: any) {
   return sent;
 }
 
+async function processAgentCommunicationAlerts(supabase: any) {
+  const thresholdMs = 2 * 60 * 1000;
+  const now = Date.now();
+  const { data: agents, error } = await supabase
+    .from("agent_tokens")
+    .select("id, name, created_at, last_seen_at")
+    .eq("active", true);
+
+  if (error) throw error;
+
+  const cfg = await getWhatsAppConfig();
+  let offlineSent = 0;
+  let recoverySent = 0;
+
+  for (const agent of agents || []) {
+    const referenceTime = agent.last_seen_at || agent.created_at;
+    if (!referenceTime) continue;
+
+    const isOffline = now - new Date(referenceTime).getTime() > thresholdMs;
+    const offlineType = `agent_offline_${agent.id}`;
+    const recoveryType = `agent_recovered_${agent.id}`;
+    const { data: latestAlerts, error: latestAlertError } = await supabase
+      .from("customer_alerts_sent")
+      .select("alert_type, sent_at")
+      .in("alert_type", [offlineType, recoveryType])
+      .order("sent_at", { ascending: false })
+      .limit(1);
+
+    if (latestAlertError) throw latestAlertError;
+    const latestType = latestAlerts?.[0]?.alert_type;
+
+    if (isOffline && latestType !== offlineType) {
+      const lastSeen = agent.last_seen_at
+        ? new Date(agent.last_seen_at).toLocaleString("pt-BR")
+        : "Nunca se comunicou";
+      const message = `🚨 *ALERTA DO AGENTE* 🚨\n\nO agente *${agent.name}* está sem comunicação há mais de 2 minutos.\n\nÚltima atividade: ${lastSeen}\n\nVerifique se o serviço Node.js está em execução.`;
+
+      try {
+        await waSendText(ADMIN_PHONE, message + BOT_DISCLAIMER, cfg);
+        const { error: insertError } = await supabase
+          .from("customer_alerts_sent")
+          .insert({ alert_type: offlineType, sent_at: new Date().toISOString() });
+        if (insertError) throw insertError;
+        offlineSent++;
+      } catch (sendError) {
+        console.error(
+          `Agent offline alert ${agent.id} failed:`,
+          (sendError as Error).message,
+        );
+      }
+    } else if (!isOffline && latestType === offlineType) {
+      const message = `✅ *AGENTE RECONECTADO* ✅\n\nO agente *${agent.name}* voltou a se comunicar normalmente.\n\nAtividade confirmada: ${new Date(referenceTime).toLocaleString("pt-BR")}`;
+
+      try {
+        await waSendText(ADMIN_PHONE, message + BOT_DISCLAIMER, cfg);
+        const { error: insertError } = await supabase
+          .from("customer_alerts_sent")
+          .insert({ alert_type: recoveryType, sent_at: new Date().toISOString() });
+        if (insertError) throw insertError;
+        recoverySent++;
+      } catch (sendError) {
+        console.error(
+          `Agent recovery alert ${agent.id} failed:`,
+          (sendError as Error).message,
+        );
+      }
+    }
+  }
+
+  return { offlineSent, recoverySent };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS")
     return new Response("ok", { headers: corsHeaders });
@@ -183,6 +255,7 @@ Deno.serve(async (req) => {
 
     const blockAlertsSent = await processBlockAlerts(supabase);
     const disconnectAlertsSent = await processCustomerDisconnections(supabase);
+    const agentAlerts = await processAgentCommunicationAlerts(supabase);
 
     // 1. Check Mikrotik Connection Alerts with custom settings
     const { data: offlineThresholdData } = await supabase
@@ -412,44 +485,6 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 7. Check Agent Communication Alerts (2 minutes)
-    const twoMinAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
-    const { data: offlineAgents } = await supabase
-      .from("agent_tokens")
-      .select("id, name, last_seen_at")
-      .eq("active", true)
-      .lt("last_seen_at", twoMinAgo);
-
-    if (offlineAgents && offlineAgents.length > 0) {
-      for (const agent of offlineAgents) {
-        const alertType = `agent_offline_${agent.id}`;
-        const { data: recentAlert } = await supabase
-          .from("customer_alerts_sent")
-          .select("id")
-          .eq("alert_type", alertType)
-          .gt("sent_at", new Date(Date.now() - 60 * 60 * 1000).toISOString())
-          .single();
-
-        if (!recentAlert) {
-          console.log(`ALERT: Agent ${agent.name} is offline (> 2 min)`);
-          const lastSeen = agent.last_seen_at
-            ? new Date(agent.last_seen_at).toLocaleString("pt-BR")
-            : "Nunca";
-          await supabase.functions.invoke("whatsapp-send/send-text", {
-            body: {
-              phone: ADMIN_PHONE,
-              message: `🤖 *ALERTA DO AGENTE VPS* 🤖\n\nO agente *${agent.name}* está sem comunicação há mais de 2 minutos!\n\nÚltima atividade: ${lastSeen}\n\nPor favor, verifique se o serviço Node.js está rodando na VPS.`,
-            },
-          });
-
-          await supabase.from("customer_alerts_sent").insert({
-            alert_type: alertType,
-            sent_at: new Date().toISOString(),
-          });
-        }
-      }
-    }
-
     // 6. Check WAN Speed Alerts
     const { data: speedThresholdData } = await supabase
       .from("settings")
@@ -521,6 +556,8 @@ Deno.serve(async (req) => {
       success: true,
       block_alerts_sent: blockAlertsSent,
       disconnect_alerts_sent: disconnectAlertsSent,
+      agent_offline_alerts_sent: agentAlerts.offlineSent,
+      agent_recovery_alerts_sent: agentAlerts.recoverySent,
     });
   } catch (e) {
     return json({ error: (e as Error).message }, 500);
