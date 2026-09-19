@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 export const useMikrotikLogs = () => {
   const [wanLogs, setWanLogs] = useState<any[]>([]);
   const [wanHistory, setWanHistory] = useState<any[]>([]);
+  const [speedtestHistory, setSpeedtestHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchWanHistory = async () => {
@@ -27,8 +28,26 @@ export const useMikrotikLogs = () => {
       .limit(1000);
     
     if (!error && data) {
+      setSpeedtestHistory(
+        data
+          .filter((log: any) =>
+            String(log.interface_name || "").startsWith("Speedtest "),
+          )
+          .map((log: any) => ({
+            id: log.id,
+            name: String(log.interface_name).replace(/^Speedtest /, ""),
+            mbps: Number(log.rx_bps || 0) / 1_000_000,
+            bytes: Number(log.rx_bytes || 0),
+            createdAt: new Date(log.created_at),
+          })),
+      );
       const grouped: Record<string, any> = {};
-      data.forEach((log: any) => {
+      data
+        .filter(
+          (log: any) =>
+            !String(log.interface_name || "").startsWith("Speedtest "),
+        )
+        .forEach((log: any) => {
         const dateObj = new Date(log.created_at);
         // Usamos uma chave de tempo com precisão de 30 segundos para agrupar logs do agente que podem variar ligeiramente
         const seconds = dateObj.getSeconds();
@@ -62,7 +81,7 @@ export const useMikrotikLogs = () => {
 
         if (newDownload > currentDownload) grouped[timeKey][`${iface} ↓`] = newDownload;
         if (newUpload > currentUpload) grouped[timeKey][`${iface} ↑`] = newUpload;
-      });
+        });
       
       // Ordenar por data e pegar os últimos 60 pontos
       const sorted = Object.values(grouped).sort((a: any, b: any) => a.fullDate.getTime() - b.fullDate.getTime());
@@ -87,5 +106,5 @@ export const useMikrotikLogs = () => {
     return () => { supabase.removeChannel(channel); };
   }, []);
 
-  return { wanLogs, wanHistory, loading };
+  return { wanLogs, wanHistory, speedtestHistory, loading };
 };

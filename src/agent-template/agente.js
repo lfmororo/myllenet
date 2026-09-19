@@ -54,6 +54,8 @@ const CFG = {
     .filter(Boolean),
   collectPppoe: String(process.env.COLLECT_PPPOE || "true") === "true",
   requestTimeoutMs: parseInt(process.env.REQUEST_TIMEOUT_MS || "8000", 10),
+  speedtestIntervalMs: 30 * 60 * 1000,
+  speedtestTimeoutMs: 5 * 60 * 1000,
   queueFile: path.join(__dirname, "queue.json"),
   maxQueue: 500,
 };
@@ -101,6 +103,44 @@ async function rest(host, endpoint) {
     let err = e.message;
     if (e.name === "AbortError") err = `Timeout (${CFG.requestTimeoutMs}ms)`;
     return { ok: false, status: 0, error: err };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function restCommand(host, endpoint, body, timeoutMs) {
+  const scheme = CFG.useHttps ? "https" : "http";
+  const url = `${scheme}://${host}:${CFG.restPort}/rest${endpoint}`;
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: authHeader,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Connection: "close",
+      },
+      body: JSON.stringify(body),
+      signal: ac.signal,
+    });
+    if (!res.ok) {
+      const responseBody = await res.text().catch(() => "");
+      return {
+        ok: false,
+        error: `HTTP ${res.status}: ${responseBody.slice(0, 160)}`,
+      };
+    }
+    return { ok: true, data: await res.json().catch(() => ({})) };
+  } catch (e) {
+    return {
+      ok: false,
+      error:
+        e.name === "AbortError"
+          ? `Timeout (${timeoutMs}ms)`
+          : e.message || "Falha desconhecida",
+    };
   } finally {
     clearTimeout(timer);
   }
@@ -161,6 +201,65 @@ async function pickHost() {
 const prevCounters = new Map(); // interface -> { rx, tx, ts }
 const seenRouterLogIds = new Set();
 let routerLogsInitialized = false;
+let lastSpeedtestAt = 0;
+
+const SPEEDTESTS = [
+  {
+    name: "Speedtest OVH DNS",
+    url: "https://proof.ovh.net/files/100Mb.dat",
+    checkCertificate: true,
+  },
+  {
+    name: "Speedtest OVH IP",
+    url: "https://141.95.207.211/files/100Mb.dat",
+    checkCertificate: false,
+  },
+];
+
+async function runSpeedtests(host) {
+  const results = [];
+  for (const test of SPEEDTESTS) {
+    const startedAt = Date.now();
+    const response = await restCommand(
+      host,
+      "/tool/fetch",
+      {
+        url: test.url,
+        output: "none",
+        ...(test.checkCertificate
+          ? {}
+          : { "check-certificate": "no" }),
+      },
+      CFG.speedtestTimeoutMs,
+    );
+    const durationMs = Math.max(1, Date.now() - startedAt);
+    const responseData = Array.isArray(response.data)
+      ? response.data[response.data.length - 1] || {}
+      : response.data || {};
+    const reportedBytes = Number(responseData.downloaded || 0);
+    const downloadedBytes = reportedBytes > 0 ? reportedBytes : 100 * 1024 * 1024;
+    const speedBps = response.ok
+      ? Math.round((downloadedBytes * 8 * 1000) / durationMs)
+      : 0;
+
+    results.push({
+      interface_name: test.name,
+      rx_bps: speedBps,
+      tx_bps: 0,
+      rx_bytes: response.ok ? downloadedBytes : 0,
+      tx_bytes: 0,
+      duration_ms: durationMs,
+      status: response.ok ? "success" : "error",
+      error: response.ok ? null : response.error,
+    });
+    log(
+      response.ok
+        ? `${test.name}: ${(speedBps / 1_000_000).toFixed(2)} Mbps em ${(durationMs / 1000).toFixed(1)}s`
+        : `${test.name}: falhou — ${response.error}`,
+    );
+  }
+  return results;
+}
 
 function isWan(name, comment) {
   if (CFG.wanFilter.length > 0)
@@ -312,6 +411,12 @@ async function collect(host, resourceRaw, connectionDuration) {
   const freeMemory =
     resource["free-memory"] != null ? Number(resource["free-memory"]) : null;
 
+  let speedtests = [];
+  if (now - lastSpeedtestAt >= CFG.speedtestIntervalMs) {
+    lastSpeedtestAt = now;
+    speedtests = await runSpeedtests(host);
+  }
+
   return {
     host,
     online: true,
@@ -349,6 +454,7 @@ async function collect(host, resourceRaw, connectionDuration) {
     },
     wan,
     pppoe,
+    speedtests,
   };
 }
 
