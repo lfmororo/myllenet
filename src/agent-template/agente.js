@@ -709,6 +709,8 @@ tick();
 setInterval(tick, CFG.intervalSeconds * 1000);
 setTimeout(speedtestTick, 10 * 1000);
 setInterval(speedtestTick, CFG.speedtestIntervalMs);
+setTimeout(commandTick, 5 * 1000);
+setInterval(commandTick, 15 * 1000);
 
 process.on("SIGTERM", () => {
   log("Encerrando agente...");
