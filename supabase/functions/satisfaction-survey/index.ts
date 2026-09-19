@@ -32,10 +32,22 @@ function isInternalCron(req: Request): boolean {
   return !!secret && !!provided && provided === secret;
 }
 
+function tokenRole(token: string): string | null {
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    return payload?.role ?? null;
+  } catch {
+    return null;
+  }
+}
+
 async function verifyAdmin(authHeader: string | null) {
   if (!authHeader) throw new Error("Não autenticado");
   const supabase = admin();
   const token = authHeader.replace("Bearer ", "");
+  if (token === Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || tokenRole(token) === "service_role") {
+    return;
+  }
   const { data: userData, error } = await supabase.auth.getUser(token);
   if (error || !userData?.user) throw new Error("Não autenticado");
   const { data: role } = await supabase
