@@ -146,6 +146,50 @@ async function restCommand(host, endpoint, body, timeoutMs) {
   }
 }
 
+/** Requisição REST genérica (GET/PUT/PATCH/DELETE) no Mikrotik. */
+async function restRequest(host, method, endpoint, body, timeoutMs) {
+  const scheme = CFG.useHttps ? "https" : "http";
+  const url = `${scheme}://${host}:${CFG.restPort}/rest${endpoint}`;
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), timeoutMs || CFG.requestTimeoutMs);
+  try {
+    const res = await fetch(url, {
+      method,
+      headers: {
+        Authorization: authHeader,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Connection: "close",
+      },
+      body: body ? JSON.stringify(body) : undefined,
+      signal: ac.signal,
+    });
+    const text = await res.text().catch(() => "");
+    if (!res.ok) {
+      return { ok: false, error: `HTTP ${res.status}: ${text.slice(0, 160)}` };
+    }
+    let data = null;
+    try {
+      data = text ? JSON.parse(text) : null;
+    } catch {
+      data = null;
+    }
+    return { ok: true, data };
+  } catch (e) {
+    return {
+      ok: false,
+      error:
+        e.name === "AbortError"
+          ? `Timeout (${timeoutMs || CFG.requestTimeoutMs}ms)`
+          : e.message || "Falha desconhecida",
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+
+
 function tcpProbe(host, port, timeoutMs = 2500) {
   return new Promise((resolve) => {
     const socket = net.createConnection({ host, port: Number(port) });
