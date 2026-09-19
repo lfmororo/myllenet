@@ -42,7 +42,7 @@ export default function CustomersPage() {
       const { data, error } = await supabase.functions.invoke("mikrotik-status");
       if (!error) {
         if (data?.activeList) {
-          setOnlineUsers(data.activeList.map((u: any) => u.name));
+          setOnlineUsers(data.activeList.map((u: any) => String(u.name || "").toLowerCase()));
           setActiveSessions(data.activeList);
         }
       }

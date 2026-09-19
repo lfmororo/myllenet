@@ -119,7 +119,7 @@ function isWan(name, comment) {
   return n.includes("wan") || n.includes("pppoe-out") || n.includes("ether1") || (comment || "").toLowerCase().includes("wan");
 }
 
-async function collect(host, resourceRaw) {
+async function collect(host, resourceRaw, connectionDuration) {
   const now = Date.now();
   const resource = Array.isArray(resourceRaw) ? resourceRaw[0] : resourceRaw || {};
 
@@ -190,7 +190,12 @@ async function collect(host, resourceRaw) {
     online: true,
     collected_at: new Date().toISOString(),
     message: `Agente VPS: OK (${wan.length} WAN, ${pppoe.length} sessões PPPoE)`,
-    diagnostics: { duration: resourceRaw.duration },
+    diagnostics: {
+      duration: connectionDuration,
+      pppoe_collection_ok: activeRes.ok,
+      pppoe_error: activeRes.ok ? null : (activeRes.error || `HTTP ${activeRes.status || 0}`),
+      pppoe_count: pppoe.length,
+    },
     resource: {
       cpu_load: resource["cpu-load"] != null ? Number(resource["cpu-load"]) : null,
       free_memory: freeMemory,
@@ -260,7 +265,7 @@ async function tick() {
       });
       return;
     }
-    const payload = await collect(picked.host, picked.resource);
+    const payload = await collect(picked.host, picked.resource, picked.duration);
     await flush(payload);
   } catch (e) {
     log("Erro no ciclo:", e.message);

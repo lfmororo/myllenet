@@ -326,18 +326,21 @@ Deno.serve(async (req) => {
     let online = restOk || reachable
     let source: 'direct' | 'agent' | 'offline' = online ? 'direct' : 'offline'
 
-    if (!online) {
+    if (!restOk) {
       const twoMinAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString()
-      const { data: activeAgents } = await supabase
-        .from('agent_tokens')
-        .select('name, last_seen_at')
-        .eq('active', true)
-        .gt('last_seen_at', twoMinAgo)
+      const { data: agentStatus } = await supabase
+        .from('mikrotik_status_history')
+        .select('host, online, logged_at, diagnostics')
+        .eq('online', true)
+        .like('message', 'Agente VPS:%')
+        .gt('logged_at', twoMinAgo)
+        .order('logged_at', { ascending: false })
         .limit(1)
 
-      if (activeAgents && activeAgents.length > 0) {
+      if (agentStatus && agentStatus.length > 0) {
         online = true
         source = 'agent'
+        connectedHost = agentStatus[0].host || connectedHost
         const { data: latestMetrics } = await supabase
           .from('wan_logs')
           .select('*')
@@ -352,12 +355,22 @@ Deno.serve(async (req) => {
           temperature = m.temperature
         }
         
-        const { data: activePppoe } = await supabase
-          .from('pppoe_logs')
-          .select('usuario_pppoe')
-          .gt('logged_at', twoMinAgo)
-          
-        activeUsers = activePppoe?.length || 0
+        const { data: latestSnapshot } = await supabase
+          .from('mikrotik_pppoe_snapshots')
+          .select('usernames, collected_at, collection_ok')
+          .eq('collection_ok', true)
+          .gt('collected_at', twoMinAgo)
+          .order('collected_at', { ascending: false })
+          .limit(1)
+
+        const names = Array.isArray(latestSnapshot?.[0]?.usernames)
+          ? latestSnapshot[0].usernames.map((name: unknown) => String(name).toLowerCase())
+          : []
+        activeList = names.map((name: string) => ({ name }))
+        activeUsers = activeList.length
+      } else if (!reachable) {
+        online = false
+        source = 'offline'
       }
     }
 

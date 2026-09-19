@@ -74,7 +74,8 @@ export default function CustomerTable({
             {customers.map((c) => {
               const hasPagoAte = c.pago_ate && new Date(c.pago_ate + "T12:00:00") >= currentMonthEnd;
               const hasInvoice = hasPagoAte || (customerIdsWithInvoice?.has(c.id) ?? false);
-              const isOnline = onlineList.includes(c.usuario_pppoe);
+              const pppoeName = String(c.usuario_pppoe || "").toLowerCase();
+              const isOnline = onlineList.some((name) => String(name).toLowerCase() === pppoeName);
               return (
                 <TableRow key={c.id} className={`hover:bg-muted/30 ${!c.ativo ? "opacity-50" : ""}`}>
                   <TableCell className="font-medium">

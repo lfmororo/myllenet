@@ -825,6 +825,8 @@ async function sendPaymentNotification(supabase: any, invoiceId: string) {
           changed_by: null // System action
         });
 
+        // A alteração de block_status aciona a fila confiável de notificação.
+
         // Trigger Mikrotik unblock via edge function
         try {
           const { error: syncErr } = await supabase.functions.invoke("mikrotik-customer", {

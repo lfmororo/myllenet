@@ -104,7 +104,23 @@ Deno.serve(async (req) => {
       }
 
       // 3. PPPoE sessions per customer
-      if (Array.isArray(p.pppoe) && p.pppoe.length > 0) {
+      const pppoeCollectionOk = p.diagnostics?.pppoe_collection_ok !== false
+      if (p.online !== false && Array.isArray(p.pppoe)) {
+        const snapshotNames = [...new Set(
+          p.pppoe
+            .map((s: any) => String(s.usuario_pppoe || '').trim().toLowerCase())
+            .filter(Boolean),
+        )]
+        const { error: snapshotError } = await supabase.from('mikrotik_pppoe_snapshots').insert({
+          host: String(p.host || 'desconhecido'),
+          collected_at: loggedAt,
+          collection_ok: pppoeCollectionOk,
+          usernames: snapshotNames,
+        })
+        if (snapshotError) console.error('mikrotik_pppoe_snapshots insert error', snapshotError.message)
+      }
+
+      if (pppoeCollectionOk && Array.isArray(p.pppoe) && p.pppoe.length > 0) {
         const rows: any[] = []
         for (const s of p.pppoe) {
           const name = String(s.usuario_pppoe || '').toLowerCase()
