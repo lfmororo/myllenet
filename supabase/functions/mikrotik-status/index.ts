@@ -443,7 +443,32 @@ Deno.serve(async (req) => {
               String(name).toLowerCase(),
             )
           : [];
-        activeList = names.map((name: string) => ({ name }));
+        const { data: recentPppoeStats } = await supabase
+          .from("pppoe_logs")
+          .select(
+            "usuario_pppoe, ip_address, uptime, rx_bytes, tx_bytes, logged_at",
+          )
+          .in("usuario_pppoe", names)
+          .gt("logged_at", twoMinAgo)
+          .order("logged_at", { ascending: false })
+          .limit(Math.max(200, names.length * 5));
+        const latestStatsByName = new Map<string, any>();
+        for (const stat of recentPppoeStats || []) {
+          const normalizedName = String(stat.usuario_pppoe || "").toLowerCase();
+          if (!latestStatsByName.has(normalizedName)) {
+            latestStatsByName.set(normalizedName, stat);
+          }
+        }
+        activeList = names.map((name: string) => {
+          const stat = latestStatsByName.get(name);
+          return {
+            name,
+            address: stat?.ip_address || null,
+            uptime: stat?.uptime || null,
+            rx_bytes: stat?.rx_bytes ?? null,
+            tx_bytes: stat?.tx_bytes ?? null,
+          };
+        });
         activeUsers = activeList.length;
       } else if (!reachable) {
         online = false;

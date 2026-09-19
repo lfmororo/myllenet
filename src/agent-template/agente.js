@@ -278,12 +278,30 @@ async function collect(host, resourceRaw, connectionDuration) {
   const pppoe = [];
   if (activeRes.ok && Array.isArray(activeRes.data)) {
     for (const s of activeRes.data) {
+      const sessionInterface = Array.isArray(ifaceRes.data)
+        ? ifaceRes.data.find(
+            (i) =>
+              i.name === s.name ||
+              i.name === `<pppoe-${s.name}>` ||
+              (i.type === "pppoe-in" && String(i.name || "").includes(s.name)),
+          )
+        : null;
       pppoe.push({
         usuario_pppoe: s.name,
         ip_address: s.address || null,
         uptime: s.uptime || null,
-        rx_bytes: s["bytes-in"] != null ? Number(s["bytes-in"]) : null,
-        tx_bytes: s["bytes-out"] != null ? Number(s["bytes-out"]) : null,
+        rx_bytes:
+          sessionInterface?.["rx-byte"] != null
+            ? Number(sessionInterface["rx-byte"])
+            : s["bytes-in"] != null
+              ? Number(s["bytes-in"])
+              : null,
+        tx_bytes:
+          sessionInterface?.["tx-byte"] != null
+            ? Number(sessionInterface["tx-byte"])
+            : s["bytes-out"] != null
+              ? Number(s["bytes-out"])
+              : null,
         event_type: "stats",
       });
     }

@@ -528,7 +528,9 @@ export default function CustomersPage() {
         mikrotikData={
           detailCustomer
             ? activeSessions.find(
-                (s) => s.name === detailCustomer.usuario_pppoe,
+                (s) =>
+                  String(s.name || "").toLowerCase() ===
+                  String(detailCustomer.usuario_pppoe || "").toLowerCase(),
               )
             : null
         }
