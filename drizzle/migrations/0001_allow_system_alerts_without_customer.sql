@@ -1,0 +1,1 @@
+ALTER TABLE public.customer_alerts_sent ALTER COLUMN customer_id DROP NOT NULL;
