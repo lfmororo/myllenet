@@ -299,6 +299,21 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
 
   const totalPending = invoices.filter(i => ["pending", "waiting"].includes(i.status)).reduce((s, i) => s + i.valor_centavos, 0);
   const totalPaid = invoices.filter(i => i.status === "paid").reduce((s, i) => s + i.valor_centavos, 0);
+  const usageLogs = logs
+    .filter((log) => Number.isFinite(Number(log.rx_bytes)) || Number.isFinite(Number(log.tx_bytes)))
+    .map((log) => ({
+      ...log,
+      rx_bytes: Number(log.rx_bytes || 0),
+      tx_bytes: Number(log.tx_bytes || 0),
+    }));
+  const latestUsage = usageLogs[0];
+  const downloadBytes = Number(mikrotikData?.rx_bytes ?? latestUsage?.rx_bytes ?? 0);
+  const uploadBytes = Number(mikrotikData?.tx_bytes ?? latestUsage?.tx_bytes ?? 0);
+  const formatBytes = (bytes: number) => {
+    if (!Number.isFinite(bytes) || bytes <= 0) return "0 MB";
+    if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(2)} GB`;
+    return `${(bytes / 1024 ** 2).toFixed(2)} MB`;
+  };
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -433,11 +448,22 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
                 <Activity className="h-4 w-4 text-primary" />
                 Consumo de Banda (24h)
               </h3>
+
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div className="rounded-md border bg-background p-3">
+                  <span className="text-muted-foreground">Download</span>
+                  <p className="mt-1 text-base font-semibold tabular-nums">{formatBytes(downloadBytes)}</p>
+                </div>
+                <div className="rounded-md border bg-background p-3">
+                  <span className="text-muted-foreground">Upload</span>
+                  <p className="mt-1 text-base font-semibold tabular-nums">{formatBytes(uploadBytes)}</p>
+                </div>
+              </div>
               
               <div className="h-[150px] w-full mt-2">
-                {logs.length > 5 ? (
+                {usageLogs.length > 1 ? (
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={[...logs].reverse().slice(-24)}>
+                    <AreaChart data={[...usageLogs].reverse().slice(-48)}>
                       <defs>
                         <linearGradient id="colorRx" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="5%" stopColor="#0d9488" stopOpacity={0.3}/>
@@ -455,14 +481,15 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
                       />
                       <Tooltip 
                         labelFormatter={(label: any) => new Date(label).toLocaleString('pt-BR')}
-                        formatter={(val: number) => [`${(val / (1024*1024)).toFixed(2)} MB`, 'Download']}
+                        formatter={(val: number, name: string) => [formatBytes(val), name === "rx_bytes" ? "Download" : "Upload"]}
                       />
                       <Area type="monotone" dataKey="rx_bytes" stroke="#0d9488" fillOpacity={1} fill="url(#colorRx)" />
+                      <Line type="monotone" dataKey="tx_bytes" stroke="hsl(var(--accent-foreground))" dot={false} />
                     </AreaChart>
                   </ResponsiveContainer>
                 ) : (
                   <div className="h-full flex items-center justify-center text-xs text-muted-foreground italic">
-                    Dados insuficientes para gerar gráfico.
+                    {loadingLogs ? "Carregando consumo..." : "Aguardando dados de consumo do agente."}
                   </div>
                 )}
               </div>
