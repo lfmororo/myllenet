@@ -1,9 +1,33 @@
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Pencil, Trash2, Eye, EyeOff, FileSearch, FileText, AlertCircle, Gift, ShieldAlert, ShieldCheck, Loader2 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  Pencil,
+  Trash2,
+  Eye,
+  EyeOff,
+  FileSearch,
+  FileText,
+  AlertCircle,
+  Gift,
+  ShieldAlert,
+  ShieldCheck,
+  Loader2,
+} from "lucide-react";
 import { useState } from "react";
 import type { Customer } from "@/hooks/useCustomers";
 import type { Plan } from "@/hooks/usePlans";
@@ -17,18 +41,31 @@ interface Props {
   customerIdsWithInvoice?: Set<string>;
   plans?: Plan[];
   onlineList?: string[];
-  syncMikrotik?: (id: string, action: 'enable' | 'disable' | 'sync') => Promise<boolean>;
+  syncMikrotik?: (
+    id: string,
+    action: "enable" | "disable" | "sync",
+  ) => Promise<boolean>;
   mikrotikLoading?: string | null;
 }
 
-export default function CustomerTable({ 
-  customers, onEdit, onDelete, onToggleActive, onDetail, customerIdsWithInvoice, plans = [], onlineList = [],
-  syncMikrotik, mikrotikLoading 
+export default function CustomerTable({
+  customers,
+  onEdit,
+  onDelete,
+  onToggleActive,
+  onDetail,
+  customerIdsWithInvoice,
+  plans = [],
+  onlineList = [],
+  syncMikrotik,
+  mikrotikLoading,
 }: Props) {
   const now = new Date();
   const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-  const planMap = Object.fromEntries(plans.map(p => [p.id, p.nome]));
-  const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
+  const planMap = Object.fromEntries(plans.map((p) => [p.id, p.nome]));
+  const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>(
+    {},
+  );
 
   const togglePassword = (id: string) => {
     setShowPasswords((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -57,45 +94,83 @@ export default function CustomerTable({
             <TableRow className="bg-muted/50">
               <TableHead className="font-semibold">Nome</TableHead>
               <TableHead className="font-semibold">CPF</TableHead>
-              <TableHead className="font-semibold hidden md:table-cell">E-mail</TableHead>
-              <TableHead className="font-semibold hidden lg:table-cell">Telefone</TableHead>
-              <TableHead className="font-semibold hidden lg:table-cell">Plano</TableHead>
-              <TableHead className="font-semibold text-center">Conexão</TableHead>
+              <TableHead className="font-semibold hidden md:table-cell">
+                E-mail
+              </TableHead>
+              <TableHead className="font-semibold hidden lg:table-cell">
+                Telefone
+              </TableHead>
+              <TableHead className="font-semibold hidden lg:table-cell">
+                Plano
+              </TableHead>
+              <TableHead className="font-semibold text-center">
+                Conexão
+              </TableHead>
               <TableHead className="font-semibold">Usuário PPPoE</TableHead>
               <TableHead className="font-semibold">Senha PPPoE</TableHead>
-              {customerIdsWithInvoice && <TableHead className="font-semibold text-center">Boleto</TableHead>}
-              <TableHead className="font-semibold text-center">Dias de Atraso</TableHead>
-              <TableHead className="font-semibold text-center">Status</TableHead>
+              {customerIdsWithInvoice && (
+                <TableHead className="font-semibold text-center">
+                  Boleto
+                </TableHead>
+              )}
+              <TableHead className="font-semibold text-center">
+                Dias de Atraso
+              </TableHead>
+              <TableHead className="font-semibold text-center">
+                Status
+              </TableHead>
 
               <TableHead className="font-semibold text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {customers.map((c) => {
-              const hasPagoAte = c.pago_ate && new Date(c.pago_ate + "T12:00:00") >= currentMonthEnd;
-              const hasInvoice = hasPagoAte || (customerIdsWithInvoice?.has(c.id) ?? false);
-              const isOnline = onlineList.includes(c.usuario_pppoe);
+              const hasPagoAte =
+                c.pago_ate &&
+                new Date(c.pago_ate + "T12:00:00") >= currentMonthEnd;
+              const hasInvoice =
+                hasPagoAte || (customerIdsWithInvoice?.has(c.id) ?? false);
+              const pppoeName = String(c.usuario_pppoe || "").toLowerCase();
+              const isOnline = onlineList.some(
+                (name) => String(name).toLowerCase() === pppoeName,
+              );
               return (
-                <TableRow key={c.id} className={`hover:bg-muted/30 ${!c.ativo ? "opacity-50" : ""}`}>
+                <TableRow
+                  key={c.id}
+                  className={`hover:bg-muted/30 ${!c.ativo ? "opacity-50" : ""}`}
+                >
                   <TableCell className="font-medium">
                     <span className="flex items-center gap-1.5">
                       {c.nome}
                       {c.cortesia && (
-                        <Badge variant="outline" className="text-xs gap-0.5 px-1.5 py-0 border-primary/30 text-primary">
+                        <Badge
+                          variant="outline"
+                          className="text-xs gap-0.5 px-1.5 py-0 border-primary/30 text-primary"
+                        >
                           <Gift className="h-3 w-3" /> Cortesia
                         </Badge>
                       )}
                     </span>
                   </TableCell>
-                  <TableCell className="font-mono text-sm">{formatCPF(c.cpf)}</TableCell>
-                  <TableCell className="hidden md:table-cell">{c.email}</TableCell>
-                  <TableCell className="hidden lg:table-cell">{c.telefone || "—"}</TableCell>
-                  <TableCell className="hidden lg:table-cell">{c.plan_id ? planMap[c.plan_id] || "—" : "—"}</TableCell>
+                  <TableCell className="font-mono text-sm">
+                    {formatCPF(c.cpf)}
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell">
+                    {c.email}
+                  </TableCell>
+                  <TableCell className="hidden lg:table-cell">
+                    {c.telefone || "—"}
+                  </TableCell>
+                  <TableCell className="hidden lg:table-cell">
+                    {c.plan_id ? planMap[c.plan_id] || "—" : "—"}
+                  </TableCell>
                   <TableCell className="text-center">
                     <Tooltip>
                       <TooltipTrigger>
                         <div className="flex justify-center">
-                          <div className={`h-2.5 w-2.5 rounded-full ${isOnline ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" : "bg-gray-300"}`} />
+                          <div
+                            className={`h-2.5 w-2.5 rounded-full ${isOnline ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" : "bg-gray-300"}`}
+                          />
                         </div>
                       </TooltipTrigger>
                       <TooltipContent>
@@ -103,38 +178,60 @@ export default function CustomerTable({
                       </TooltipContent>
                     </Tooltip>
                   </TableCell>
-                  <TableCell className="font-mono text-sm">{c.usuario_pppoe}</TableCell>
+                  <TableCell className="font-mono text-sm">
+                    {c.usuario_pppoe}
+                  </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
                       <span className="font-mono text-sm">
                         {showPasswords[c.id] ? c.senha_pppoe : "••••••"}
                       </span>
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => togglePassword(c.id)}>
-                        {showPasswords[c.id] ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        onClick={() => togglePassword(c.id)}
+                      >
+                        {showPasswords[c.id] ? (
+                          <EyeOff className="h-3.5 w-3.5" />
+                        ) : (
+                          <Eye className="h-3.5 w-3.5" />
+                        )}
                       </Button>
                     </div>
                   </TableCell>
                   {customerIdsWithInvoice && (
                     <TableCell className="text-center">
                       {c.cortesia ? (
-                        <Badge variant="outline" className="text-xs gap-1 border-primary/30 text-primary">
+                        <Badge
+                          variant="outline"
+                          className="text-xs gap-1 border-primary/30 text-primary"
+                        >
                           <Gift className="h-3 w-3" /> Cortesia
                         </Badge>
                       ) : (
                         <Tooltip>
                           <TooltipTrigger>
                             {hasInvoice ? (
-                              <Badge variant="default" className="text-xs gap-1">
+                              <Badge
+                                variant="default"
+                                className="text-xs gap-1"
+                              >
                                 <FileText className="h-3 w-3" /> Emitido
                               </Badge>
                             ) : (
-                              <Badge variant="destructive" className="text-xs gap-1">
+                              <Badge
+                                variant="destructive"
+                                className="text-xs gap-1"
+                              >
                                 <AlertCircle className="h-3 w-3" /> Sem boleto
                               </Badge>
                             )}
                           </TooltipTrigger>
                           <TooltipContent>
-                            {hasInvoice ? "Boleto emitido no mês atual" : "Sem boleto emitido no mês atual"}
+                            {hasInvoice
+                              ? "Boleto emitido no mês atual"
+                              : "Sem boleto emitido no mês atual"}
                           </TooltipContent>
                         </Tooltip>
                       )}
@@ -144,29 +241,56 @@ export default function CustomerTable({
                     <div className="flex items-center justify-center gap-2">
                       <Switch
                         checked={c.ativo}
-                        onCheckedChange={(checked) => onToggleActive(c.id, checked)}
+                        onCheckedChange={(checked) =>
+                          onToggleActive(c.id, checked)
+                        }
                       />
-                      <Badge variant={c.ativo ? "default" : "secondary"} className="text-xs">
+                      <Badge
+                        variant={c.ativo ? "default" : "secondary"}
+                        className="text-xs"
+                      >
                         {c.ativo ? "Ativo" : "Inativo"}
                       </Badge>
                     </div>
                   </TableCell>
                   <TableCell className="text-center">
                     {(() => {
-                      const customerInvoices = (customerIdsWithInvoice as any)?._allInvoices?.filter((inv: any) => inv.customer_id === c.id) || [];
-                      const overdueInvoices = customerInvoices.filter((inv: any) => (inv.status === 'overdue' || inv.status === 'pending') && new Date(inv.vencimento + "T12:00:00") < now);
-                      
-                      if (overdueInvoices.length === 0) return <span className="text-muted-foreground text-xs">—</span>;
-                      
-                      const oldestVencimento = overdueInvoices.reduce((oldest: string, inv: any) => {
-                        return inv.vencimento < oldest ? inv.vencimento : oldest;
-                      }, overdueInvoices[0].vencimento);
-                      
-                      const days = Math.floor((now.getTime() - new Date(oldestVencimento + "T12:00:00").getTime()) / 86400000);
-                      
+                      const customerInvoices =
+                        (customerIdsWithInvoice as any)?._allInvoices?.filter(
+                          (inv: any) => inv.customer_id === c.id,
+                        ) || [];
+                      const overdueInvoices = customerInvoices.filter(
+                        (inv: any) =>
+                          (inv.status === "overdue" ||
+                            inv.status === "pending") &&
+                          new Date(inv.vencimento + "T12:00:00") < now,
+                      );
+
+                      if (overdueInvoices.length === 0)
+                        return (
+                          <span className="text-muted-foreground text-xs">
+                            —
+                          </span>
+                        );
+
+                      const oldestVencimento = overdueInvoices.reduce(
+                        (oldest: string, inv: any) => {
+                          return inv.vencimento < oldest
+                            ? inv.vencimento
+                            : oldest;
+                        },
+                        overdueInvoices[0].vencimento,
+                      );
+
+                      const days = Math.floor(
+                        (now.getTime() -
+                          new Date(oldestVencimento + "T12:00:00").getTime()) /
+                          86400000,
+                      );
+
                       return (
                         <Badge variant="destructive" className="text-xs">
-                          {days} {days === 1 ? 'dia' : 'dias'}
+                          {days} {days === 1 ? "dia" : "dias"}
                         </Badge>
                       );
                     })()}
@@ -184,8 +308,12 @@ export default function CustomerTable({
                               title="Desbloquear no Mikrotik"
                               disabled={mikrotikLoading === c.id}
                               onClick={() => {
-                                if (window.confirm(`Deseja realmente DESBLOQUEAR o cliente ${c.nome}?`)) {
-                                  syncMikrotik(c.id, 'enable');
+                                if (
+                                  window.confirm(
+                                    `Deseja realmente DESBLOQUEAR o cliente ${c.nome}?`,
+                                  )
+                                ) {
+                                  syncMikrotik(c.id, "enable");
                                 }
                               }}
                             >
@@ -203,8 +331,12 @@ export default function CustomerTable({
                               title="Bloquear no Mikrotik"
                               disabled={mikrotikLoading === c.id}
                               onClick={() => {
-                                if (window.confirm(`Deseja realmente BLOQUEAR o cliente ${c.nome}?`)) {
-                                  syncMikrotik(c.id, 'disable');
+                                if (
+                                  window.confirm(
+                                    `Deseja realmente BLOQUEAR o cliente ${c.nome}?`,
+                                  )
+                                ) {
+                                  syncMikrotik(c.id, "disable");
                                 }
                               }}
                             >
@@ -217,13 +349,29 @@ export default function CustomerTable({
                           )}
                         </>
                       )}
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onDetail(c)} title="Detalhes">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => onDetail(c)}
+                        title="Detalhes"
+                      >
                         <FileSearch className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(c)}>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => onEdit(c)}
+                      >
                         <Pencil className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => onDelete(c)}>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-destructive hover:text-destructive"
+                        onClick={() => onDelete(c)}
+                      >
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>

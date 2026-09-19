@@ -80,15 +80,6 @@ Deno.serve(async (req) => {
           changed_by: null // System action
         });
 
-        // 4. Record for block_alerts_sent so mikrotik-sync picks it up and sends WA
-        // Note: The table name was referenced as 'block_alerts_sent' in mikrotik-sync logs
-        await supabase.from("block_alerts_sent" as any).insert({
-          customer_id: customerId,
-          new_status: "blocked",
-          invoice_id: (customer as any).invoice_id,
-          processed: null
-        } as any);
-
         results.push({ customer: customer.nome, status: "blocked" });
       } catch (err) {
         console.error(`[Blocking] Failed to block ${customer.nome}:`, err);

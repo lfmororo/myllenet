@@ -362,6 +362,30 @@ export type Database = {
           },
         ]
       }
+      mikrotik_pppoe_snapshots: {
+        Row: {
+          collected_at: string
+          collection_ok: boolean
+          host: string
+          id: string
+          usernames: Json
+        }
+        Insert: {
+          collected_at?: string
+          collection_ok?: boolean
+          host: string
+          id?: string
+          usernames?: Json
+        }
+        Update: {
+          collected_at?: string
+          collection_ok?: boolean
+          host?: string
+          id?: string
+          usernames?: Json
+        }
+        Relationships: []
+      }
       mikrotik_status_history: {
         Row: {
           diagnostics: Json | null
