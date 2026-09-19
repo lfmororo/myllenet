@@ -22,10 +22,51 @@ async function processBlockAlerts(supabase: any) {
 
   for (const alert of alerts || []) {
     const customer = alert.customers;
-    if (!customer?.telefone) {
-      console.error(`Block alert ${alert.id}: cliente sem telefone`);
+    if (!customer) {
+      await supabase
+        .from("block_alerts_sent")
+        .update({ processed: true })
+        .eq("id", alert.id);
       continue;
     }
+
+    // Aviso interno para os usuários do sistema (admin)
+    const adminMessages: Record<string, string> = {
+      blocked: `🚫 *CLIENTE BLOQUEADO*\n\nCliente: ${customer.nome}\nTelefone: ${customer.telefone || "não informado"}\n\nO acesso foi bloqueado por pendência financeira.`,
+      deactivated: `🛑 *CLIENTE DESATIVADO*\n\nCliente: ${customer.nome}\nTelefone: ${customer.telefone || "não informado"}\n\nO plano foi desativado e o usuário removido do roteador.`,
+    };
+    const adminMessage = adminMessages[alert.new_status];
+    if (adminMessage) {
+      try {
+        await waSendText(ADMIN_PHONE, adminMessage + BOT_DISCLAIMER, cfg);
+        await supabase.from("notification_logs").insert({
+          customer_id: alert.customer_id,
+          customer_name: customer.nome,
+          phone: ADMIN_PHONE,
+          type:
+            alert.new_status === "blocked"
+              ? "admin_cliente_bloqueado"
+              : "admin_cliente_desativado",
+          message: adminMessage,
+          status: "sent",
+        });
+      } catch (adminError) {
+        console.error(
+          `Admin block alert ${alert.id} failed:`,
+          (adminError as Error).message,
+        );
+      }
+    }
+
+    if (!customer?.telefone) {
+      console.error(`Block alert ${alert.id}: cliente sem telefone`);
+      await supabase
+        .from("block_alerts_sent")
+        .update({ processed: true })
+        .eq("id", alert.id);
+      continue;
+    }
+
 
     const messages: Record<string, string> = {
       blocked: `⚠️ *Aviso de Bloqueio*\n\nOlá ${customer.nome}, seu acesso à internet foi bloqueado por pendência financeira. Entre em contato com o atendimento para regularizar a situação.`,
