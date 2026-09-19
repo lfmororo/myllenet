@@ -194,7 +194,20 @@ async function processAgentCommunicationAlerts(supabase: any) {
     if (stateError) throw stateError;
     const previousState = stateRow?.value;
 
-    if (isOffline && previousState !== "offline") {
+    const { data: recordedOfflineAlert, error: recordedAlertError } =
+      await supabase
+        .from("notification_logs")
+        .select("id")
+        .eq("type", "agent_offline")
+        .eq("customer_name", agent.name)
+        .eq("status", "sent")
+        .gte("created_at", new Date(referenceTime).toISOString())
+        .limit(1)
+        .maybeSingle();
+
+    if (recordedAlertError) throw recordedAlertError;
+
+    if (isOffline && (previousState !== "offline" || !recordedOfflineAlert)) {
       const lastSeen = agent.last_seen_at
         ? new Date(agent.last_seen_at).toLocaleString("pt-BR")
         : "Nunca se comunicou";
@@ -202,12 +215,30 @@ async function processAgentCommunicationAlerts(supabase: any) {
 
       try {
         await waSendText(ADMIN_PHONE, message + BOT_DISCLAIMER, cfg);
+        const { error: logError } = await supabase
+          .from("notification_logs")
+          .insert({
+            customer_name: agent.name,
+            phone: ADMIN_PHONE,
+            type: "agent_offline",
+            message,
+            status: "sent",
+          });
+        if (logError) throw logError;
         const { error: saveError } = await supabase
           .from("settings")
           .upsert({ key: stateKey, value: "offline" }, { onConflict: "key" });
         if (saveError) throw saveError;
         offlineSent++;
       } catch (sendError) {
+        await supabase.from("notification_logs").insert({
+          customer_name: agent.name,
+          phone: ADMIN_PHONE,
+          type: "agent_offline",
+          message,
+          status: "failed",
+          error_message: (sendError as Error).message,
+        });
         console.error(
           `Agent offline alert ${agent.id} failed:`,
           (sendError as Error).message,
@@ -218,12 +249,30 @@ async function processAgentCommunicationAlerts(supabase: any) {
 
       try {
         await waSendText(ADMIN_PHONE, message + BOT_DISCLAIMER, cfg);
+        const { error: logError } = await supabase
+          .from("notification_logs")
+          .insert({
+            customer_name: agent.name,
+            phone: ADMIN_PHONE,
+            type: "agent_recovery",
+            message,
+            status: "sent",
+          });
+        if (logError) throw logError;
         const { error: saveError } = await supabase
           .from("settings")
           .upsert({ key: stateKey, value: "online" }, { onConflict: "key" });
         if (saveError) throw saveError;
         recoverySent++;
       } catch (sendError) {
+        await supabase.from("notification_logs").insert({
+          customer_name: agent.name,
+          phone: ADMIN_PHONE,
+          type: "agent_recovery",
+          message,
+          status: "failed",
+          error_message: (sendError as Error).message,
+        });
         console.error(
           `Agent recovery alert ${agent.id} failed:`,
           (sendError as Error).message,
