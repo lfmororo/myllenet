@@ -3,9 +3,12 @@
   "version": "1.0.0",
   "private": true,
   "description": "Agente Node para coleta de metricas Mikrotik e envio ao sistema Mororo.Tech",
-  "main": "agent.js",
+  "main": "agente.js",
   "scripts": {
-    "start": "node agent.js"
+    "start": "node agente.js"
+  },
+  "dependencies": {
+    "ssh2": "^1.16.0"
   },
   "engines": {
     "node": ">=18"

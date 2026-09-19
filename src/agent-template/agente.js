@@ -1,20 +1,15 @@
 #!/usr/bin/env node
 /**
- * Mororo.Tech - Agente de Monitoramento Mikrotik
- * Coleta métricas do Mikrotik (RouterOS REST API) e envia para o sistema.
- * Requer Node.js 18+ (fetch nativo). Sem dependências externas.
+ * Mororo.Tech - Agente de Monitoramento Mikrotik via SSH
+ * Coleta métricas pelo túnel VPN e envia para o sistema.
  */
-
 const fs = require("fs");
 const path = require("path");
+const { Client } = require("ssh2");
 
-// ---------- .env loader (sem dependências) ----------
 function loadEnv() {
   const file = path.join(__dirname, ".env");
-  if (!fs.existsSync(file)) {
-    console.error("Arquivo .env não encontrado em", file);
-    process.exit(1);
-  }
+  if (!fs.existsSync(file)) { console.error("Arquivo .env não encontrado em", file); process.exit(1); }
   for (const line of fs.readFileSync(file, "utf8").split("\n")) {
     const t = line.trim();
     if (!t || t.startsWith("#")) continue;
@@ -34,85 +29,83 @@ const CFG = {
   hosts: [process.env.MIKROTIK_HOST, process.env.MIKROTIK_HOST_SECONDARY].filter(Boolean),
   user: process.env.MIKROTIK_USER || "admin",
   pass: process.env.MIKROTIK_PASSWORD || "",
-  restPort: process.env.MIKROTIK_REST_PORT || "80",
-  useHttps: String(process.env.MIKROTIK_USE_HTTPS || "false") === "true",
+  sshPort: Number(process.env.MIKROTIK_SSH_PORT || 22),
   intervalSeconds: Math.max(5, parseInt(process.env.INTERVAL_SECONDS || "30", 10)),
-  wanFilter: (process.env.WAN_INTERFACES || "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean),
+  wanFilter: (process.env.WAN_INTERFACES || "").split(",").map((s) => s.trim()).filter(Boolean),
   collectPppoe: String(process.env.COLLECT_PPPOE || "true") === "true",
   requestTimeoutMs: parseInt(process.env.REQUEST_TIMEOUT_MS || "8000", 10),
   queueFile: path.join(__dirname, "queue.json"),
   maxQueue: 500,
 };
-
-if (!CFG.supabaseUrl || !CFG.agentToken) {
-  console.error("SUPABASE_URL e AGENT_TOKEN são obrigatórios no .env");
-  process.exit(1);
-}
-if (CFG.hosts.length === 0) {
-  console.error("Configure MIKROTIK_HOST no .env");
-  process.exit(1);
-}
+if (!CFG.supabaseUrl || !CFG.agentToken) { console.error("SUPABASE_URL e AGENT_TOKEN são obrigatórios no .env"); process.exit(1); }
+if (CFG.hosts.length === 0) { console.error("Configure MIKROTIK_HOST no .env"); process.exit(1); }
 
 const INGEST_URL = `${CFG.supabaseUrl}/functions/v1/mikrotik-agent-ingest`;
 const log = (...a) => console.log(`[${new Date().toISOString()}]`, ...a);
+const cleanHost = (host) => String(host).replace(/^https?:\/\//, "").split("/")[0].replace(/:\d+$/, "");
 
-// ---------- Mikrotik REST ----------
-const authHeader = "Basic " + Buffer.from(`${CFG.user}:${CFG.pass}`).toString("base64");
-
-async function rest(host, endpoint) {
-  const scheme = CFG.useHttps ? "https" : "http";
-  const url = `${scheme}://${host}:${CFG.restPort}/rest${endpoint}`;
-  const ac = new AbortController();
-  const timer = setTimeout(() => ac.abort(), CFG.requestTimeoutMs);
-  try {
-    const res = await fetch(url, {
-      headers: { 
-        Authorization: authHeader, 
-        Accept: "application/json", 
-        Connection: "close" 
-      },
-      signal: ac.signal,
-    });
-    if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      return { ok: false, status: res.status, error: `HTTP ${res.status}: ${body.slice(0, 100)}` };
+function parseValueRows(raw) {
+  const clean = raw.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "").replace(/\r/g, "").trim();
+  const rows = [];
+  let current = {};
+  for (const line of clean.split("\n")) {
+    const text = line.trim();
+    if (!text) { if (Object.keys(current).length) { rows.push(current); current = {}; } continue; }
+    const parts = text.split(";").filter(Boolean);
+    let found = false;
+    for (const part of parts) {
+      const eq = part.indexOf("=");
+      if (eq < 1) continue;
+      current[part.slice(0, eq).trim()] = part.slice(eq + 1).trim();
+      found = true;
     }
-    return { ok: true, data: await res.json() };
-  } catch (e) {
-    let err = e.message;
-    if (e.name === 'AbortError') err = `Timeout (${CFG.requestTimeoutMs}ms)`;
-    return { ok: false, status: 0, error: err };
-  } finally {
-    clearTimeout(timer);
+    if (found && parts.length > 1) { rows.push(current); current = {}; }
   }
+  if (Object.keys(current).length) rows.push(current);
+  return rows;
 }
 
-/** Retorna o primeiro host que responde (preferencial primeiro). */
+function sshExec(host, command) {
+  return new Promise((resolve) => {
+    const conn = new Client();
+    let settled = false;
+    const timer = setTimeout(() => finish({ ok: false, status: 0, error: `Timeout SSH (${CFG.requestTimeoutMs}ms)` }), CFG.requestTimeoutMs);
+    const finish = (result) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      conn.end();
+      resolve(result);
+    };
+    conn.on("ready", () => {
+      conn.exec(command, (err, stream) => {
+        if (err) return finish({ ok: false, status: 0, error: err.message });
+        let stdout = ""; let stderr = "";
+        stream.on("data", (d) => { stdout += d.toString(); });
+        stream.stderr.on("data", (d) => { stderr += d.toString(); });
+        stream.on("close", (code) => finish(code === 0
+          ? { ok: true, data: parseValueRows(stdout) }
+          : { ok: false, status: code || 0, error: stderr.trim() || `SSH saiu com código ${code}` }));
+      });
+    }).on("error", (e) => finish({ ok: false, status: 0, error: e.message }))
+      .connect({ host: cleanHost(host), port: CFG.sshPort, username: CFG.user, password: CFG.pass, readyTimeout: CFG.requestTimeoutMs, keepaliveInterval: 3000 });
+  });
+}
+
 async function pickHost() {
   for (const host of CFG.hosts) {
     const start = Date.now();
-    const probe = await rest(host, "/system/resource");
+    const probe = await sshExec(host, "/system resource print as-value");
     const duration = Date.now() - start;
-    if (probe.ok) return { host, resource: probe.data, duration };
-    log(`Host ${host} indisponível: ${probe.error} (${duration}ms)`);
-    // Se falhar, enviamos o erro individual para o histórico
-    await flush({
-      host,
-      online: false,
-      collected_at: new Date().toISOString(),
-      message: `Agente VPS: erro ao conectar em ${host}: ${probe.error}`,
-      diagnostics: { duration, error: probe.error, status: probe.status }
-    });
+    if (probe.ok && probe.data.length) return { host, resource: probe.data, duration };
+    const error = probe.error || "Resposta SSH vazia";
+    log(`Host ${host} indisponível via SSH: ${error} (${duration}ms)`);
+    await flush({ host, online: false, collected_at: new Date().toISOString(), message: `Agente VPS SSH: erro ao conectar em ${host}: ${error}`, diagnostics: { duration, error, status: probe.status, protocol: "ssh" } });
   }
   return null;
 }
 
-// ---------- Coleta ----------
-const prevCounters = new Map(); // interface -> { rx, tx, ts }
-
+const prevCounters = new Map();
 function isWan(name, comment) {
   if (CFG.wanFilter.length > 0) return CFG.wanFilter.some((f) => name.toLowerCase().includes(f.toLowerCase()));
   const n = name.toLowerCase();
@@ -121,159 +114,65 @@ function isWan(name, comment) {
 
 async function collect(host, resourceRaw) {
   const now = Date.now();
-  const resource = Array.isArray(resourceRaw) ? resourceRaw[0] : resourceRaw || {};
-
+  const resource = Array.isArray(resourceRaw) ? resourceRaw[0] || {} : resourceRaw || {};
   const [healthRes, ifaceRes, activeRes] = await Promise.all([
-    rest(host, "/system/health"),
-    rest(host, "/interface"),
-    CFG.collectPppoe ? rest(host, "/ppp/active") : Promise.resolve({ ok: true, data: [] }),
+    sshExec(host, "/system health print as-value"),
+    sshExec(host, "/interface print stats as-value"),
+    CFG.collectPppoe ? sshExec(host, "/ppp active print stats as-value") : Promise.resolve({ ok: true, data: [] }),
   ]);
-
-  // Temperatura (formato varia entre versões do RouterOS)
   let temperature = null;
-  if (healthRes.ok && Array.isArray(healthRes.data)) {
-    const t = healthRes.data.find((h) => /temp/i.test(h.name || ""));
-    if (t) temperature = parseFloat(t.value);
-    else if (healthRes.data[0]?.temperature) temperature = parseFloat(healthRes.data[0].temperature);
+  if (healthRes.ok) {
+    const item = healthRes.data.find((h) => /temp/i.test(h.name || "")) || healthRes.data.find((h) => h.temperature != null);
+    if (item) temperature = Number.parseFloat(item.value ?? item.temperature);
   }
-
-  // WAN: bps calculado pela diferença de contadores
   const wan = [];
-  if (ifaceRes.ok && Array.isArray(ifaceRes.data)) {
-    for (const i of ifaceRes.data) {
-      const name = i.name;
-      if (!name || !isWan(name, i.comment)) continue;
-      if (i.running === "false" || i.disabled === "true") continue;
-
-      const rx = Number(i["rx-byte"] || 0);
-      const tx = Number(i["tx-byte"] || 0);
-      const prev = prevCounters.get(name);
-      prevCounters.set(name, { rx, tx, ts: now });
-
-      let rxBps = 0;
-      let txBps = 0;
-      if (prev) {
-        const seconds = (now - prev.ts) / 1000;
-        if (seconds > 0 && seconds < CFG.intervalSeconds * 5 && rx >= prev.rx && tx >= prev.tx) {
-          rxBps = ((rx - prev.rx) * 8) / seconds;
-          txBps = ((tx - prev.tx) * 8) / seconds;
-        }
+  if (ifaceRes.ok) for (const item of ifaceRes.data) {
+    const name = item.name;
+    if (!name || !isWan(name, item.comment) || item.running === "false" || item.disabled === "true") continue;
+    const rx = Number(item["rx-byte"] || 0); const tx = Number(item["tx-byte"] || 0);
+    const prev = prevCounters.get(name); prevCounters.set(name, { rx, tx, ts: now });
+    let rxBps = 0; let txBps = 0;
+    if (prev) {
+      const seconds = (now - prev.ts) / 1000;
+      if (seconds > 0 && seconds < CFG.intervalSeconds * 5 && rx >= prev.rx && tx >= prev.tx) {
+        rxBps = ((rx - prev.rx) * 8) / seconds; txBps = ((tx - prev.tx) * 8) / seconds;
       }
-      // Sanidade: descarta picos irreais acima de 2 Gbps
-      const LIMIT = 2_000_000_000;
-      if (rxBps > LIMIT) rxBps = 0;
-      if (txBps > LIMIT) txBps = 0;
-
-      wan.push({ interface_name: name, rx_bps: rxBps, tx_bps: txBps, rx_bytes: rx, tx_bytes: tx });
     }
+    if (rxBps > 2_000_000_000) rxBps = 0;
+    if (txBps > 2_000_000_000) txBps = 0;
+    wan.push({ interface_name: name, rx_bps: rxBps, tx_bps: txBps, rx_bytes: rx, tx_bytes: tx });
   }
-
   const pppoe = [];
-  if (activeRes.ok && Array.isArray(activeRes.data)) {
-    for (const s of activeRes.data) {
-      pppoe.push({
-        usuario_pppoe: s.name,
-        ip_address: s.address || null,
-        uptime: s.uptime || null,
-        rx_bytes: s["bytes-in"] != null ? Number(s["bytes-in"]) : null,
-        tx_bytes: s["bytes-out"] != null ? Number(s["bytes-out"]) : null,
-        event_type: "stats",
-      });
-    }
-  }
-
-  const totalMemory = resource["total-memory"] != null ? Number(resource["total-memory"]) : null;
-  const freeMemory = resource["free-memory"] != null ? Number(resource["free-memory"]) : null;
-
+  if (activeRes.ok) for (const s of activeRes.data) pppoe.push({ usuario_pppoe: s.name, ip_address: s.address || null, uptime: s.uptime || null, rx_bytes: s["bytes-in"] != null ? Number(s["bytes-in"]) : null, tx_bytes: s["bytes-out"] != null ? Number(s["bytes-out"]) : null, event_type: "stats" });
   return {
-    host,
-    online: true,
-    collected_at: new Date().toISOString(),
-    message: `Agente VPS: OK (${wan.length} WAN, ${pppoe.length} sessões PPPoE)`,
-    diagnostics: { duration: resourceRaw.duration },
-    resource: {
-      cpu_load: resource["cpu-load"] != null ? Number(resource["cpu-load"]) : null,
-      free_memory: freeMemory,
-      total_memory: totalMemory,
-      temperature,
-      uptime: resource.uptime || null,
-      version: resource.version || null,
-    },
-    wan,
-    pppoe,
+    host, online: true, collected_at: new Date().toISOString(),
+    message: `Agente VPS SSH: OK (${wan.length} WAN, ${pppoe.length} sessões PPPoE)`,
+    diagnostics: { duration: resourceRaw.duration, protocol: "ssh", port: CFG.sshPort },
+    resource: { cpu_load: resource["cpu-load"] != null ? Number(resource["cpu-load"]) : null, free_memory: resource["free-memory"] != null ? Number(resource["free-memory"]) : null, total_memory: resource["total-memory"] != null ? Number(resource["total-memory"]) : null, temperature, uptime: resource.uptime || null, version: resource.version || null },
+    wan, pppoe,
   };
 }
 
-// ---------- Fila local (resiliência) ----------
-function readQueue() {
-  try {
-    return JSON.parse(fs.readFileSync(CFG.queueFile, "utf8"));
-  } catch {
-    return [];
-  }
-}
-function writeQueue(items) {
-  try {
-    fs.writeFileSync(CFG.queueFile, JSON.stringify(items.slice(-CFG.maxQueue)));
-  } catch (e) {
-    log("Falha ao gravar fila local:", e.message);
-  }
-}
-
+function readQueue() { try { return JSON.parse(fs.readFileSync(CFG.queueFile, "utf8")); } catch { return []; } }
+function writeQueue(items) { try { fs.writeFileSync(CFG.queueFile, JSON.stringify(items.slice(-CFG.maxQueue))); } catch (e) { log("Falha ao gravar fila local:", e.message); } }
 async function send(payloads) {
-  const res = await fetch(INGEST_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-agent-token": CFG.agentToken },
-    body: JSON.stringify(payloads.length === 1 ? payloads[0] : { batch: payloads }),
-  });
-  const text = await res.text();
-  if (!res.ok) throw new Error(`Ingest HTTP ${res.status}: ${text.slice(0, 200)}`);
-  return text;
+  const res = await fetch(INGEST_URL, { method: "POST", headers: { "Content-Type": "application/json", "x-agent-token": CFG.agentToken }, body: JSON.stringify(payloads.length === 1 ? payloads[0] : { batch: payloads }) });
+  const text = await res.text(); if (!res.ok) throw new Error(`Ingest HTTP ${res.status}: ${text.slice(0, 200)}`); return text;
 }
-
 async function flush(payload) {
-  const queue = readQueue();
-  const batch = [...queue, payload];
-  try {
-    const out = await send(batch);
-    if (queue.length) writeQueue([]);
-    log(`Enviado (${batch.length} amostra(s)) →`, out.slice(0, 200));
-  } catch (e) {
-    log("Envio falhou, guardando na fila local:", e.message);
-    writeQueue(batch);
-  }
+  const queue = readQueue(); const batch = [...queue, payload];
+  try { const out = await send(batch); if (queue.length) writeQueue([]); log(`Enviado (${batch.length} amostra(s)) →`, out.slice(0, 200)); }
+  catch (e) { log("Envio falhou, guardando na fila local:", e.message); writeQueue(batch); }
 }
-
-// ---------- Loop ----------
 let running = false;
 async function tick() {
-  if (running) return;
-  running = true;
+  if (running) return; running = true;
   try {
     const picked = await pickHost();
-    if (!picked) {
-      await flush({
-        host: CFG.hosts[0],
-        online: false,
-        collected_at: new Date().toISOString(),
-        message: "Agente VPS: nenhum host Mikrotik respondeu",
-      });
-      return;
-    }
-    const payload = await collect(picked.host, picked.resource);
-    await flush(payload);
-  } catch (e) {
-    log("Erro no ciclo:", e.message);
-  } finally {
-    running = false;
-  }
+    if (!picked) { await flush({ host: CFG.hosts[0], online: false, collected_at: new Date().toISOString(), message: "Agente VPS SSH: nenhum host Mikrotik respondeu" }); return; }
+    const payload = await collect(picked.host, picked.resource); payload.diagnostics.duration = picked.duration; await flush(payload);
+  } catch (e) { log("Erro no ciclo:", e.message); } finally { running = false; }
 }
-
-log(`Agente iniciado. Hosts: ${CFG.hosts.join(", ")} | intervalo: ${CFG.intervalSeconds}s`);
-tick();
-setInterval(tick, CFG.intervalSeconds * 1000);
-
-process.on("SIGTERM", () => {
-  log("Encerrando agente...");
-  process.exit(0);
-});
+log(`Agente SSH iniciado. Hosts: ${CFG.hosts.join(", ")} | porta: ${CFG.sshPort} | intervalo: ${CFG.intervalSeconds}s`);
+tick(); setInterval(tick, CFG.intervalSeconds * 1000);
+process.on("SIGTERM", () => { log("Encerrando agente..."); process.exit(0); });
