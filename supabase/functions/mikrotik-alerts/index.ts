@@ -125,92 +125,144 @@ async function processBlockAlerts(supabase: any) {
   return sent;
 }
 
+function formatDuration(ms: number) {
+  const totalMinutes = Math.max(1, Math.round(ms / 60000));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours === 0) return `${minutes} min`;
+  if (minutes === 0) return `${hours}h`;
+  return `${hours}h ${minutes}min`;
+}
+
 async function processCustomerDisconnections(supabase: any) {
   const now = Date.now();
-  const recentCutoff = new Date(now - 2 * 60 * 1000).toISOString();
-  const comparisonStart = new Date(now - 10 * 60 * 1000).toISOString();
-  const fiveMinutesAgo = now - 5 * 60 * 1000;
-  const { data: snapshots, error } = await supabase
-    .from("mikrotik_pppoe_snapshots")
-    .select("host, collected_at, usernames")
-    .eq("collection_ok", true)
-    .gt("collected_at", comparisonStart)
-    .order("collected_at", { ascending: false })
-    .limit(100);
+  const windowStart = new Date(now - 6 * 60 * 60 * 1000).toISOString();
+
+  // Eventos de conexão/desconexão registrados pelo agente
+  const { data: events, error } = await supabase
+    .from("pppoe_logs")
+    .select("customer_id, usuario_pppoe, event_type, logged_at")
+    .in("event_type", ["connected", "disconnected"])
+    .gt("logged_at", windowStart)
+    .order("logged_at", { ascending: true })
+    .limit(500);
 
   if (error) throw error;
-  const latest = snapshots?.find(
-    (row: any) => row.collected_at >= recentCutoff,
-  );
-  if (!latest) return 0;
-  const baseline = snapshots?.find(
-    (row: any) =>
-      row.host === latest.host &&
-      new Date(row.collected_at).getTime() <= fiveMinutesAgo,
-  );
-  if (!baseline) return 0;
+  if (!events || events.length === 0) return 0;
 
-  const currentNames = new Set(
-    (latest.usernames || []).map((name: unknown) => String(name).toLowerCase()),
-  );
-  const disconnectedNames = [
-    ...new Set(
-      (baseline.usernames || [])
-        .map((name: unknown) => String(name).toLowerCase())
-        .filter((name: string) => {
-          if (currentNames.has(name)) return false;
-          const lastPresence = snapshots.find((row: any) =>
-            (row.usernames || []).some(
-              (seen: unknown) => String(seen).toLowerCase() === name,
-            ),
-          );
-          return (
-            lastPresence &&
-            new Date(lastPresence.collected_at).getTime() <= fiveMinutesAgo
-          );
-        }),
-    ),
-  ];
-  if (disconnectedNames.length === 0) return 0;
+  // Último evento de cada cliente + última desconexão conhecida
+  const lastEvent = new Map<string, any>();
+  const lastDisconnect = new Map<string, any>();
+  for (const event of events) {
+    if (!event.customer_id) continue;
+    lastEvent.set(event.customer_id, event);
+    if (event.event_type === "disconnected") {
+      lastDisconnect.set(event.customer_id, event);
+    }
+  }
+  if (lastEvent.size === 0) return 0;
 
   const { data: customers } = await supabase
     .from("customers")
     .select("id, nome, usuario_pppoe, alert_on_disconnect")
+    .in("id", [...lastEvent.keys()])
     .eq("ativo", true)
     .neq("block_status", "blocked")
     .eq("alert_on_disconnect", true);
 
-  const customerMap = new Map(
-    (customers || []).map((customer: any) => [
-      String(customer.usuario_pppoe || "").toLowerCase(),
-      customer,
-    ]),
-  );
+  if (!customers || customers.length === 0) return 0;
+
   const cfg = await getWhatsAppConfig();
   let sent = 0;
 
-  for (const username of disconnectedNames) {
-    const customer = customerMap.get(username);
-    if (!customer) continue;
-    const { data: previousAlert } = await supabase
+  for (const customer of customers) {
+    const event = lastEvent.get(customer.id);
+    if (!event) continue;
+    const eventTime = new Date(event.logged_at).getTime();
+    const username = customer.usuario_pppoe || event.usuario_pppoe;
+
+    if (event.event_type === "disconnected") {
+      // Aguarda 3 minutos para evitar alarme em quedas instantâneas
+      if (now - eventTime < 3 * 60 * 1000) continue;
+
+      const { data: already } = await supabase
+        .from("customer_alerts_sent")
+        .select("id")
+        .eq("customer_id", customer.id)
+        .eq("alert_type", "disconnect")
+        .gte("sent_at", event.logged_at)
+        .limit(1);
+      if (already && already.length > 0) continue;
+
+      const message = `⚠️ *CLIENTE DESCONECTADO* ⚠️\n\nCliente: *${customer.nome}* (${username})\nDesconectou em: ${new Date(event.logged_at).toLocaleString("pt-BR")}\nTempo off-line: ${formatDuration(now - eventTime)}`;
+      try {
+        await waSendText(ADMIN_PHONE, message + BOT_DISCLAIMER, cfg);
+        await supabase.from("customer_alerts_sent").insert({
+          customer_id: customer.id,
+          alert_type: "disconnect",
+        });
+        await supabase.from("notification_logs").insert({
+          customer_id: customer.id,
+          customer_name: customer.nome,
+          phone: ADMIN_PHONE,
+          type: "admin_cliente_desconectado",
+          message,
+          status: "sent",
+        });
+        sent++;
+      } catch (sendError) {
+        console.error(
+          `Disconnect alert ${username} failed:`,
+          (sendError as Error).message,
+        );
+      }
+      continue;
+    }
+
+    // Reconexão: só avisa se houve alerta de desconexão pendente
+    const disconnect = lastDisconnect.get(customer.id);
+    if (!disconnect) continue;
+    const disconnectTime = new Date(disconnect.logged_at).getTime();
+    if (disconnectTime >= eventTime) continue;
+
+    const { data: disconnectAlert } = await supabase
+      .from("customer_alerts_sent")
+      .select("id, sent_at")
+      .eq("customer_id", customer.id)
+      .eq("alert_type", "disconnect")
+      .gte("sent_at", disconnect.logged_at)
+      .order("sent_at", { ascending: false })
+      .limit(1);
+    if (!disconnectAlert || disconnectAlert.length === 0) continue;
+
+    const { data: alreadyReconnect } = await supabase
       .from("customer_alerts_sent")
       .select("id")
       .eq("customer_id", customer.id)
-      .eq("alert_type", "disconnect")
-      .gt("sent_at", new Date(now - 30 * 60 * 1000).toISOString())
-      .maybeSingle();
-    if (previousAlert) continue;
+      .eq("alert_type", "reconnect")
+      .gte("sent_at", event.logged_at)
+      .limit(1);
+    if (alreadyReconnect && alreadyReconnect.length > 0) continue;
 
-    const message = `⚠️ *ALERTA DE DESCONEXÃO* ⚠️\n\nO cliente *${customer.nome}* (${username}) está desconectado há pelo menos 5 minutos.\n\nÚltima presença confirmada: ${new Date(baseline.collected_at).toLocaleString("pt-BR")}`;
+    const message = `✅ *CLIENTE RECONECTADO* ✅\n\nCliente: *${customer.nome}* (${username})\nReconectou em: ${new Date(event.logged_at).toLocaleString("pt-BR")}\nTempo de inatividade: ${formatDuration(eventTime - disconnectTime)}`;
     try {
       await waSendText(ADMIN_PHONE, message + BOT_DISCLAIMER, cfg);
-      await supabase
-        .from("customer_alerts_sent")
-        .insert({ customer_id: customer.id, alert_type: "disconnect" });
+      await supabase.from("customer_alerts_sent").insert({
+        customer_id: customer.id,
+        alert_type: "reconnect",
+      });
+      await supabase.from("notification_logs").insert({
+        customer_id: customer.id,
+        customer_name: customer.nome,
+        phone: ADMIN_PHONE,
+        type: "admin_cliente_reconectado",
+        message,
+        status: "sent",
+      });
       sent++;
     } catch (sendError) {
       console.error(
-        `Disconnect alert ${username} failed:`,
+        `Reconnect alert ${username} failed:`,
         (sendError as Error).message,
       );
     }
