@@ -300,7 +300,7 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
   const totalPending = invoices.filter(i => ["pending", "waiting"].includes(i.status)).reduce((s, i) => s + i.valor_centavos, 0);
   const totalPaid = invoices.filter(i => i.status === "paid").reduce((s, i) => s + i.valor_centavos, 0);
   const usageLogs = logs
-    .filter((log) => Number.isFinite(Number(log.rx_bytes)) || Number.isFinite(Number(log.tx_bytes)))
+    .filter((log) => log.rx_bytes != null || log.tx_bytes != null)
     .map((log) => ({
       ...log,
       rx_bytes: Number(log.rx_bytes || 0),
