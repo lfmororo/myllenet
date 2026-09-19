@@ -118,7 +118,9 @@ export function MikrotikCommandQueue() {
                   <TableCell className="font-medium">
                     {row.usuario_pppoe}
                   </TableCell>
-                  <TableCell>{ACTION_LABEL[row.action] || row.action}</TableCell>
+                  <TableCell>
+                    {ACTION_LABEL[row.action] || row.action}
+                  </TableCell>
                   <TableCell>
                     <Badge variant={badgeVariant(row.status)}>
                       {STATUS_LABEL[row.status] || row.status}

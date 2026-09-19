@@ -188,8 +188,6 @@ async function restRequest(host, method, endpoint, body, timeoutMs) {
   }
 }
 
-
-
 function tcpProbe(host, port, timeoutMs = 2500) {
   return new Promise((resolve) => {
     const socket = net.createConnection({ host, port: Number(port) });
