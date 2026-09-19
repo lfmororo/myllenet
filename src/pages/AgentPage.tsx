@@ -22,13 +22,13 @@ const steps = [
     body: (
       <div className="space-y-3">
         <p className="text-sm text-muted-foreground">
-          O agente utiliza a API REST do RouterOS (v7). Habilite o serviço <strong>www</strong> e
-          libere o acesso apenas para o IP da sua VPS.
+          O agente utiliza SSH pela VPN. Habilite o serviço <strong>ssh</strong> e
+          libere o acesso apenas para o endereço da VPS na VPN.
         </p>
-        <Code>{`/ip service enable www
-/ip service set www port=80
+        <Code>{`/ip service enable ssh
+/ip service set ssh port=22
 /ip firewall filter add chain=input action=accept protocol=tcp \\
-  dst-port=80 src-address=IP_DA_SUA_VPS comment="Agente VPS"`}</Code>
+  dst-port=22 src-address=IP_DA_VPS_NA_VPN comment="Agente VPS SSH"`}</Code>
         <p className="text-xs text-muted-foreground">
           Recomendado: usar um usuário dedicado no RouterOS com permissão de leitura (grupo{" "}
           <code>read</code>) para a coleta.
@@ -42,7 +42,7 @@ const steps = [
     body: (
       <p className="text-sm text-muted-foreground">
         Em <strong>Configurações → Mikrotik</strong>, preencha o IP/Host preferencial, o secundário
-        (opcional), usuário, senha e a porta REST. Esses valores são gravados automaticamente no{" "}
+         (opcional), usuário e senha. O agente usa a porta SSH 22, que pode ser alterada no arquivo{" "}
         <code>.env</code> do pacote no momento do download — não é preciso editar nada depois.
       </p>
     ),
