@@ -371,9 +371,26 @@ async function processMikrotikErrorAlerts(supabase: any) {
     }
   }
 
+  // Ignorar erros (ex.: falhas de autenticação PPPoE) de clientes bloqueados
+  // ou desativados — só alertar sobre clientes ativos e desbloqueados.
+  const { data: ignoredCustomers } = await supabase
+    .from("customers")
+    .select("usuario_pppoe, ativo, block_status")
+    .or("ativo.eq.false,block_status.eq.blocked");
+
+  const ignoredUsernames = (ignoredCustomers || [])
+    .map((c: any) => String(c.usuario_pppoe || "").toLowerCase().trim())
+    .filter((name: string) => name.length >= 3);
+
+  const mentionsIgnoredCustomer = (detail: string) => {
+    const lower = detail.toLowerCase();
+    return ignoredUsernames.some((name: string) => lower.includes(name));
+  };
+
   const cfg = await getWhatsAppConfig();
   const processed = new Set<string>();
   let sent = 0;
+
 
   for (const candidate of candidates) {
     const normalized =
