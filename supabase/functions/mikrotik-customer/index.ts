@@ -76,9 +76,47 @@ Deno.serve(async (req) => {
     }
 
     if (!activeBase) {
+      // Cloud has no direct REST access to the router: delegate to the local agent
+      const { data: queueCustomer } = await supabase
+        .from('customers')
+        .select('id, nome, usuario_pppoe, senha_pppoe, block_status')
+        .eq('id', customerId)
+        .maybeSingle()
+
+      if (!queueCustomer?.usuario_pppoe) {
+        return json({ success: false, error: 'Cliente sem usuário PPPoE' }, 400)
+      }
+
+      const { error: queueError } = await supabase.from('mikrotik_commands').insert({
+        customer_id: queueCustomer.id,
+        usuario_pppoe: queueCustomer.usuario_pppoe,
+        action,
+        payload: { password: queueCustomer.senha_pppoe, nome: queueCustomer.nome },
+      })
+
+      if (queueError) {
+        return json({ success: false, error: `Falha ao enfileirar comando: ${queueError.message}` })
+      }
+
+      if (action === 'enable' || action === 'disable') {
+        const newStatus = action === 'disable' ? 'blocked' : 'active'
+        if (queueCustomer.block_status !== newStatus) {
+          await supabase.from('customers').update({ block_status: newStatus }).eq('id', queueCustomer.id)
+          await supabase.from('block_history').insert({
+            customer_id: queueCustomer.id,
+            old_status: queueCustomer.block_status,
+            new_status: newStatus,
+            reason: action === 'disable' ? 'Bloqueio enviado ao agente' : 'Desbloqueio enviado ao agente',
+            changed_by: user.id,
+          })
+        }
+      }
+
       return json({
-        success: false,
-        error: 'API REST do Mikrotik não respondeu em nenhum dos IPs configurados.',
+        success: true,
+        action,
+        queued: true,
+        message: `Comando enviado ao agente local (${queueCustomer.usuario_pppoe}); será aplicado no Mikrotik em poucos segundos.`,
       })
     }
 
