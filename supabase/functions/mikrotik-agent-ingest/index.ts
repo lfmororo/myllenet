@@ -48,6 +48,49 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
 
+    // --- Command queue: report results of previously claimed commands ---
+    if (Array.isArray(body?.command_results)) {
+      for (const r of body.command_results) {
+        if (!r?.id) continue;
+        await supabase
+          .from("mikrotik_commands")
+          .update({
+            status: r.success ? "done" : "error",
+            error_message: r.success ? null : String(r.error || "Falha"),
+            result: r.result ?? null,
+            executed_at: new Date().toISOString(),
+          })
+          .eq("id", r.id);
+      }
+    }
+
+    // --- Command queue: hand out pending commands for the agent to run ---
+    if (body?.commands_poll) {
+      const { data: pending } = await supabase
+        .from("mikrotik_commands")
+        .select("*")
+        .in("status", ["pending", "running"])
+        .lt("attempts", 5)
+        .order("created_at", { ascending: true })
+        .limit(20);
+
+      const commands = [] as any[];
+      for (const c of pending || []) {
+        await supabase
+          .from("mikrotik_commands")
+          .update({ status: "running", attempts: (c.attempts || 0) + 1 })
+          .eq("id", c.id);
+        commands.push({
+          id: c.id,
+          action: c.action,
+          usuario_pppoe: c.usuario_pppoe,
+          payload: c.payload || {},
+        });
+      }
+
+      return json({ success: true, commands });
+    }
+
     // Support batched payloads: { batch: [payload, payload, ...] } or a single payload
     const payloads: any[] = Array.isArray(body?.batch) ? body.batch : [body];
 

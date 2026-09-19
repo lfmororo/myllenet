@@ -146,6 +146,48 @@ async function restCommand(host, endpoint, body, timeoutMs) {
   }
 }
 
+/** Requisição REST genérica (GET/PUT/PATCH/DELETE) no Mikrotik. */
+async function restRequest(host, method, endpoint, body, timeoutMs) {
+  const scheme = CFG.useHttps ? "https" : "http";
+  const url = `${scheme}://${host}:${CFG.restPort}/rest${endpoint}`;
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), timeoutMs || CFG.requestTimeoutMs);
+  try {
+    const res = await fetch(url, {
+      method,
+      headers: {
+        Authorization: authHeader,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Connection: "close",
+      },
+      body: body ? JSON.stringify(body) : undefined,
+      signal: ac.signal,
+    });
+    const text = await res.text().catch(() => "");
+    if (!res.ok) {
+      return { ok: false, error: `HTTP ${res.status}: ${text.slice(0, 160)}` };
+    }
+    let data = null;
+    try {
+      data = text ? JSON.parse(text) : null;
+    } catch {
+      data = null;
+    }
+    return { ok: true, data };
+  } catch (e) {
+    return {
+      ok: false,
+      error:
+        e.name === "AbortError"
+          ? `Timeout (${timeoutMs || CFG.requestTimeoutMs}ms)`
+          : e.message || "Falha desconhecida",
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function tcpProbe(host, port, timeoutMs = 2500) {
   return new Promise((resolve) => {
     const socket = net.createConnection({ host, port: Number(port) });
@@ -497,6 +539,116 @@ async function flush(payload) {
   }
 }
 
+// ---------- Fila de comandos (bloqueio/desbloqueio no Mikrotik) ----------
+async function findSecret(host, username) {
+  const res = await restRequest(
+    host,
+    "GET",
+    `/ppp/secret?name=${encodeURIComponent(username)}`,
+  );
+  if (!res.ok) return { ok: false, error: res.error };
+  const list = Array.isArray(res.data) ? res.data : [];
+  return { ok: true, secret: list.find((s) => s.name === username) || null };
+}
+
+async function kickSession(host, username) {
+  const res = await restRequest(
+    host,
+    "GET",
+    `/ppp/active?name=${encodeURIComponent(username)}`,
+  );
+  const list = Array.isArray(res.data) ? res.data : [];
+  const session = list.find((a) => a.name === username);
+  if (!session) return false;
+  await restRequest(host, "DELETE", `/ppp/active/${session[".id"]}`);
+  return true;
+}
+
+async function runCommand(host, cmd) {
+  const username = cmd.usuario_pppoe;
+  const found = await findSecret(host, username);
+  if (!found.ok) return { id: cmd.id, success: false, error: found.error };
+  const secret = found.secret;
+
+  if (cmd.action === "remove") {
+    if (secret)
+      await restRequest(host, "DELETE", `/ppp/secret/${secret[".id"]}`);
+    const kicked = await kickSession(host, username);
+    return { id: cmd.id, success: true, result: { removed: !!secret, kicked } };
+  }
+
+  const disable = cmd.action === "disable";
+
+  if (!secret) {
+    const put = await restRequest(host, "PUT", "/ppp/secret", {
+      name: username,
+      password: cmd.payload?.password || "",
+      service: "pppoe",
+      disabled: disable ? "true" : "false",
+      comment: cmd.payload?.nome || "",
+    });
+    if (!put.ok) return { id: cmd.id, success: false, error: put.error };
+  } else {
+    const patch = await restRequest(
+      host,
+      "PATCH",
+      `/ppp/secret/${secret[".id"]}`,
+      { disabled: disable ? "true" : "false" },
+    );
+    if (!patch.ok) return { id: cmd.id, success: false, error: patch.error };
+  }
+
+  let kicked = false;
+  if (disable) kicked = await kickSession(host, username);
+
+  return { id: cmd.id, success: true, result: { disabled: disable, kicked } };
+}
+
+let commandsRunning = false;
+async function commandTick() {
+  if (commandsRunning || !currentHost) return;
+  commandsRunning = true;
+  try {
+    const res = await fetch(INGEST_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-agent-token": CFG.agentToken,
+      },
+      body: JSON.stringify({ commands_poll: true }),
+    });
+    const data = await res.json().catch(() => ({}));
+    const commands = Array.isArray(data.commands) ? data.commands : [];
+    if (commands.length === 0) return;
+
+    log(`Executando ${commands.length} comando(s) no Mikrotik...`);
+    const results = [];
+    for (const cmd of commands) {
+      try {
+        results.push(await runCommand(currentHost, cmd));
+      } catch (e) {
+        results.push({ id: cmd.id, success: false, error: e.message });
+      }
+    }
+
+    await fetch(INGEST_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-agent-token": CFG.agentToken,
+      },
+      body: JSON.stringify({ command_results: results }),
+    });
+    log(
+      `Comandos concluídos: ${results.filter((r) => r.success).length}/${results.length}`,
+    );
+  } catch (e) {
+    log("Erro na fila de comandos:", e.message);
+  } finally {
+    commandsRunning = false;
+  }
+}
+
 // ---------- Loop ----------
 let running = false;
 async function tick() {
@@ -555,6 +707,8 @@ tick();
 setInterval(tick, CFG.intervalSeconds * 1000);
 setTimeout(speedtestTick, 10 * 1000);
 setInterval(speedtestTick, CFG.speedtestIntervalMs);
+setTimeout(commandTick, 5 * 1000);
+setInterval(commandTick, 15 * 1000);
 
 process.on("SIGTERM", () => {
   log("Encerrando agente...");

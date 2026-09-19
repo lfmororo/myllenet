@@ -41,6 +41,7 @@ import {
 } from "lucide-react";
 import { MikrotikHostStatus } from "@/components/MikrotikHostStatus";
 import { RecentPppoeConnections } from "@/components/RecentPppoeConnections";
+import { MikrotikCommandQueue } from "@/components/MikrotikCommandQueue";
 import {
   Dialog,
   DialogContent,
@@ -642,6 +643,9 @@ export default function MikrotikPage() {
       <MikrotikHostStatus />
 
       <RecentPppoeConnections />
+
+      <MikrotikCommandQueue />
+
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-2">

@@ -362,6 +362,56 @@ export type Database = {
           },
         ]
       }
+      mikrotik_commands: {
+        Row: {
+          action: string
+          attempts: number
+          created_at: string
+          customer_id: string | null
+          error_message: string | null
+          executed_at: string | null
+          id: string
+          payload: Json
+          result: Json | null
+          status: string
+          usuario_pppoe: string
+        }
+        Insert: {
+          action: string
+          attempts?: number
+          created_at?: string
+          customer_id?: string | null
+          error_message?: string | null
+          executed_at?: string | null
+          id?: string
+          payload?: Json
+          result?: Json | null
+          status?: string
+          usuario_pppoe: string
+        }
+        Update: {
+          action?: string
+          attempts?: number
+          created_at?: string
+          customer_id?: string | null
+          error_message?: string | null
+          executed_at?: string | null
+          id?: string
+          payload?: Json
+          result?: Json | null
+          status?: string
+          usuario_pppoe?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mikrotik_commands_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       mikrotik_pppoe_snapshots: {
         Row: {
           collected_at: string

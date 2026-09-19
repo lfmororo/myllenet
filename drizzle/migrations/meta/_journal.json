@@ -15,6 +15,13 @@
       "when": 1789841119732,
       "tag": "0001_allow_system_alerts_without_customer",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789841321289,
+      "tag": "0002_mikrotik_command_queue",
+      "breakpoints": true
     }
   ]
 }
