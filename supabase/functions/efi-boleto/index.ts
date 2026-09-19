@@ -855,7 +855,8 @@ async function sendPaymentNotification(supabase: any, invoiceId: string) {
     }
 
     const valor = (invoice.valor_centavos / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-    const message = `Olá ${customer.nome}! 🌐\n\n✅ Pagamento confirmado!\n\n📋 ${invoice.descricao}\n💰 Valor: ${valor}\n\nObrigado por manter sua internet em dia! 🚀`;
+    const surveyUrl = await getSatisfactionUrl(supabase);
+    const message = `Olá ${customer.nome}! 🌐\n\n✅ Pagamento confirmado!\n\n📋 ${invoice.descricao}\n💰 Valor: ${valor}\n\nObrigado por manter sua internet em dia! 🚀\n\n⭐ *Avalie nosso atendimento*\nSua opinião nos ajuda a melhorar. Se preferir, registre também uma solicitação ou reclamação:\n👉 ${surveyUrl}`;
 
     let sendOk = true;
     let sendError: string | null = null;
