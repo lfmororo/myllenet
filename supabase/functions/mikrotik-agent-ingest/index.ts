@@ -53,6 +53,7 @@ Deno.serve(async (req) => {
 
     const result = {
       wan: 0,
+      speedtests: 0,
       pppoe: 0,
       status: 0,
       unknown_pppoe: [] as string[],
@@ -129,6 +130,32 @@ Deno.serve(async (req) => {
         const { error } = await supabase.from("wan_logs").insert(rows);
         if (!error) result.wan += rows.length;
         else console.error("wan_logs insert error", error.message);
+      }
+
+      // 2.1 Speedtests executados localmente pelo agente a cada 30 minutos
+      if (Array.isArray(p.speedtests) && p.speedtests.length > 0) {
+        const rows = p.speedtests.map((test: any) => ({
+          interface_name: String(test.interface_name || "Speedtest"),
+          rx_bps: Math.max(0, Math.round(Number(test.rx_bps) || 0)),
+          tx_bps: 0,
+          rx_bytes:
+            test.rx_bytes != null ? Math.max(0, Number(test.rx_bytes)) : null,
+          tx_bytes: 0,
+          cpu_load:
+            resource.cpu_load != null ? Number(resource.cpu_load) : null,
+          free_memory:
+            resource.free_memory != null ? Number(resource.free_memory) : null,
+          total_memory:
+            resource.total_memory != null
+              ? Number(resource.total_memory)
+              : null,
+          temperature:
+            resource.temperature != null ? Number(resource.temperature) : null,
+          created_at: loggedAt,
+        }));
+        const { error } = await supabase.from("wan_logs").insert(rows);
+        if (!error) result.speedtests += rows.length;
+        else console.error("speedtest wan_logs insert error", error.message);
       }
 
       // 3. PPPoE sessions per customer

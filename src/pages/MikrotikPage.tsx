@@ -88,7 +88,12 @@ export default function MikrotikPage() {
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
   const { customers } = useCustomers();
   const { plans } = usePlans();
-  const { wanLogs, wanHistory, loading: loadingWan } = useMikrotikLogs();
+  const {
+    wanLogs,
+    wanHistory,
+    speedtestHistory,
+    loading: loadingWan,
+  } = useMikrotikLogs();
   const [syncing, setSyncing] = useState(false);
   const [live, setLive] = useState(true);
   const [dateRange, setDateRange] = useState("today"); // today, 7d, 30d
@@ -1049,11 +1054,10 @@ export default function MikrotikPage() {
                 Histórico de Speedtests Realizados
               </CardTitle>
               <CardDescription>
-                Registros das medições de tráfego efetuadas nas interfaces WAN.
-                esta gerando a cada minuto ao inves de a cada hora
+                Testes de download executados pelo agente a cada 30 minutos.
               </CardDescription>
             </div>
-            {wanLogs.length > 0 && (
+            {speedtestHistory.length > 0 && (
               <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
@@ -1071,13 +1075,7 @@ export default function MikrotikPage() {
                   size="sm"
                   onClick={() => setHistoryPage((p) => p + 1)}
                   disabled={
-                    historyPage * historyItemsPerPage >=
-                    wanLogs.reduce(
-                      (acc, log) =>
-                        acc +
-                        Object.keys(log).filter((k) => k.endsWith(" ↓")).length,
-                      0,
-                    )
+                    historyPage * historyItemsPerPage >= speedtestHistory.length
                   }
                 >
                   Próxima
@@ -1103,26 +1101,11 @@ export default function MikrotikPage() {
                         <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
                       </TableCell>
                     </TableRow>
-                  ) : wanLogs.length > 0 ? (
+                  ) : speedtestHistory.length > 0 ? (
                     (() => {
-                      const allEntries: any[] = [];
-                      [...wanLogs].reverse().forEach((log) => {
-                        const interfaces = Object.keys(log)
-                          .filter((k) => k.endsWith(" ↓"))
-                          .map((k) => k.replace(" ↓", ""));
-                        interfaces.forEach((iface) => {
-                          allEntries.push({
-                            date: log.fullDate,
-                            iface,
-                            download: log[`${iface} ↓`],
-                            upload: log[`${iface} ↑`],
-                          });
-                        });
-                      });
-
                       const startIndex =
                         (historyPage - 1) * historyItemsPerPage;
-                      const pageEntries = allEntries.slice(
+                      const pageEntries = speedtestHistory.slice(
                         startIndex,
                         startIndex + historyItemsPerPage,
                       );
@@ -1133,22 +1116,22 @@ export default function MikrotikPage() {
                       }
 
                       return pageEntries.map((entry, idx) => (
-                        <TableRow key={`${idx}-${entry.iface}`}>
+                        <TableRow key={entry.id || `${idx}-${entry.name}`}>
                           <TableCell className="font-medium text-xs">
-                            {format(entry.date, "dd/MM HH:mm:ss", {
+                            {format(entry.createdAt, "dd/MM HH:mm:ss", {
                               locale: ptBR,
                             })}
                           </TableCell>
                           <TableCell>
                             <Badge variant="outline" className="text-[10px]">
-                              {entry.iface}
+                              {entry.name}
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right text-success font-semibold">
-                            {entry.download?.toFixed(2)} Mbps
+                            {entry.mbps.toFixed(2)} Mbps
                           </TableCell>
                           <TableCell className="text-right text-accent">
-                            {entry.upload?.toFixed(2)} Mbps
+                            —
                           </TableCell>
                         </TableRow>
                       ));
