@@ -55,13 +55,13 @@ node agente.js
 
 - O token identifica somente este agente e pode ser revogado no sistema
   (Configurações → Agente VPS) sem afetar nada mais.
-- No Mikrotik, libere a porta REST apenas para o IP da VPS:
-  `/ip firewall filter add chain=input action=accept protocol=tcp dst-port=80 src-address=IP_DA_VPS`
+- No Mikrotik, libere a porta REST apenas para o IP do computador que executa o agente:
+  `/ip firewall filter add chain=input action=accept protocol=tcp dst-port=80 src-address=IP_DO_AGENTE place-before=0`
 - Se o envio falhar, o agente guarda as amostras em `queue.json` e reenvia no próximo ciclo.
 
 ## Requisitos no Mikrotik
 
 ```
-/ip service enable www
-/ip service set www port=80
+/ip service set www disabled=no port=80 address=IP_DO_AGENTE/32
+/ip firewall filter add chain=input action=accept protocol=tcp dst-port=80 src-address=IP_DO_AGENTE place-before=0 comment="Agente REST"
 ```

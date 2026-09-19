@@ -7,6 +7,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const net = require("net");
 
 // ---------- .env loader (sem dependências) ----------
 function loadEnv() {
@@ -105,6 +106,25 @@ async function rest(host, endpoint) {
   }
 }
 
+function tcpProbe(host, port, timeoutMs = 2500) {
+  return new Promise((resolve) => {
+    const socket = net.createConnection({ host, port: Number(port) });
+    let settled = false;
+    const finish = (result) => {
+      if (settled) return;
+      settled = true;
+      socket.destroy();
+      resolve(result);
+    };
+    socket.setTimeout(timeoutMs);
+    socket.once("connect", () => finish("open"));
+    socket.once("timeout", () => finish("timeout"));
+    socket.once("error", (error) =>
+      finish(error.code === "ECONNREFUSED" ? "refused" : "unreachable"),
+    );
+  });
+}
+
 /** Retorna o primeiro host que responde (preferencial primeiro). */
 async function pickHost() {
   for (const host of CFG.hosts) {
@@ -112,14 +132,26 @@ async function pickHost() {
     const probe = await rest(host, "/system/resource");
     const duration = Date.now() - start;
     if (probe.ok) return { host, resource: probe.data, duration };
-    log(`Host ${host} indisponível: ${probe.error} (${duration}ms)`);
+    let diagnostic = probe.error;
+    if (probe.status === 0) {
+      const [restPortState, winboxState] = await Promise.all([
+        tcpProbe(host, CFG.restPort),
+        tcpProbe(host, 8291),
+      ]);
+      if (winboxState === "open" && restPortState !== "open") {
+        diagnostic = `${probe.error}. Winbox 8291 responde, mas REST ${CFG.restPort} não responde; habilite/libere o serviço ${CFG.useHttps ? "www-ssl" : "www"}`;
+      } else if (restPortState === "refused") {
+        diagnostic = `${probe.error}. A porta REST ${CFG.restPort} recusou a conexão; confira o serviço ${CFG.useHttps ? "www-ssl" : "www"}`;
+      }
+    }
+    log(`Host ${host} indisponível: ${diagnostic} (${duration}ms)`);
     // Se falhar, enviamos o erro individual para o histórico
     await flush({
       host,
       online: false,
       collected_at: new Date().toISOString(),
-      message: `Agente VPS: erro ao conectar em ${host}: ${probe.error}`,
-      diagnostics: { duration, error: probe.error, status: probe.status },
+      message: `Agente VPS: erro ao conectar em ${host}: ${diagnostic}`,
+      diagnostics: { duration, error: diagnostic, status: probe.status },
     });
   }
   return null;
