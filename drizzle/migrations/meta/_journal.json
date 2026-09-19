@@ -29,6 +29,13 @@
       "when": 1789841707067,
       "tag": "0003_remove_inactive_customers_from_mikrotik",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1789841965791,
+      "tag": "0004_queue_alerts_on_customer_activation_change",
+      "breakpoints": true
     }
   ]
 }
