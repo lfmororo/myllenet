@@ -5,7 +5,7 @@ import { useInvoices } from "@/hooks/useInvoices";
 import { usePlans } from "@/hooks/usePlans";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, AlertTriangle, DollarSign, TrendingUp, Router, Wifi, WifiOff, Loader2, Activity } from "lucide-react";
+import { Users, AlertTriangle, DollarSign, TrendingUp, Router, Wifi, WifiOff, Loader2, Activity, Server } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, LineChart, Line } from "recharts";
 
 export default function DashboardHome() {
@@ -14,10 +14,53 @@ export default function DashboardHome() {
   const { plans } = usePlans();
 
   const [routerStatus, setRouterStatus] = useState<"loading" | "online" | "offline">("loading");
+  const [agentStatus, setAgentStatus] = useState<"loading" | "online" | "offline">("loading");
+  const [agentLastSeen, setAgentLastSeen] = useState<string | null>(null);
   const [onlineUsers, setOnlineUsers] = useState<number | null>(null);
   const [hwInfo, setHwInfo] = useState<{ cpu: number | null, temp: number | null }>({ cpu: null, temp: null });
   const [wanLogs, setWanLogs] = useState<any[]>([]);
   const [loadingWan, setLoadingWan] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const checkAgent = async () => {
+      const { data, error } = await supabase
+        .from("agent_tokens")
+        .select("last_seen_at")
+        .eq("active", true)
+        .order("last_seen_at", { ascending: false, nullsFirst: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (cancelled) return;
+
+      const lastSeen = data?.last_seen_at ?? null;
+      setAgentLastSeen(lastSeen);
+      setAgentStatus(
+        !error && lastSeen && Date.now() - new Date(lastSeen).getTime() <= 2 * 60 * 1000
+          ? "online"
+          : "offline",
+      );
+    };
+
+    checkAgent();
+    const timer = window.setInterval(checkAgent, 30000);
+    const channel = supabase
+      .channel("dashboard_agent_status")
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "agent_tokens" },
+        checkAgent,
+      )
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   useEffect(() => {
     const fetchWanLogs = async () => {
@@ -194,7 +237,30 @@ export default function DashboardHome() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-6">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+        {/* Agent Status */}
+        <Card className={`border-l-4 ${agentStatus === "online" ? "border-l-success" : agentStatus === "offline" ? "border-l-destructive" : "border-l-muted"}`}>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium">Agente</CardTitle>
+            <div className={`rounded-lg p-2 ${agentStatus === "online" ? "bg-success/10" : agentStatus === "offline" ? "bg-destructive/10" : "bg-muted/10"}`}>
+              {agentStatus === "loading" ? (
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              ) : (
+                <Server className={`h-4 w-4 ${agentStatus === "online" ? "text-success" : "text-destructive"}`} />
+              )}
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className={`text-2xl font-bold ${agentStatus === "online" ? "text-success" : agentStatus === "offline" ? "text-destructive" : "text-muted-foreground"}`}>
+              {agentStatus === "loading" ? "Verificando..." : agentStatus === "online" ? "On-line" : "Off-line"}
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {agentLastSeen
+                ? `Última comunicação: ${new Date(agentLastSeen).toLocaleString("pt-BR")}`
+                : "Nenhuma comunicação registrada"}
+            </p>
+          </CardContent>
+        </Card>
         {/* Router Status */}
         <Card className={`border-l-4 ${routerStatus === "online" ? "border-l-success" : routerStatus === "offline" ? "border-l-destructive" : "border-l-muted"}`}>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
