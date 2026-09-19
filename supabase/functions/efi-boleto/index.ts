@@ -785,6 +785,21 @@ async function checkCustomerCharges(req: Request) {
   }
 }
 
+const DEFAULT_SATISFACTION_URL = "https://app.mororo.tech/satisfacao";
+
+async function getSatisfactionUrl(supabase: any): Promise<string> {
+  try {
+    const { data } = await supabase
+      .from("settings")
+      .select("value")
+      .eq("key", "satisfaction_url")
+      .maybeSingle();
+    return data?.value || DEFAULT_SATISFACTION_URL;
+  } catch {
+    return DEFAULT_SATISFACTION_URL;
+  }
+}
+
 async function sendPaymentNotification(supabase: any, invoiceId: string) {
   try {
     const { data: invoice } = await supabase
@@ -855,7 +870,8 @@ async function sendPaymentNotification(supabase: any, invoiceId: string) {
     }
 
     const valor = (invoice.valor_centavos / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-    const message = `Olá ${customer.nome}! 🌐\n\n✅ Pagamento confirmado!\n\n📋 ${invoice.descricao}\n💰 Valor: ${valor}\n\nObrigado por manter sua internet em dia! 🚀`;
+    const surveyUrl = await getSatisfactionUrl(supabase);
+    const message = `Olá ${customer.nome}! 🌐\n\n✅ Pagamento confirmado!\n\n📋 ${invoice.descricao}\n💰 Valor: ${valor}\n\nObrigado por manter sua internet em dia! 🚀\n\n⭐ *Avalie nosso atendimento*\nSua opinião nos ajuda a melhorar. Se preferir, registre também uma solicitação ou reclamação:\n👉 ${surveyUrl}`;
 
     let sendOk = true;
     let sendError: string | null = null;

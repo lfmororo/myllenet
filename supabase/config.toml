@@ -35,3 +35,6 @@ verify_jwt = false
 
 [functions.auto-block-30d]
 verify_jwt = false
+
+[functions.satisfaction-survey]
+verify_jwt = false
