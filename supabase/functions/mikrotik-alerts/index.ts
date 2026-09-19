@@ -202,10 +202,9 @@ async function processAgentCommunicationAlerts(supabase: any) {
 
       try {
         await waSendText(ADMIN_PHONE, message + BOT_DISCLAIMER, cfg);
-        const { error: saveError } = await supabase.from("settings").upsert(
-          { key: stateKey, value: "offline" },
-          { onConflict: "key" },
-        );
+        const { error: saveError } = await supabase
+          .from("settings")
+          .upsert({ key: stateKey, value: "offline" }, { onConflict: "key" });
         if (saveError) throw saveError;
         offlineSent++;
       } catch (sendError) {
@@ -219,10 +218,9 @@ async function processAgentCommunicationAlerts(supabase: any) {
 
       try {
         await waSendText(ADMIN_PHONE, message + BOT_DISCLAIMER, cfg);
-        const { error: saveError } = await supabase.from("settings").upsert(
-          { key: stateKey, value: "online" },
-          { onConflict: "key" },
-        );
+        const { error: saveError } = await supabase
+          .from("settings")
+          .upsert({ key: stateKey, value: "online" }, { onConflict: "key" });
         if (saveError) throw saveError;
         recoverySent++;
       } catch (sendError) {
@@ -232,15 +230,121 @@ async function processAgentCommunicationAlerts(supabase: any) {
         );
       }
     } else if (!isOffline && !previousState) {
-      const { error: saveError } = await supabase.from("settings").upsert(
-        { key: stateKey, value: "online" },
-        { onConflict: "key" },
-      );
+      const { error: saveError } = await supabase
+        .from("settings")
+        .upsert({ key: stateKey, value: "online" }, { onConflict: "key" });
       if (saveError) throw saveError;
     }
   }
 
   return { offlineSent, recoverySent };
+}
+
+function errorFingerprint(value: string) {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index++) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16);
+}
+
+async function processMikrotikErrorAlerts(supabase: any) {
+  const since = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+  const { data: history, error } = await supabase
+    .from("mikrotik_status_history")
+    .select("host, online, message, logged_at, diagnostics")
+    .gte("logged_at", since)
+    .order("logged_at", { ascending: false })
+    .limit(100);
+
+  if (error) throw error;
+
+  const candidates: Array<{
+    host: string;
+    category: string;
+    detail: string;
+    loggedAt: string;
+  }> = [];
+
+  for (const row of history || []) {
+    const diagnostics = row.diagnostics || {};
+    if (!row.online) {
+      candidates.push({
+        host: row.host,
+        category: "Falha de conexão",
+        detail: diagnostics.error || row.message || "Host sem resposta",
+        loggedAt: row.logged_at,
+      });
+    }
+
+    const collectionErrors = [
+      ["PPPoE", diagnostics.pppoe_collection_ok, diagnostics.pppoe_error],
+      [
+        "interfaces WAN",
+        diagnostics.interface_collection_ok,
+        diagnostics.interface_error,
+      ],
+      ["hardware", diagnostics.health_collection_ok, diagnostics.health_error],
+      ["logs", diagnostics.log_collection_ok, diagnostics.log_error],
+    ];
+    for (const [label, collectionOk, collectionError] of collectionErrors) {
+      if (collectionOk === false) {
+        candidates.push({
+          host: row.host,
+          category: `Falha na coleta de ${label}`,
+          detail: String(collectionError || "Erro sem descrição"),
+          loggedAt: row.logged_at,
+        });
+      }
+    }
+
+    for (const routerLog of diagnostics.router_log_errors || []) {
+      candidates.push({
+        host: row.host,
+        category: "Erro registrado no Mikrotik",
+        detail: `${routerLog.topics ? `[${routerLog.topics}] ` : ""}${routerLog.message || "Erro sem descrição"}`,
+        loggedAt: row.logged_at,
+      });
+    }
+  }
+
+  const cfg = await getWhatsAppConfig();
+  const processed = new Set<string>();
+  let sent = 0;
+
+  for (const candidate of candidates) {
+    const normalized =
+      `${candidate.host}|${candidate.category}|${candidate.detail}`.toLowerCase();
+    const alertType = `mikrotik_error_${errorFingerprint(normalized)}`;
+    if (processed.has(alertType)) continue;
+    processed.add(alertType);
+
+    const { data: previousAlert } = await supabase
+      .from("customer_alerts_sent")
+      .select("id")
+      .eq("alert_type", alertType)
+      .gt("sent_at", new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString())
+      .maybeSingle();
+    if (previousAlert) continue;
+
+    const message = `🚨 *ERRO NO MIKROTIK* 🚨\n\nHost: *${candidate.host}*\nTipo: *${candidate.category}*\nDetalhes: ${candidate.detail}\nData: ${new Date(candidate.loggedAt).toLocaleString("pt-BR")}`;
+    try {
+      await waSendText(ADMIN_PHONE, message + BOT_DISCLAIMER, cfg);
+      const { error: saveError } = await supabase
+        .from("customer_alerts_sent")
+        .insert({ alert_type: alertType });
+      if (saveError) throw saveError;
+      sent++;
+    } catch (sendError) {
+      console.error(
+        `Mikrotik error alert ${alertType} failed:`,
+        (sendError as Error).message,
+      );
+    }
+  }
+
+  return sent;
 }
 
 Deno.serve(async (req) => {
@@ -262,6 +366,7 @@ Deno.serve(async (req) => {
     const blockAlertsSent = await processBlockAlerts(supabase);
     const disconnectAlertsSent = await processCustomerDisconnections(supabase);
     const agentAlerts = await processAgentCommunicationAlerts(supabase);
+    const mikrotikErrorAlertsSent = await processMikrotikErrorAlerts(supabase);
 
     // 1. Check Mikrotik Connection Alerts with custom settings
     const { data: offlineThresholdData } = await supabase
@@ -564,6 +669,7 @@ Deno.serve(async (req) => {
       disconnect_alerts_sent: disconnectAlertsSent,
       agent_offline_alerts_sent: agentAlerts.offlineSent,
       agent_recovery_alerts_sent: agentAlerts.recoverySent,
+      mikrotik_error_alerts_sent: mikrotikErrorAlertsSent,
     });
   } catch (e) {
     return json({ error: (e as Error).message }, 500);
