@@ -26,6 +26,12 @@ export function surveyMessage(nome: string | null, url: string) {
   );
 }
 
+function isInternalCron(req: Request): boolean {
+  const secret = Deno.env.get("CRON_SECRET");
+  const provided = req.headers.get("x-cron-secret");
+  return !!secret && !!provided && provided === secret;
+}
+
 async function verifyAdmin(authHeader: string | null) {
   if (!authHeader) throw new Error("Não autenticado");
   const supabase = admin();
@@ -61,7 +67,9 @@ Deno.serve(async (req) => {
     });
 
   try {
-    await verifyAdmin(req.headers.get("Authorization"));
+    if (!isInternalCron(req)) {
+      await verifyAdmin(req.headers.get("Authorization"));
+    }
 
     const body = await req.json().catch(() => ({}));
     const supabase = admin();
