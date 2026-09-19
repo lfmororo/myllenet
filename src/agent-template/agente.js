@@ -201,7 +201,8 @@ async function pickHost() {
 const prevCounters = new Map(); // interface -> { rx, tx, ts }
 const seenRouterLogIds = new Set();
 let routerLogsInitialized = false;
-let lastSpeedtestAt = 0;
+let currentHost = null;
+let speedtestRunning = false;
 
 const SPEEDTESTS = [
   {
@@ -411,12 +412,6 @@ async function collect(host, resourceRaw, connectionDuration) {
   const freeMemory =
     resource["free-memory"] != null ? Number(resource["free-memory"]) : null;
 
-  let speedtests = [];
-  if (now - lastSpeedtestAt >= CFG.speedtestIntervalMs) {
-    lastSpeedtestAt = now;
-    speedtests = await runSpeedtests(host);
-  }
-
   return {
     host,
     online: true,
@@ -454,7 +449,6 @@ async function collect(host, resourceRaw, connectionDuration) {
     },
     wan,
     pppoe,
-    speedtests,
   };
 }
 
@@ -512,6 +506,7 @@ async function tick() {
   try {
     const picked = await pickHost();
     if (!picked) {
+      currentHost = null;
       await flush({
         host: CFG.hosts[0],
         online: false,
@@ -520,6 +515,7 @@ async function tick() {
       });
       return;
     }
+    currentHost = picked.host;
     const payload = await collect(
       picked.host,
       picked.resource,
@@ -533,11 +529,33 @@ async function tick() {
   }
 }
 
+async function speedtestTick() {
+  if (speedtestRunning || !currentHost) return;
+  speedtestRunning = true;
+  try {
+    log("Iniciando testes de velocidade sem interromper o monitoramento...");
+    const speedtests = await runSpeedtests(currentHost);
+    await flush({
+      host: currentHost,
+      online: true,
+      collected_at: new Date().toISOString(),
+      message: `Agente VPS: ${speedtests.length} testes de velocidade concluídos`,
+      speedtests,
+    });
+  } catch (e) {
+    log("Erro nos testes de velocidade:", e.message);
+  } finally {
+    speedtestRunning = false;
+  }
+}
+
 log(
   `Agente iniciado. Hosts: ${CFG.hosts.join(", ")} | intervalo: ${CFG.intervalSeconds}s`,
 );
 tick();
 setInterval(tick, CFG.intervalSeconds * 1000);
+setTimeout(speedtestTick, 10 * 1000);
+setInterval(speedtestTick, CFG.speedtestIntervalMs);
 
 process.on("SIGTERM", () => {
   log("Encerrando agente...");
