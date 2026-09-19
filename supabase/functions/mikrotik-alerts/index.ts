@@ -393,6 +393,8 @@ async function processMikrotikErrorAlerts(supabase: any) {
 
 
   for (const candidate of candidates) {
+    if (mentionsIgnoredCustomer(candidate.detail)) continue;
+
     const normalized =
       `${candidate.host}|${candidate.category}|${candidate.detail}`.toLowerCase();
     const alertType = `mikrotik_error_${errorFingerprint(normalized)}`;
