@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Loader2, Star, ExternalLink, Copy } from "lucide-react";
+import { Loader2, Star, ExternalLink, Copy, Send } from "lucide-react";
 import { toast } from "sonner";
 
 interface Feedback {
@@ -25,6 +25,7 @@ const tipoLabel: Record<string, string> = {
 export default function FeedbackPage() {
   const [items, setItems] = useState<Feedback[]>([]);
   const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
 
   const publicUrl = `${window.location.origin}/satisfacao`;
 
@@ -41,6 +42,26 @@ export default function FeedbackPage() {
     };
     load();
   }, []);
+
+  const sendSurvey = async () => {
+    if (
+      !confirm(
+        "Enviar o convite de avaliação por WhatsApp para todos os clientes ativos agora?",
+      )
+    )
+      return;
+    setSending(true);
+    toast.info("Enviando... isso pode levar alguns minutos.");
+    const { data, error } = await supabase.functions.invoke("satisfaction-survey", {
+      body: { url: publicUrl },
+    });
+    setSending(false);
+    if (error) {
+      toast.error("Erro ao enviar as mensagens.");
+      return;
+    }
+    toast.success(`Enviadas: ${data?.sent ?? 0} · Falhas: ${data?.failed ?? 0}`);
+  };
 
   const media = items.length
     ? (items.reduce((s, i) => s + i.rating, 0) / items.length).toFixed(1)
@@ -68,6 +89,14 @@ export default function FeedbackPage() {
             <a href="/satisfacao" target="_blank" rel="noreferrer">
               <ExternalLink className="mr-2 h-4 w-4" /> Abrir
             </a>
+          </Button>
+          <Button size="sm" onClick={sendSurvey} disabled={sending}>
+            {sending ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="mr-2 h-4 w-4" />
+            )}
+            Enviar pesquisa a todos
           </Button>
           <div className="ml-auto flex items-center gap-2 text-sm">
             <Star className="h-4 w-4 fill-primary text-primary" />
