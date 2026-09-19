@@ -27,10 +27,27 @@ async function processBlockAlerts(supabase: any) {
       continue;
     }
 
-    const message =
-      alert.new_status === "blocked"
-        ? `⚠️ *Aviso de Bloqueio*\n\nOlá ${customer.nome}, seu acesso à internet foi bloqueado por pendência financeira. Entre em contato com o atendimento para regularizar a situação.`
-        : `✅ *Sinal Liberado*\n\nOlá ${customer.nome}, seu acesso à internet foi liberado novamente. Obrigado!`;
+    const messages: Record<string, string> = {
+      blocked: `⚠️ *Aviso de Bloqueio*\n\nOlá ${customer.nome}, seu acesso à internet foi bloqueado por pendência financeira. Entre em contato com o atendimento para regularizar a situação.`,
+      active: `✅ *Sinal Liberado*\n\nOlá ${customer.nome}, seu acesso à internet foi liberado novamente. Obrigado!`,
+      deactivated: `🚫 *Serviço Desativado*\n\nOlá ${customer.nome}, seu plano de internet foi desativado e seu acesso foi encerrado. Se isso não estava previsto, entre em contato com o atendimento.`,
+      reactivated: `🎉 *Serviço Reativado*\n\nOlá ${customer.nome}, seu plano de internet foi reativado e seu acesso está liberado. Bem-vindo de volta!`,
+    };
+    const types: Record<string, string> = {
+      blocked: "cliente_bloqueado",
+      active: "cliente_desbloqueado",
+      deactivated: "cliente_desativado",
+      reactivated: "cliente_reativado",
+    };
+    const message = messages[alert.new_status];
+    const logType = types[alert.new_status] || "cliente_status";
+    if (!message) {
+      await supabase
+        .from("block_alerts_sent")
+        .update({ processed: true })
+        .eq("id", alert.id);
+      continue;
+    }
 
     try {
       await waSendText(customer.telefone, message + BOT_DISCLAIMER, cfg);
@@ -38,13 +55,11 @@ async function processBlockAlerts(supabase: any) {
         customer_id: alert.customer_id,
         customer_name: customer.nome,
         phone: customer.telefone,
-        type:
-          alert.new_status === "blocked"
-            ? "cliente_bloqueado"
-            : "cliente_desbloqueado",
+        type: logType,
         message,
         status: "sent",
       });
+
       await supabase
         .from("block_alerts_sent")
         .update({ processed: true })
