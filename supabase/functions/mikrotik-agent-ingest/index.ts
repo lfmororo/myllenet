@@ -179,7 +179,9 @@ Deno.serve(async (req) => {
           const currentNames = new Set(snapshotNames);
           const sessionsByName = new Map(
             p.pppoe.map((session: any) => [
-              String(session.usuario_pppoe || "").trim().toLowerCase(),
+              String(session.usuario_pppoe || "")
+                .trim()
+                .toLowerCase(),
               session,
             ]),
           );
@@ -219,7 +221,10 @@ Deno.serve(async (req) => {
               .from("pppoe_logs")
               .insert(sessionEvents);
             if (eventError)
-              console.error("pppoe session events insert error", eventError.message);
+              console.error(
+                "pppoe session events insert error",
+                eventError.message,
+              );
           }
         }
       }

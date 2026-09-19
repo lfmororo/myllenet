@@ -2,8 +2,21 @@ import { useCallback, useEffect, useState } from "react";
 import { ArrowDownCircle, ArrowUpCircle, History, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 type ConnectionEvent = {
   id: string;
@@ -22,13 +35,17 @@ type CustomerName = {
 
 export function RecentPppoeConnections() {
   const [events, setEvents] = useState<ConnectionEvent[]>([]);
-  const [customerNames, setCustomerNames] = useState<Record<string, string>>({});
+  const [customerNames, setCustomerNames] = useState<Record<string, string>>(
+    {},
+  );
   const [loading, setLoading] = useState(true);
 
   const fetchEvents = useCallback(async () => {
     const { data, error } = await supabase
       .from("pppoe_logs")
-      .select("id, customer_id, usuario_pppoe, event_type, ip_address, uptime, logged_at")
+      .select(
+        "id, customer_id, usuario_pppoe, event_type, ip_address, uptime, logged_at",
+      )
       .in("event_type", ["connected", "disconnected"])
       .order("logged_at", { ascending: false })
       .limit(20);
@@ -42,7 +59,9 @@ export function RecentPppoeConnections() {
     const recentEvents = (data || []) as ConnectionEvent[];
     setEvents(recentEvents);
 
-    const customerIds = [...new Set(recentEvents.map((event) => event.customer_id))];
+    const customerIds = [
+      ...new Set(recentEvents.map((event) => event.customer_id)),
+    ];
     if (customerIds.length > 0) {
       const { data: customers } = await supabase
         .from("customers")
@@ -50,10 +69,13 @@ export function RecentPppoeConnections() {
         .in("id", customerIds);
 
       setCustomerNames(
-        ((customers || []) as CustomerName[]).reduce<Record<string, string>>((names, customer) => {
-          names[customer.id] = customer.nome;
-          return names;
-        }, {}),
+        ((customers || []) as CustomerName[]).reduce<Record<string, string>>(
+          (names, customer) => {
+            names[customer.id] = customer.nome;
+            return names;
+          },
+          {},
+        ),
       );
     }
 
@@ -68,7 +90,8 @@ export function RecentPppoeConnections() {
         "postgres_changes" as any,
         { event: "INSERT", schema: "public", table: "pppoe_logs" },
         (payload: any) => {
-          if (["connected", "disconnected"].includes(payload.new?.event_type)) fetchEvents();
+          if (["connected", "disconnected"].includes(payload.new?.event_type))
+            fetchEvents();
         },
       )
       .subscribe();
@@ -85,7 +108,9 @@ export function RecentPppoeConnections() {
           <History className="h-5 w-5 text-primary" />
           Últimas Conexões e Desconexões
         </CardTitle>
-        <CardDescription>Movimentações mais recentes dos clientes PPPoE</CardDescription>
+        <CardDescription>
+          Movimentações mais recentes dos clientes PPPoE
+        </CardDescription>
       </CardHeader>
       <CardContent>
         {loading ? (
@@ -115,19 +140,32 @@ export function RecentPppoeConnections() {
                   return (
                     <TableRow key={event.id}>
                       <TableCell className="font-medium">
-                        {customerNames[event.customer_id] || "Cliente não identificado"}
+                        {customerNames[event.customer_id] ||
+                          "Cliente não identificado"}
                       </TableCell>
-                      <TableCell className="font-mono text-xs">{event.usuario_pppoe}</TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {event.usuario_pppoe}
+                      </TableCell>
                       <TableCell>
                         <Badge
                           variant="outline"
-                          className={connected ? "border-success/30 bg-success/10 text-success" : "border-destructive/30 bg-destructive/10 text-destructive"}
+                          className={
+                            connected
+                              ? "border-success/30 bg-success/10 text-success"
+                              : "border-destructive/30 bg-destructive/10 text-destructive"
+                          }
                         >
-                          {connected ? <ArrowUpCircle className="mr-1 h-3.5 w-3.5" /> : <ArrowDownCircle className="mr-1 h-3.5 w-3.5" />}
+                          {connected ? (
+                            <ArrowUpCircle className="mr-1 h-3.5 w-3.5" />
+                          ) : (
+                            <ArrowDownCircle className="mr-1 h-3.5 w-3.5" />
+                          )}
                           {connected ? "Conectou" : "Desconectou"}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-muted-foreground">{event.ip_address || "—"}</TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {event.ip_address || "—"}
+                      </TableCell>
                       <TableCell className="whitespace-nowrap text-right text-muted-foreground">
                         {event.logged_at
                           ? new Date(event.logged_at).toLocaleString("pt-BR", {
