@@ -156,6 +156,36 @@ export type Database = {
           },
         ]
       }
+      customer_feedback: {
+        Row: {
+          created_at: string
+          id: string
+          mensagem: string | null
+          nome: string | null
+          rating: number
+          telefone: string | null
+          tipo: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          mensagem?: string | null
+          nome?: string | null
+          rating: number
+          telefone?: string | null
+          tipo?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          mensagem?: string | null
+          nome?: string | null
+          rating?: number
+          telefone?: string | null
+          tipo?: string
+        }
+        Relationships: []
+      }
       customers: {
         Row: {
           alert_on_abnormal_usage: boolean | null
