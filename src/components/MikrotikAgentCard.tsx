@@ -240,8 +240,8 @@ export function MikrotikAgentCard() {
           <code className="block">unzip mikrotik-agent-*.zip -d /opt</code>
           <code className="block">cd /opt/mikrotik-agent && sudo bash install.sh</code>
           <p>
-            No Mikrotik: <code>/ip service enable www</code> e libere a porta apenas para o IP da
-            VPS.
+            No Mikrotik: <code>/ip service enable ssh</code> e libere a porta 22 apenas para o IP da
+            VPS na VPN.
           </p>
         </div>
       </CardContent>
