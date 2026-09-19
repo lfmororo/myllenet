@@ -22,6 +22,13 @@
       "when": 1789841321289,
       "tag": "0002_mikrotik_command_queue",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1789841707067,
+      "tag": "0003_remove_inactive_customers_from_mikrotik",
+      "breakpoints": true
     }
   ]
 }
