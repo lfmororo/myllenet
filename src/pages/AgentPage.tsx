@@ -25,10 +25,9 @@ const steps = [
           O agente utiliza a API REST do RouterOS (v7). Habilite o serviço <strong>www</strong> e
           libere o acesso apenas para o IP da sua VPS.
         </p>
-        <Code>{`/ip service enable www
-/ip service set www port=80
+        <Code>{`/ip service set www disabled=no port=80 address=IP_DO_AGENTE/32
 /ip firewall filter add chain=input action=accept protocol=tcp \\
-  dst-port=80 src-address=IP_DA_SUA_VPS comment="Agente VPS"`}</Code>
+  dst-port=80 src-address=IP_DO_AGENTE place-before=0 comment="Agente REST"`}</Code>
         <p className="text-xs text-muted-foreground">
           Recomendado: usar um usuário dedicado no RouterOS com permissão de leitura (grupo{" "}
           <code>read</code>) para a coleta.
@@ -256,6 +255,11 @@ journalctl -u mikrotik-agent -n 50 # últimas 50 linhas de log`}</Code>
               </li>
               <li>
                 <strong>Timeout / Indisponível</strong>: certifique-se de que o Mikrotik é acessível a partir da VPS ou do computador onde o agente está rodando. O Winbox usa uma porta diferente da API REST.
+              </li>
+              <li>
+                <strong>Winbox responde, mas REST não responde</strong>: o endereço está correto,
+                porém o serviço <code>www</code> ou a porta configurada está bloqueada. Execute os
+                comandos da etapa 1 usando o IP público do computador que executa o agente.
               </li>
               <li>
                 <strong>Token inválido</strong>: o agente foi revogado no sistema — baixe um novo pacote.
