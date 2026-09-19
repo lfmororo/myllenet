@@ -8,6 +8,13 @@
       "when": 1789788251826,
       "tag": "0000_reliable_mikrotik_session_and_block_alerts",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1789841119732,
+      "tag": "0001_allow_system_alerts_without_customer",
+      "breakpoints": true
     }
   ]
 }

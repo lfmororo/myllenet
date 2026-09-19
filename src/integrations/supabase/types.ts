@@ -130,19 +130,19 @@ export type Database = {
       customer_alerts_sent: {
         Row: {
           alert_type: string
-          customer_id: string
+          customer_id: string | null
           id: string
           sent_at: string | null
         }
         Insert: {
           alert_type: string
-          customer_id: string
+          customer_id?: string | null
           id?: string
           sent_at?: string | null
         }
         Update: {
           alert_type?: string
-          customer_id?: string
+          customer_id?: string | null
           id?: string
           sent_at?: string | null
         }
