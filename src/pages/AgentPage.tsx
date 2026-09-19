@@ -22,13 +22,13 @@ const steps = [
     body: (
       <div className="space-y-3">
         <p className="text-sm text-muted-foreground">
-          O agente utiliza SSH pela VPN. Habilite o serviço <strong>ssh</strong> e
-          libere o acesso apenas para o endereço da VPS na VPN.
+          O agente utiliza a API REST do RouterOS (v7). Habilite o serviço <strong>www</strong> e
+          libere o acesso apenas para o IP da sua VPS.
         </p>
-        <Code>{`/ip service enable ssh
-/ip service set ssh port=22
+        <Code>{`/ip service enable www
+/ip service set www port=80
 /ip firewall filter add chain=input action=accept protocol=tcp \\
-  dst-port=22 src-address=IP_DA_VPS_NA_VPN comment="Agente VPS SSH"`}</Code>
+  dst-port=80 src-address=IP_DA_SUA_VPS comment="Agente VPS"`}</Code>
         <p className="text-xs text-muted-foreground">
           Recomendado: usar um usuário dedicado no RouterOS com permissão de leitura (grupo{" "}
           <code>read</code>) para a coleta.
@@ -42,7 +42,7 @@ const steps = [
     body: (
       <p className="text-sm text-muted-foreground">
         Em <strong>Configurações → Mikrotik</strong>, preencha o IP/Host preferencial, o secundário
-         (opcional), usuário e senha. O agente usa a porta SSH 22, que pode ser alterada no arquivo{" "}
+        (opcional), usuário, senha e a porta REST. Esses valores são gravados automaticamente no{" "}
         <code>.env</code> do pacote no momento do download — não é preciso editar nada depois.
       </p>
     ),
@@ -100,9 +100,8 @@ sudo bash install.sh`}</Code>
           </li>
           <li>Extraia o pacote em uma pasta (ex: <code>C:\mikrotik</code>).</li>
           <li>
-             Abra o <strong>PowerShell</strong> como Administrador, navegue até a pasta e execute:
-             <Code>{`npm install
-node agente.js`}</Code>
+            Abra o <strong>PowerShell</strong> como Administrador, navegue até a pasta e execute:
+            <Code>{`node agente.js`}</Code>
           </li>
           <li>
             <strong>Exemplo de log de sucesso:</strong>
@@ -253,10 +252,10 @@ journalctl -u mikrotik-agent -n 50 # últimas 50 linhas de log`}</Code>
             <p className="font-medium text-foreground">verificar o motivo do agente nao conseguir conectar o mikrotik</p>
             <ul className="list-disc space-y-1 pl-5">
               <li>
-                <strong>Nenhum host respondeu</strong>: verifique se o serviço <code>ssh</code> está habilitado no Mikrotik (<code>/ip service enable ssh</code>) e se a porta está correta (padrão 22).
+                <strong>Nenhum host respondeu</strong>: verifique se o serviço <code>www</code> está habilitado no Mikrotik (<code>/ip service enable www</code>) e se a porta está correta (padrão 80).
               </li>
               <li>
-                <strong>Timeout / Indisponível</strong>: confirme que a VPN está ativa e que a VPS alcança o IP do Mikrotik na porta SSH. O Winbox usa outra porta.
+                <strong>Timeout / Indisponível</strong>: certifique-se de que o Mikrotik é acessível a partir da VPS ou do computador onde o agente está rodando. O Winbox usa uma porta diferente da API REST.
               </li>
               <li>
                 <strong>Token inválido</strong>: o agente foi revogado no sistema — baixe um novo pacote.

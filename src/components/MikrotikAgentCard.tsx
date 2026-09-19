@@ -82,6 +82,7 @@ export function MikrotikAgentCard() {
           "mikrotik_host_secondary",
           "mikrotik_username",
           "mikrotik_password",
+          "mikrotik_rest_port",
         ]);
 
       const cfg: Record<string, string> = {};
@@ -105,7 +106,8 @@ export function MikrotikAgentCard() {
         `MIKROTIK_HOST_SECONDARY=${cfg.mikrotik_host_secondary || ""}`,
         `MIKROTIK_USER=${cfg.mikrotik_username || "admin"}`,
         `MIKROTIK_PASSWORD=${cfg.mikrotik_password || ""}`,
-        "MIKROTIK_SSH_PORT=22",
+        `MIKROTIK_REST_PORT=${cfg.mikrotik_rest_port || "80"}`,
+        "MIKROTIK_USE_HTTPS=false",
         "",
         "# Coleta",
         `INTERVAL_SECONDS=${parseInt(interval, 10) || 30}`,
@@ -148,7 +150,7 @@ export function MikrotikAgentCard() {
           <Server className="h-5 w-5" /> Agente VPS (Coleta Mikrotik)
         </CardTitle>
         <CardDescription>
-          Baixe um agente Node.js já configurado para rodar na sua VPS. Ele acessa o Mikrotik por SSH pela VPN e coleta tráfego WAN,
+          Baixe um agente Node.js já configurado para rodar na sua VPS. Ele coleta tráfego WAN,
           CPU, memória, temperatura e sessões PPPoE em intervalos configuráveis e envia direto ao
           sistema.
         </CardDescription>
@@ -240,8 +242,8 @@ export function MikrotikAgentCard() {
           <code className="block">unzip mikrotik-agent-*.zip -d /opt</code>
           <code className="block">cd /opt/mikrotik-agent && sudo bash install.sh</code>
           <p>
-            No Mikrotik: <code>/ip service enable ssh</code> e libere a porta 22 apenas para o IP da
-            VPS na VPN.
+            No Mikrotik: <code>/ip service enable www</code> e libere a porta apenas para o IP da
+            VPS.
           </p>
         </div>
       </CardContent>

@@ -13,10 +13,6 @@ Se você ainda não tem o Node.js instalado:
 ## 2. Instalar o Agente
 1. Baixe o pacote `.zip` do agente pelo painel do sistema.
 2. Extraia o conteúdo em uma pasta permanente, por exemplo: `C:\mikrotik`.
-3. Abra o terminal nessa pasta e instale a biblioteca SSH:
-   ```cmd
-   npm install
-   ```
 
 ## 3. Instalar como Serviço (Windows)
 Para que o agente inicie automaticamente com o Windows, recomendamos o uso do `qckwinsvc` ou `nssm`.
@@ -47,7 +43,6 @@ Para que o agente inicie automaticamente com o Windows, recomendamos o uso do `q
 ## 4. Verificar Logs
 Os logs serão exibidos no console se você rodar manualmente:
 ```cmd
-npm install
 node agente.js
 ```
 Se estiver rodando como serviço, verifique o Visualizador de Eventos do Windows ou o arquivo de log gerado pelo utilitário escolhido.

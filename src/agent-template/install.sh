@@ -28,10 +28,6 @@ fi
 
 chmod 600 "$DIR/.env"
 
-echo "Instalando dependencias do agente..."
-cd "$DIR"
-npm install --omit=dev
-
 echo "Instalando servico systemd em $SERVICE ..."
 sed "s|__AGENT_DIR__|$DIR|g; s|__NODE_BIN__|$(command -v node)|g" \
   "$DIR/mikrotik-agent.service" > "$SERVICE"
