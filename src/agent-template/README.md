@@ -37,19 +37,19 @@ node agente.js
 
 ## Configuração (.env)
 
-| Variável | Descrição |
-| --- | --- |
-| `SUPABASE_URL` | URL do backend do sistema (já preenchida) |
-| `AGENT_TOKEN` | Token exclusivo deste agente (já preenchido) |
-| `MIKROTIK_HOST` | IP/host preferencial |
-| `MIKROTIK_HOST_SECONDARY` | IP/host secundário (failover automático) |
-| `MIKROTIK_USER` / `MIKROTIK_PASSWORD` | Credenciais do RouterOS |
-| `MIKROTIK_REST_PORT` | Porta do serviço www (REST) |
-| `MIKROTIK_USE_HTTPS` | `true` para usar www-ssl |
-| `INTERVAL_SECONDS` | Intervalo de coleta (mínimo 5s) |
-| `WAN_INTERFACES` | Lista de interfaces WAN separadas por vírgula (vazio = detecção automática) |
-| `COLLECT_PPPOE` | `true` para coletar sessões PPPoE dos clientes |
-| `REQUEST_TIMEOUT_MS` | Timeout de cada chamada ao Mikrotik |
+| Variável                              | Descrição                                                                   |
+| ------------------------------------- | --------------------------------------------------------------------------- |
+| `SUPABASE_URL`                        | URL do backend do sistema (já preenchida)                                   |
+| `AGENT_TOKEN`                         | Token exclusivo deste agente (já preenchido)                                |
+| `MIKROTIK_HOST`                       | IP/host preferencial                                                        |
+| `MIKROTIK_HOST_SECONDARY`             | IP/host secundário (failover automático)                                    |
+| `MIKROTIK_USER` / `MIKROTIK_PASSWORD` | Credenciais do RouterOS                                                     |
+| `MIKROTIK_REST_PORT`                  | Porta do serviço www (REST)                                                 |
+| `MIKROTIK_USE_HTTPS`                  | `true` para usar www-ssl                                                    |
+| `INTERVAL_SECONDS`                    | Intervalo de coleta (mínimo 5s)                                             |
+| `WAN_INTERFACES`                      | Lista de interfaces WAN separadas por vírgula (vazio = detecção automática) |
+| `COLLECT_PPPOE`                       | `true` para coletar sessões PPPoE dos clientes                              |
+| `REQUEST_TIMEOUT_MS`                  | Timeout de cada chamada ao Mikrotik                                         |
 
 O agente executa a cada 30 minutos os dois testes de download OVH configurados no sistema e envia as velocidades para o histórico do menu Mikrotik.
 

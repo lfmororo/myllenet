@@ -227,9 +227,7 @@ async function runSpeedtests(host) {
       {
         url: test.url,
         output: "none",
-        ...(test.checkCertificate
-          ? {}
-          : { "check-certificate": "no" }),
+        ...(test.checkCertificate ? {} : { "check-certificate": "no" }),
       },
       CFG.speedtestTimeoutMs,
     );
@@ -238,7 +236,8 @@ async function runSpeedtests(host) {
       ? response.data[response.data.length - 1] || {}
       : response.data || {};
     const reportedBytes = Number(responseData.downloaded || 0);
-    const downloadedBytes = reportedBytes > 0 ? reportedBytes : 100 * 1024 * 1024;
+    const downloadedBytes =
+      reportedBytes > 0 ? reportedBytes : 100 * 1024 * 1024;
     const speedBps = response.ok
       ? Math.round((downloadedBytes * 8 * 1000) / durationMs)
       : 0;

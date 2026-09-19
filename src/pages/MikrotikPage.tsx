@@ -1075,8 +1075,7 @@ export default function MikrotikPage() {
                   size="sm"
                   onClick={() => setHistoryPage((p) => p + 1)}
                   disabled={
-                    historyPage * historyItemsPerPage >=
-                    speedtestHistory.length
+                    historyPage * historyItemsPerPage >= speedtestHistory.length
                   }
                 >
                   Próxima
