@@ -150,7 +150,7 @@ Deno.serve(async (req) => {
     const disconnectAlertsSent = await processCustomerDisconnections(supabase)
 
     // 1. Check Mikrotik Connection Alerts with custom settings
-    const { data: speedThresholdData } = await supabase
+    const { data: offlineThresholdData } = await supabase
       .from('settings')
       .select('value')
       .eq('key', 'mikrotik_alert_offline_minutes')
@@ -162,7 +162,7 @@ Deno.serve(async (req) => {
       .eq('key', 'mikrotik_alert_failure_count')
       .single()
 
-    const alertMinutes = parseInt(thresholdData?.value || '5')
+    const alertMinutes = parseInt(offlineThresholdData?.value || '5')
     const failureThreshold = parseInt(countData?.value || '3')
     const timeThreshold = new Date(Date.now() - alertMinutes * 60 * 1000).toISOString()
 
@@ -397,7 +397,7 @@ Deno.serve(async (req) => {
     }
     
     // 6. Check WAN Speed Alerts
-    const { data: thresholdData } = await supabase
+    const { data: speedThresholdData } = await supabase
       .from('settings')
       .select('value')
       .eq('key', 'mikrotik_speed_threshold_mbps')
