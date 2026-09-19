@@ -22,7 +22,11 @@ function loadEnv() {
     if (i === -1) continue;
     const k = t.slice(0, i).trim();
     let v = t.slice(i + 1).trim();
-    if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) v = v.slice(1, -1);
+    if (
+      (v.startsWith('"') && v.endsWith('"')) ||
+      (v.startsWith("'") && v.endsWith("'"))
+    )
+      v = v.slice(1, -1);
     if (!(k in process.env)) process.env[k] = v;
   }
 }
@@ -31,12 +35,18 @@ loadEnv();
 const CFG = {
   supabaseUrl: (process.env.SUPABASE_URL || "").replace(/\/$/, ""),
   agentToken: process.env.AGENT_TOKEN || "",
-  hosts: [process.env.MIKROTIK_HOST, process.env.MIKROTIK_HOST_SECONDARY].filter(Boolean),
+  hosts: [
+    process.env.MIKROTIK_HOST,
+    process.env.MIKROTIK_HOST_SECONDARY,
+  ].filter(Boolean),
   user: process.env.MIKROTIK_USER || "admin",
   pass: process.env.MIKROTIK_PASSWORD || "",
   restPort: process.env.MIKROTIK_REST_PORT || "80",
   useHttps: String(process.env.MIKROTIK_USE_HTTPS || "false") === "true",
-  intervalSeconds: Math.max(5, parseInt(process.env.INTERVAL_SECONDS || "30", 10)),
+  intervalSeconds: Math.max(
+    5,
+    parseInt(process.env.INTERVAL_SECONDS || "30", 10),
+  ),
   wanFilter: (process.env.WAN_INTERFACES || "")
     .split(",")
     .map((s) => s.trim())
@@ -60,7 +70,8 @@ const INGEST_URL = `${CFG.supabaseUrl}/functions/v1/mikrotik-agent-ingest`;
 const log = (...a) => console.log(`[${new Date().toISOString()}]`, ...a);
 
 // ---------- Mikrotik REST ----------
-const authHeader = "Basic " + Buffer.from(`${CFG.user}:${CFG.pass}`).toString("base64");
+const authHeader =
+  "Basic " + Buffer.from(`${CFG.user}:${CFG.pass}`).toString("base64");
 
 async function rest(host, endpoint) {
   const scheme = CFG.useHttps ? "https" : "http";
@@ -69,21 +80,25 @@ async function rest(host, endpoint) {
   const timer = setTimeout(() => ac.abort(), CFG.requestTimeoutMs);
   try {
     const res = await fetch(url, {
-      headers: { 
-        Authorization: authHeader, 
-        Accept: "application/json", 
-        Connection: "close" 
+      headers: {
+        Authorization: authHeader,
+        Accept: "application/json",
+        Connection: "close",
       },
       signal: ac.signal,
     });
     if (!res.ok) {
       const body = await res.text().catch(() => "");
-      return { ok: false, status: res.status, error: `HTTP ${res.status}: ${body.slice(0, 100)}` };
+      return {
+        ok: false,
+        status: res.status,
+        error: `HTTP ${res.status}: ${body.slice(0, 100)}`,
+      };
     }
     return { ok: true, data: await res.json() };
   } catch (e) {
     let err = e.message;
-    if (e.name === 'AbortError') err = `Timeout (${CFG.requestTimeoutMs}ms)`;
+    if (e.name === "AbortError") err = `Timeout (${CFG.requestTimeoutMs}ms)`;
     return { ok: false, status: 0, error: err };
   } finally {
     clearTimeout(timer);
@@ -104,7 +119,7 @@ async function pickHost() {
       online: false,
       collected_at: new Date().toISOString(),
       message: `Agente VPS: erro ao conectar em ${host}: ${probe.error}`,
-      diagnostics: { duration, error: probe.error, status: probe.status }
+      diagnostics: { duration, error: probe.error, status: probe.status },
     });
   }
   return null;
@@ -114,19 +129,31 @@ async function pickHost() {
 const prevCounters = new Map(); // interface -> { rx, tx, ts }
 
 function isWan(name, comment) {
-  if (CFG.wanFilter.length > 0) return CFG.wanFilter.some((f) => name.toLowerCase().includes(f.toLowerCase()));
+  if (CFG.wanFilter.length > 0)
+    return CFG.wanFilter.some((f) =>
+      name.toLowerCase().includes(f.toLowerCase()),
+    );
   const n = name.toLowerCase();
-  return n.includes("wan") || n.includes("pppoe-out") || n.includes("ether1") || (comment || "").toLowerCase().includes("wan");
+  return (
+    n.includes("wan") ||
+    n.includes("pppoe-out") ||
+    n.includes("ether1") ||
+    (comment || "").toLowerCase().includes("wan")
+  );
 }
 
 async function collect(host, resourceRaw, connectionDuration) {
   const now = Date.now();
-  const resource = Array.isArray(resourceRaw) ? resourceRaw[0] : resourceRaw || {};
+  const resource = Array.isArray(resourceRaw)
+    ? resourceRaw[0]
+    : resourceRaw || {};
 
   const [healthRes, ifaceRes, activeRes] = await Promise.all([
     rest(host, "/system/health"),
     rest(host, "/interface"),
-    CFG.collectPppoe ? rest(host, "/ppp/active") : Promise.resolve({ ok: true, data: [] }),
+    CFG.collectPppoe
+      ? rest(host, "/ppp/active")
+      : Promise.resolve({ ok: true, data: [] }),
   ]);
 
   // Temperatura (formato varia entre versões do RouterOS)
@@ -134,7 +161,8 @@ async function collect(host, resourceRaw, connectionDuration) {
   if (healthRes.ok && Array.isArray(healthRes.data)) {
     const t = healthRes.data.find((h) => /temp/i.test(h.name || ""));
     if (t) temperature = parseFloat(t.value);
-    else if (healthRes.data[0]?.temperature) temperature = parseFloat(healthRes.data[0].temperature);
+    else if (healthRes.data[0]?.temperature)
+      temperature = parseFloat(healthRes.data[0].temperature);
   }
 
   // WAN: bps calculado pela diferença de contadores
@@ -154,7 +182,12 @@ async function collect(host, resourceRaw, connectionDuration) {
       let txBps = 0;
       if (prev) {
         const seconds = (now - prev.ts) / 1000;
-        if (seconds > 0 && seconds < CFG.intervalSeconds * 5 && rx >= prev.rx && tx >= prev.tx) {
+        if (
+          seconds > 0 &&
+          seconds < CFG.intervalSeconds * 5 &&
+          rx >= prev.rx &&
+          tx >= prev.tx
+        ) {
           rxBps = ((rx - prev.rx) * 8) / seconds;
           txBps = ((tx - prev.tx) * 8) / seconds;
         }
@@ -164,7 +197,13 @@ async function collect(host, resourceRaw, connectionDuration) {
       if (rxBps > LIMIT) rxBps = 0;
       if (txBps > LIMIT) txBps = 0;
 
-      wan.push({ interface_name: name, rx_bps: rxBps, tx_bps: txBps, rx_bytes: rx, tx_bytes: tx });
+      wan.push({
+        interface_name: name,
+        rx_bps: rxBps,
+        tx_bps: txBps,
+        rx_bytes: rx,
+        tx_bytes: tx,
+      });
     }
   }
 
@@ -182,8 +221,10 @@ async function collect(host, resourceRaw, connectionDuration) {
     }
   }
 
-  const totalMemory = resource["total-memory"] != null ? Number(resource["total-memory"]) : null;
-  const freeMemory = resource["free-memory"] != null ? Number(resource["free-memory"]) : null;
+  const totalMemory =
+    resource["total-memory"] != null ? Number(resource["total-memory"]) : null;
+  const freeMemory =
+    resource["free-memory"] != null ? Number(resource["free-memory"]) : null;
 
   return {
     host,
@@ -193,11 +234,14 @@ async function collect(host, resourceRaw, connectionDuration) {
     diagnostics: {
       duration: connectionDuration,
       pppoe_collection_ok: activeRes.ok,
-      pppoe_error: activeRes.ok ? null : (activeRes.error || `HTTP ${activeRes.status || 0}`),
+      pppoe_error: activeRes.ok
+        ? null
+        : activeRes.error || `HTTP ${activeRes.status || 0}`,
       pppoe_count: pppoe.length,
     },
     resource: {
-      cpu_load: resource["cpu-load"] != null ? Number(resource["cpu-load"]) : null,
+      cpu_load:
+        resource["cpu-load"] != null ? Number(resource["cpu-load"]) : null,
       free_memory: freeMemory,
       total_memory: totalMemory,
       temperature,
@@ -228,11 +272,17 @@ function writeQueue(items) {
 async function send(payloads) {
   const res = await fetch(INGEST_URL, {
     method: "POST",
-    headers: { "Content-Type": "application/json", "x-agent-token": CFG.agentToken },
-    body: JSON.stringify(payloads.length === 1 ? payloads[0] : { batch: payloads }),
+    headers: {
+      "Content-Type": "application/json",
+      "x-agent-token": CFG.agentToken,
+    },
+    body: JSON.stringify(
+      payloads.length === 1 ? payloads[0] : { batch: payloads },
+    ),
   });
   const text = await res.text();
-  if (!res.ok) throw new Error(`Ingest HTTP ${res.status}: ${text.slice(0, 200)}`);
+  if (!res.ok)
+    throw new Error(`Ingest HTTP ${res.status}: ${text.slice(0, 200)}`);
   return text;
 }
 
@@ -265,7 +315,11 @@ async function tick() {
       });
       return;
     }
-    const payload = await collect(picked.host, picked.resource, picked.duration);
+    const payload = await collect(
+      picked.host,
+      picked.resource,
+      picked.duration,
+    );
     await flush(payload);
   } catch (e) {
     log("Erro no ciclo:", e.message);
@@ -274,7 +328,9 @@ async function tick() {
   }
 }
 
-log(`Agente iniciado. Hosts: ${CFG.hosts.join(", ")} | intervalo: ${CFG.intervalSeconds}s`);
+log(
+  `Agente iniciado. Hosts: ${CFG.hosts.join(", ")} | intervalo: ${CFG.intervalSeconds}s`,
+);
 tick();
 setInterval(tick, CFG.intervalSeconds * 1000);
 
