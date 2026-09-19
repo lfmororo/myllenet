@@ -72,10 +72,8 @@ async function processBlockAlerts(supabase: any) {
         customer_id: alert.customer_id,
         customer_name: customer.nome,
         phone: customer.telefone,
-        type:
-          alert.new_status === "blocked"
-            ? "cliente_bloqueado"
-            : "cliente_desbloqueado",
+        type: logType,
+
         message,
         status: "failed",
         error_message: errorMessage,
