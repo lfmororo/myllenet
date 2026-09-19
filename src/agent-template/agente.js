@@ -69,7 +69,14 @@ function sshExec(host, command) {
   return new Promise((resolve) => {
     const conn = new Client();
     let settled = false;
-    const finish = (result) => { if (settled) return; settled = true; conn.end(); resolve(result); };
+    const timer = setTimeout(() => finish({ ok: false, status: 0, error: `Timeout SSH (${CFG.requestTimeoutMs}ms)` }), CFG.requestTimeoutMs);
+    const finish = (result) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      conn.end();
+      resolve(result);
+    };
     conn.on("ready", () => {
       conn.exec(command, (err, stream) => {
         if (err) return finish({ ok: false, status: 0, error: err.message });

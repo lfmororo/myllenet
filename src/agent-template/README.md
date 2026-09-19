@@ -32,6 +32,7 @@ systemctl restart mikrotik-agent     # reiniciar após editar o .env
 ## Teste manual
 
 ```bash
+ npm install
 node agente.js
 ```
 
