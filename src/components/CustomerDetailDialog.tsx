@@ -1,19 +1,69 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, ExternalLink, Copy, CheckCircle2, Clock, Import, CalendarCheck, X, XCircle, Activity, History, Bell, BellOff, AlertTriangle, ShieldCheck, ShieldAlert, Lock, Unlock, UploadCloud, Power, PowerOff, Trash2 } from "lucide-react";
+import {
+  Loader2,
+  ExternalLink,
+  Copy,
+  CheckCircle2,
+  Clock,
+  Import,
+  CalendarCheck,
+  X,
+  XCircle,
+  Activity,
+  History,
+  Bell,
+  BellOff,
+  AlertTriangle,
+  ShieldCheck,
+  ShieldAlert,
+  Lock,
+  Unlock,
+  UploadCloud,
+  Power,
+  PowerOff,
+  Trash2,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tooltip as UITooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type { Customer } from "@/hooks/useCustomers";
 import type { Invoice } from "@/hooks/useInvoices";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+} from "recharts";
 
 interface MikrotikSession {
   name: string;
@@ -31,7 +81,13 @@ interface Props {
   mikrotikData?: MikrotikSession | null;
 }
 
-export default function CustomerDetailDialog({ open, onOpenChange, customer, onCustomerUpdated, mikrotikData }: Props) {
+export default function CustomerDetailDialog({
+  open,
+  onOpenChange,
+  customer,
+  onCustomerUpdated,
+  mikrotikData,
+}: Props) {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(false);
   const [checkingEfi, setCheckingEfi] = useState(false);
@@ -45,13 +101,18 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
   const [unlocking, setUnlocking] = useState(false);
   const [mikrotikAction, setMikrotikAction] = useState<string | null>(null);
 
-  const runMikrotikAction = async (action: "sync" | "enable" | "disable" | "remove") => {
+  const runMikrotikAction = async (
+    action: "sync" | "enable" | "disable" | "remove",
+  ) => {
     if (!customer) return;
     setMikrotikAction(action);
     try {
-      const { data, error } = await supabase.functions.invoke("mikrotik-customer", {
-        body: { customer_id: customer.id, action },
-      });
+      const { data, error } = await supabase.functions.invoke(
+        "mikrotik-customer",
+        {
+          body: { customer_id: customer.id, action },
+        },
+      );
       if (error) throw error;
       if (data?.success) {
         toast.success(data.message || "Ação executada no Mikrotik");
@@ -66,33 +127,35 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
     }
   };
 
+  const fetchLogs = useCallback(
+    async (isLoadMore = false) => {
+      if (!customer) return;
+      if (isLoadMore && !hasMoreLogs) return;
 
-  const fetchLogs = useCallback(async (isLoadMore = false) => {
-    if (!customer) return;
-    if (isLoadMore && !hasMoreLogs) return;
-    
-    setLoadingLogs(true);
-    const from = isLoadMore ? logs.length : 0;
-    const to = from + 49;
+      setLoadingLogs(true);
+      const from = isLoadMore ? logs.length : 0;
+      const to = from + 49;
 
-    const { data, error } = await supabase
-      .from("pppoe_logs")
-      .select("*")
-      .eq("customer_id", customer.id)
-      .order("logged_at", { ascending: false })
-      .range(from, to);
-    
-    if (!error && data) {
-      if (isLoadMore) {
-        setLogs(prev => [...prev, ...data]);
-      } else {
-        setLogs(data);
+      const { data, error } = await supabase
+        .from("pppoe_logs")
+        .select("*")
+        .eq("customer_id", customer.id)
+        .order("logged_at", { ascending: false })
+        .range(from, to);
+
+      if (!error && data) {
+        if (isLoadMore) {
+          setLogs((prev) => [...prev, ...data]);
+        } else {
+          setLogs(data);
+        }
+        setHasMoreLogs(data.length === 50);
       }
-      setHasMoreLogs(data.length === 50);
-    }
-    setLoadingLogs(false);
-  }, [customer, logs.length, hasMoreLogs]);
-  
+      setLoadingLogs(false);
+    },
+    [customer, logs.length, hasMoreLogs],
+  );
+
   const fetchBlockHistory = useCallback(async () => {
     if (!customer) return;
     setLoadingBlockHistory(true);
@@ -102,7 +165,7 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
       .eq("customer_id", customer.id)
       .order("created_at", { ascending: false })
       .limit(10);
-    
+
     if (!error && data) {
       setBlockHistory(data);
     }
@@ -138,16 +201,16 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
       const channel = supabase
         .channel(`pppoe_logs_${customer.id}`)
         .on(
-          'postgres_changes',
+          "postgres_changes",
           {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'pppoe_logs',
-            filter: `customer_id=eq.${customer.id}`
+            event: "INSERT",
+            schema: "public",
+            table: "pppoe_logs",
+            filter: `customer_id=eq.${customer.id}`,
           },
           (payload) => {
             setLogs((prev) => [payload.new, ...prev].slice(0, 100));
-          }
+          },
         )
         .subscribe();
 
@@ -200,34 +263,35 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
         .from("customers")
         .update({ block_status: "active" } as any)
         .eq("id", customer.id);
-      
+
       if (error) throw error;
 
       // Log the manual unlock
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       await supabase.from("block_history" as any).insert({
         customer_id: customer.id,
         old_status: customer.block_status,
         new_status: "active",
         reason: "Desbloqueio manual pelo administrador",
-        changed_by: user?.id
+        changed_by: user?.id,
       } as any);
 
       toast.success("Cliente desbloqueado manualmente!");
       fetchBlockHistory();
       onCustomerUpdated?.();
-      
+
       // Request Mikrotik sync
       const { data: sessionData } = await supabase.auth.getSession();
       const token = sessionData?.session?.access_token;
       if (token) {
         const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
         fetch(`https://${projectId}.supabase.co/functions/v1/mikrotik-sync`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}` }
-        }).catch(e => console.error("Sync error:", e));
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+        }).catch((e) => console.error("Sync error:", e));
       }
-
     } catch (err) {
       console.error(err);
       toast.error("Erro ao desbloquear cliente");
@@ -249,7 +313,11 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
     try {
       const { data: sessionData } = await supabase.auth.getSession();
       const token = sessionData?.session?.access_token;
-      if (!token) { toast.error("Sessão expirada"); setCheckingEfi(false); return; }
+      if (!token) {
+        toast.error("Sessão expirada");
+        setCheckingEfi(false);
+        return;
+      }
 
       const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
       const response = await fetch(
@@ -259,14 +327,16 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
             Authorization: `Bearer ${token}`,
             apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
           },
-        }
+        },
       );
 
       const result = await response.json();
       if (!response.ok) {
         toast.error(result.error || "Erro ao consultar EFI");
       } else {
-        toast.success(`Encontrados: ${result.total_found} | Importados: ${result.imported} | Já existentes: ${result.skipped}`);
+        toast.success(
+          `Encontrados: ${result.total_found} | Importados: ${result.imported} | Já existentes: ${result.skipped}`,
+        );
         if (result.imported > 0) {
           fetchInvoices();
         }
@@ -287,9 +357,18 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
   };
 
   const formatCurrency = (cents: number) =>
-    (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+    (cents / 100).toLocaleString("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    });
 
-  const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
+  const statusConfig: Record<
+    string,
+    {
+      label: string;
+      variant: "default" | "secondary" | "destructive" | "outline";
+    }
+  > = {
     pending: { label: "Pendente", variant: "outline" },
     waiting: { label: "Aguardando", variant: "secondary" },
     paid: { label: "Pago", variant: "default" },
@@ -297,8 +376,12 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
     expired: { label: "Vencido", variant: "destructive" },
   };
 
-  const totalPending = invoices.filter(i => ["pending", "waiting"].includes(i.status)).reduce((s, i) => s + i.valor_centavos, 0);
-  const totalPaid = invoices.filter(i => i.status === "paid").reduce((s, i) => s + i.valor_centavos, 0);
+  const totalPending = invoices
+    .filter((i) => ["pending", "waiting"].includes(i.status))
+    .reduce((s, i) => s + i.valor_centavos, 0);
+  const totalPaid = invoices
+    .filter((i) => i.status === "paid")
+    .reduce((s, i) => s + i.valor_centavos, 0);
   const usageLogs = logs
     .filter((log) => log.rx_bytes != null || log.tx_bytes != null)
     .map((log) => ({
@@ -307,8 +390,12 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
       tx_bytes: Number(log.tx_bytes || 0),
     }));
   const latestUsage = usageLogs[0];
-  const downloadBytes = Number(mikrotikData?.rx_bytes ?? latestUsage?.rx_bytes ?? 0);
-  const uploadBytes = Number(mikrotikData?.tx_bytes ?? latestUsage?.tx_bytes ?? 0);
+  const downloadBytes = Number(
+    mikrotikData?.rx_bytes ?? latestUsage?.rx_bytes ?? 0,
+  );
+  const uploadBytes = Number(
+    mikrotikData?.tx_bytes ?? latestUsage?.tx_bytes ?? 0,
+  );
   const formatBytes = (bytes: number) => {
     if (!Number.isFinite(bytes) || bytes <= 0) return "0 MB";
     if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(2)} GB`;
@@ -330,21 +417,25 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
               <Badge variant={customer.ativo ? "default" : "secondary"}>
                 {customer.ativo ? "Ativo" : "Inativo"}
               </Badge>
-              {customer.block_status === 'blocked' && (
+              {customer.block_status === "blocked" && (
                 <Badge variant="destructive" className="animate-pulse">
                   BLOQUEADO
                 </Badge>
               )}
             </div>
-            {customer.block_status === 'blocked' && (
-              <Button 
-                size="sm" 
-                variant="outline" 
+            {customer.block_status === "blocked" && (
+              <Button
+                size="sm"
+                variant="outline"
                 className="h-7 text-xs border-green-500 text-green-600 hover:bg-green-50 ml-auto"
                 onClick={handleManualUnlock}
                 disabled={unlocking}
               >
-                {unlocking ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Unlock className="h-3 w-3 mr-1" />}
+                {unlocking ? (
+                  <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                ) : (
+                  <Unlock className="h-3 w-3 mr-1" />
+                )}
                 Desbloquear Manual
               </Button>
             )}
@@ -357,25 +448,34 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
             <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold flex items-center gap-2">
-                  <div className={`h-2 w-2 rounded-full ${mikrotikData ? "bg-green-500 animate-pulse" : "bg-gray-300"}`} />
+                  <div
+                    className={`h-2 w-2 rounded-full ${mikrotikData ? "bg-green-500 animate-pulse" : "bg-gray-300"}`}
+                  />
                   Status Mikrotik
                 </h3>
                 {mikrotikData && (
-                  <Badge variant="outline" className="text-[10px] uppercase font-bold text-green-600 border-green-200">
+                  <Badge
+                    variant="outline"
+                    className="text-[10px] uppercase font-bold text-green-600 border-green-200"
+                  >
                     Conectado
                   </Badge>
                 )}
               </div>
-              
+
               {mikrotikData ? (
                 <div className="space-y-2 text-xs">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Tempo Online:</span>
-                    <span className="font-mono font-medium">{mikrotikData.uptime || "—"}</span>
+                    <span className="font-mono font-medium">
+                      {mikrotikData.uptime || "—"}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Endereço IP:</span>
-                    <span className="font-mono font-medium">{mikrotikData.address || "—"}</span>
+                    <span className="font-mono font-medium">
+                      {mikrotikData.address || "—"}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Serviço:</span>
@@ -402,7 +502,11 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
                     disabled={!!mikrotikAction}
                     onClick={() => runMikrotikAction("sync")}
                   >
-                    {mikrotikAction === "sync" ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <UploadCloud className="h-3 w-3 mr-1" />}
+                    {mikrotikAction === "sync" ? (
+                      <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                    ) : (
+                      <UploadCloud className="h-3 w-3 mr-1" />
+                    )}
                     Cadastrar / Atualizar
                   </Button>
                   <Button
@@ -412,7 +516,11 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
                     disabled={!!mikrotikAction}
                     onClick={() => runMikrotikAction("enable")}
                   >
-                    {mikrotikAction === "enable" ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Power className="h-3 w-3 mr-1" />}
+                    {mikrotikAction === "enable" ? (
+                      <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                    ) : (
+                      <Power className="h-3 w-3 mr-1" />
+                    )}
                     Ativar
                   </Button>
                   <Button
@@ -422,7 +530,11 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
                     disabled={!!mikrotikAction}
                     onClick={() => runMikrotikAction("disable")}
                   >
-                    {mikrotikAction === "disable" ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <PowerOff className="h-3 w-3 mr-1" />}
+                    {mikrotikAction === "disable" ? (
+                      <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                    ) : (
+                      <PowerOff className="h-3 w-3 mr-1" />
+                    )}
                     Desativar
                   </Button>
                   <Button
@@ -431,16 +543,24 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
                     className="h-7 text-xs text-muted-foreground"
                     disabled={!!mikrotikAction}
                     onClick={() => {
-                      if (confirm("Remover o usuário PPPoE deste cliente do Mikrotik?")) runMikrotikAction("remove");
+                      if (
+                        confirm(
+                          "Remover o usuário PPPoE deste cliente do Mikrotik?",
+                        )
+                      )
+                        runMikrotikAction("remove");
                     }}
                   >
-                    {mikrotikAction === "remove" ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Trash2 className="h-3 w-3 mr-1" />}
+                    {mikrotikAction === "remove" ? (
+                      <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                    ) : (
+                      <Trash2 className="h-3 w-3 mr-1" />
+                    )}
                     Remover
                   </Button>
                 </div>
               </div>
             </div>
-
 
             {/* Consumo de Banda (Chart) */}
             <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
@@ -452,44 +572,83 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
               <div className="grid grid-cols-2 gap-3 text-xs">
                 <div className="rounded-md border bg-background p-3">
                   <span className="text-muted-foreground">Download</span>
-                  <p className="mt-1 text-base font-semibold tabular-nums">{formatBytes(downloadBytes)}</p>
+                  <p className="mt-1 text-base font-semibold tabular-nums">
+                    {formatBytes(downloadBytes)}
+                  </p>
                 </div>
                 <div className="rounded-md border bg-background p-3">
                   <span className="text-muted-foreground">Upload</span>
-                  <p className="mt-1 text-base font-semibold tabular-nums">{formatBytes(uploadBytes)}</p>
+                  <p className="mt-1 text-base font-semibold tabular-nums">
+                    {formatBytes(uploadBytes)}
+                  </p>
                 </div>
               </div>
-              
+
               <div className="h-[150px] w-full mt-2">
                 {usageLogs.length > 1 ? (
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={[...usageLogs].reverse().slice(-48)}>
                       <defs>
-                        <linearGradient id="colorRx" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#0d9488" stopOpacity={0.3}/>
-                          <stop offset="95%" stopColor="#0d9488" stopOpacity={0}/>
+                        <linearGradient
+                          id="colorRx"
+                          x1="0"
+                          y1="0"
+                          x2="0"
+                          y2="1"
+                        >
+                          <stop
+                            offset="5%"
+                            stopColor="#0d9488"
+                            stopOpacity={0.3}
+                          />
+                          <stop
+                            offset="95%"
+                            stopColor="#0d9488"
+                            stopOpacity={0}
+                          />
                         </linearGradient>
                       </defs>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                      <XAxis 
-                        dataKey="logged_at" 
-                        hide 
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        vertical={false}
+                        stroke="#e2e8f0"
                       />
-                      <YAxis 
-                        tick={{fontSize: 10}} 
-                        tickFormatter={(val) => `${(val / (1024*1024)).toFixed(0)}MB`}
+                      <XAxis dataKey="logged_at" hide />
+                      <YAxis
+                        tick={{ fontSize: 10 }}
+                        tickFormatter={(val) =>
+                          `${(val / (1024 * 1024)).toFixed(0)}MB`
+                        }
                       />
-                      <Tooltip 
-                        labelFormatter={(label: any) => new Date(label).toLocaleString('pt-BR')}
-                        formatter={(val: number, name: string) => [formatBytes(val), name === "rx_bytes" ? "Download" : "Upload"]}
+                      <Tooltip
+                        labelFormatter={(label: any) =>
+                          new Date(label).toLocaleString("pt-BR")
+                        }
+                        formatter={(val: number, name: string) => [
+                          formatBytes(val),
+                          name === "rx_bytes" ? "Download" : "Upload",
+                        ]}
                       />
-                      <Area type="monotone" dataKey="rx_bytes" stroke="#0d9488" fillOpacity={1} fill="url(#colorRx)" />
-                      <Line type="monotone" dataKey="tx_bytes" stroke="hsl(var(--accent-foreground))" dot={false} />
+                      <Area
+                        type="monotone"
+                        dataKey="rx_bytes"
+                        stroke="#0d9488"
+                        fillOpacity={1}
+                        fill="url(#colorRx)"
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="tx_bytes"
+                        stroke="hsl(var(--accent-foreground))"
+                        dot={false}
+                      />
                     </AreaChart>
                   </ResponsiveContainer>
                 ) : (
                   <div className="h-full flex items-center justify-center text-xs text-muted-foreground italic">
-                    {loadingLogs ? "Carregando consumo..." : "Aguardando dados de consumo do agente."}
+                    {loadingLogs
+                      ? "Carregando consumo..."
+                      : "Aguardando dados de consumo do agente."}
                   </div>
                 )}
               </div>
@@ -504,13 +663,23 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
               <div className="space-y-2 max-h-[150px] overflow-y-auto pr-2 custom-scrollbar">
                 {blockHistory.length > 0 ? (
                   blockHistory.map((h, idx) => (
-                    <div key={idx} className="flex flex-col text-[11px] border-b border-muted py-2 last:border-0">
+                    <div
+                      key={idx}
+                      className="flex flex-col text-[11px] border-b border-muted py-2 last:border-0"
+                    >
                       <div className="flex items-center justify-between mb-1">
                         <span className="font-medium text-muted-foreground">
-                          {new Date(h.created_at).toLocaleString('pt-BR')}
+                          {new Date(h.created_at).toLocaleString("pt-BR")}
                         </span>
-                        <Badge variant={h.new_status === 'active' ? 'outline' : 'destructive'} className="text-[9px] h-4 px-1 leading-none">
-                          {h.new_status === 'active' ? 'LIBERADO' : 'BLOQUEADO'}
+                        <Badge
+                          variant={
+                            h.new_status === "active"
+                              ? "outline"
+                              : "destructive"
+                          }
+                          className="text-[9px] h-4 px-1 leading-none"
+                        >
+                          {h.new_status === "active" ? "LIBERADO" : "BLOQUEADO"}
                         </Badge>
                       </div>
                       <span className="text-[10px] text-muted-foreground leading-tight italic">
@@ -519,9 +688,13 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
                     </div>
                   ))
                 ) : loadingBlockHistory ? (
-                  <div className="flex justify-center py-4"><Loader2 className="h-4 w-4 animate-spin" /></div>
+                  <div className="flex justify-center py-4">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  </div>
                 ) : (
-                  <div className="text-xs text-muted-foreground italic py-2">Nenhuma alteração de status registrada.</div>
+                  <div className="text-xs text-muted-foreground italic py-2">
+                    Nenhuma alteração de status registrada.
+                  </div>
                 )}
               </div>
             </div>
@@ -535,64 +708,126 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
               <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
                 {logs.length > 0 ? (
                   <>
-                    {logs.filter(l => l.event_type === 'connected' || l.event_type === 'disconnected' || (l.event_type === 'stats' && l.uptime)).map((log, idx) => (
-                      <div key={idx} className="flex items-center justify-between text-[11px] border-b border-muted py-1.5 last:border-0">
-                        <div className="flex flex-col">
-                          <span className="font-medium text-muted-foreground">
-                            {new Date(log.logged_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                          <span className="text-[10px] text-green-600">Online: {log.uptime}</span>
+                    {logs
+                      .filter(
+                        (l) =>
+                          l.event_type === "connected" ||
+                          l.event_type === "disconnected" ||
+                          (l.event_type === "stats" && l.uptime),
+                      )
+                      .map((log, idx) => (
+                        <div
+                          key={idx}
+                          className="flex items-center justify-between text-[11px] border-b border-muted py-1.5 last:border-0"
+                        >
+                          <div className="flex flex-col">
+                            <span className="font-medium text-muted-foreground">
+                              {new Date(log.logged_at).toLocaleString("pt-BR", {
+                                day: "2-digit",
+                                month: "2-digit",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </span>
+                            <span className="text-[10px] text-green-600">
+                              Online: {log.uptime}
+                            </span>
+                          </div>
+                          <Badge
+                            variant="outline"
+                            className="text-[9px] h-4 px-1"
+                          >
+                            {log.ip_address}
+                          </Badge>
                         </div>
-                        <Badge variant="outline" className="text-[9px] h-4 px-1">
-                          {log.ip_address}
-                        </Badge>
-                      </div>
-                    ))}
+                      ))}
                     {hasMoreLogs && (
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="w-full text-[10px] h-8 mt-2" 
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-full text-[10px] h-8 mt-2"
                         onClick={() => fetchLogs(true)}
                         disabled={loadingLogs}
                       >
-                        {loadingLogs ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                        {loadingLogs ? (
+                          <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                        ) : null}
                         Carregar mais histórico
                       </Button>
                     )}
                   </>
                 ) : loadingLogs ? (
-                  <div className="flex justify-center py-4"><Loader2 className="h-4 w-4 animate-spin" /></div>
+                  <div className="flex justify-center py-4">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  </div>
                 ) : (
-                  <div className="text-xs text-muted-foreground italic py-2">Sem histórico disponível.</div>
+                  <div className="text-xs text-muted-foreground italic py-2">
+                    Sem histórico disponível.
+                  </div>
                 )}
               </div>
             </div>
 
-
             <div className="grid grid-cols-1 gap-2 text-sm">
-              <div><span className="text-muted-foreground">CPF:</span> <span className="font-mono">{formatCPF(customer.cpf)}</span></div>
-              <div><span className="text-muted-foreground">E-mail:</span> {customer.email}</div>
-              <div><span className="text-muted-foreground">Telefone:</span> {customer.telefone || "—"}</div>
-              <div><span className="text-muted-foreground">PPPoE:</span> <span className="font-mono">{customer.usuario_pppoe}</span></div>
+              <div>
+                <span className="text-muted-foreground">CPF:</span>{" "}
+                <span className="font-mono">{formatCPF(customer.cpf)}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">E-mail:</span>{" "}
+                {customer.email}
+              </div>
+              <div>
+                <span className="text-muted-foreground">Telefone:</span>{" "}
+                {customer.telefone || "—"}
+              </div>
+              <div>
+                <span className="text-muted-foreground">PPPoE:</span>{" "}
+                <span className="font-mono">{customer.usuario_pppoe}</span>
+              </div>
             </div>
           </div>
 
           <div className="space-y-3 text-sm">
             {customer.rua && (
               <div className="rounded-lg border p-3 bg-muted/10">
-                <span className="text-xs font-semibold text-muted-foreground uppercase block mb-1">Endereço</span>
+                <span className="text-xs font-semibold text-muted-foreground uppercase block mb-1">
+                  Endereço
+                </span>
                 <p className="leading-relaxed">
-                  {[customer.rua, customer.numero, customer.complemento, customer.bairro, customer.cidade, customer.estado, customer.cep].filter(Boolean).join(", ")}
+                  {[
+                    customer.rua,
+                    customer.numero,
+                    customer.complemento,
+                    customer.bairro,
+                    customer.cidade,
+                    customer.estado,
+                    customer.cep,
+                  ]
+                    .filter(Boolean)
+                    .join(", ")}
                 </p>
               </div>
             )}
             <div className="rounded-lg border p-3 bg-muted/10">
-              <span className="text-xs font-semibold text-muted-foreground uppercase block mb-1">Dados Supabase</span>
+              <span className="text-xs font-semibold text-muted-foreground uppercase block mb-1">
+                Dados Supabase
+              </span>
               <div className="space-y-1 text-xs">
-                <div className="flex justify-between"><span className="text-muted-foreground">ID Interno:</span> <span className="font-mono text-[10px]">{customer.id}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Criado em:</span> <span>{new Date(customer.created_at).toLocaleDateString("pt-BR")}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Vencimento:</span> <span>Dia {customer.dia_vencimento}</span></div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">ID Interno:</span>{" "}
+                  <span className="font-mono text-[10px]">{customer.id}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Criado em:</span>{" "}
+                  <span>
+                    {new Date(customer.created_at).toLocaleDateString("pt-BR")}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Vencimento:</span>{" "}
+                  <span>Dia {customer.dia_vencimento}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -607,7 +842,8 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
             Pagamento Antecipado (PIX direto)
           </div>
           <p className="text-xs text-muted-foreground">
-            Informe até que mês o cliente já pagou. Meses cobertos não gerarão alerta de "sem boleto".
+            Informe até que mês o cliente já pagou. Meses cobertos não gerarão
+            alerta de "sem boleto".
           </p>
           <div className="flex items-center gap-2">
             <Input
@@ -626,18 +862,35 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
               }}
               className="w-48"
             />
-            <Button size="sm" onClick={handleSavePagoAte} disabled={savingPagoAte}>
-              {savingPagoAte ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Salvar"}
+            <Button
+              size="sm"
+              onClick={handleSavePagoAte}
+              disabled={savingPagoAte}
+            >
+              {savingPagoAte ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                "Salvar"
+              )}
             </Button>
             {customer.pago_ate && (
-              <Button size="sm" variant="ghost" onClick={handleClearPagoAte} disabled={savingPagoAte}>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={handleClearPagoAte}
+                disabled={savingPagoAte}
+              >
                 <X className="h-3.5 w-3.5 mr-1" /> Limpar
               </Button>
             )}
           </div>
           {customer.pago_ate && (
             <p className="text-xs text-primary">
-              ✅ Pago até: {new Date(customer.pago_ate + "T12:00:00").toLocaleDateString("pt-BR", { month: "long", year: "numeric" })}
+              ✅ Pago até:{" "}
+              {new Date(customer.pago_ate + "T12:00:00").toLocaleDateString(
+                "pt-BR",
+                { month: "long", year: "numeric" },
+              )}
             </p>
           )}
         </div>
@@ -650,49 +903,67 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
             <Bell className="h-4 w-4 text-primary" />
             Configurações de Alertas
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="flex items-center justify-between space-x-2">
               <div className="space-y-0.5">
                 <Label className="text-sm">Quedas de Conexão</Label>
-                <p className="text-[10px] text-muted-foreground">Alerta quando desconectar por 5min.</p>
+                <p className="text-[10px] text-muted-foreground">
+                  Alerta quando desconectar por 5min.
+                </p>
               </div>
               <Switch
                 checked={customer.alert_on_disconnect}
-                onCheckedChange={(val) => updateCustomer({ alert_on_disconnect: val })}
+                onCheckedChange={(val) =>
+                  updateCustomer({ alert_on_disconnect: val })
+                }
               />
             </div>
 
             <div className="flex items-center justify-between space-x-2">
               <div className="space-y-0.5">
                 <Label className="text-sm">Quedas Frequentes</Label>
-                <p className="text-[10px] text-muted-foreground">Alerta se reconectar 3x em 1h.</p>
+                <p className="text-[10px] text-muted-foreground">
+                  Alerta se reconectar 3x em 1h.
+                </p>
               </div>
               <Switch
                 checked={customer.alert_on_frequent_drops}
-                onCheckedChange={(val) => updateCustomer({ alert_on_frequent_drops: val })}
+                onCheckedChange={(val) =>
+                  updateCustomer({ alert_on_frequent_drops: val })
+                }
               />
             </div>
 
             <div className="flex items-center justify-between space-x-2">
               <div className="space-y-0.5">
                 <Label className="text-sm">Consumo Anormal</Label>
-                <p className="text-[10px] text-muted-foreground">Alerta tráfego {'>'} 500MB em 15min.</p>
+                <p className="text-[10px] text-muted-foreground">
+                  Alerta tráfego {">"} 500MB em 15min.
+                </p>
               </div>
               <Switch
                 checked={customer.alert_on_abnormal_usage}
-                onCheckedChange={(val) => updateCustomer({ alert_on_abnormal_usage: val })}
+                onCheckedChange={(val) =>
+                  updateCustomer({ alert_on_abnormal_usage: val })
+                }
               />
             </div>
 
             <div className="flex items-center justify-between space-x-2">
               <div className="space-y-0.5">
-                <Label className="text-sm text-primary font-bold">Bloqueio Automático</Label>
-                <p className="text-[10px] text-muted-foreground font-medium">Alerta WhatsApp ao ser bloqueado ou liberado.</p>
+                <Label className="text-sm text-primary font-bold">
+                  Bloqueio Automático
+                </Label>
+                <p className="text-[10px] text-muted-foreground font-medium">
+                  Alerta WhatsApp ao ser bloqueado ou liberado.
+                </p>
               </div>
               <Switch
                 checked={customer.alert_on_block_change}
-                onCheckedChange={(val) => updateCustomer({ alert_on_block_change: val })}
+                onCheckedChange={(val) =>
+                  updateCustomer({ alert_on_block_change: val })
+                }
               />
             </div>
           </div>
@@ -709,11 +980,18 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <Label htmlFor="alert-disconnect" className="text-xs font-medium cursor-pointer">Desconexão (&gt;5min)</Label>
-                <Switch 
+                <Label
+                  htmlFor="alert-disconnect"
+                  className="text-xs font-medium cursor-pointer"
+                >
+                  Desconexão (&gt;5min)
+                </Label>
+                <Switch
                   id="alert-disconnect"
-                  checked={customer.alert_on_disconnect} 
-                  onCheckedChange={(val) => updateCustomer({ alert_on_disconnect: val })}
+                  checked={customer.alert_on_disconnect}
+                  onCheckedChange={(val) =>
+                    updateCustomer({ alert_on_disconnect: val })
+                  }
                 />
               </div>
               <p className="text-[10px] text-muted-foreground leading-tight">
@@ -723,11 +1001,18 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
 
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <Label htmlFor="alert-drops" className="text-xs font-medium cursor-pointer">Quedas Frequentes</Label>
-                <Switch 
+                <Label
+                  htmlFor="alert-drops"
+                  className="text-xs font-medium cursor-pointer"
+                >
+                  Quedas Frequentes
+                </Label>
+                <Switch
                   id="alert-drops"
-                  checked={customer.alert_on_frequent_drops} 
-                  onCheckedChange={(val) => updateCustomer({ alert_on_frequent_drops: val })}
+                  checked={customer.alert_on_frequent_drops}
+                  onCheckedChange={(val) =>
+                    updateCustomer({ alert_on_frequent_drops: val })
+                  }
                 />
               </div>
               <p className="text-[10px] text-muted-foreground leading-tight">
@@ -737,11 +1022,18 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
 
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <Label htmlFor="alert-usage" className="text-xs font-medium cursor-pointer">Consumo Anormal</Label>
-                <Switch 
+                <Label
+                  htmlFor="alert-usage"
+                  className="text-xs font-medium cursor-pointer"
+                >
+                  Consumo Anormal
+                </Label>
+                <Switch
                   id="alert-usage"
-                  checked={customer.alert_on_abnormal_usage} 
-                  onCheckedChange={(val) => updateCustomer({ alert_on_abnormal_usage: val })}
+                  checked={customer.alert_on_abnormal_usage}
+                  onCheckedChange={(val) =>
+                    updateCustomer({ alert_on_abnormal_usage: val })
+                  }
                 />
               </div>
               <p className="text-[10px] text-muted-foreground leading-tight">
@@ -758,7 +1050,9 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
           <div className="flex items-center gap-1.5">
             <Clock className="h-4 w-4 text-muted-foreground" />
             <span className="text-muted-foreground">Em aberto:</span>
-            <span className="font-semibold">{formatCurrency(totalPending)}</span>
+            <span className="font-semibold">
+              {formatCurrency(totalPending)}
+            </span>
           </div>
           <div className="flex items-center gap-1.5">
             <CheckCircle2 className="h-4 w-4 text-green-500" />
@@ -769,8 +1063,17 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
             {invoices.length} fatura{invoices.length !== 1 ? "s" : ""}
           </div>
           <div className="ml-auto">
-            <Button variant="outline" size="sm" disabled={checkingEfi} onClick={handleCheckEfi}>
-              {checkingEfi ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Import className="mr-1.5 h-3.5 w-3.5" />}
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={checkingEfi}
+              onClick={handleCheckEfi}
+            >
+              {checkingEfi ? (
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Import className="mr-1.5 h-3.5 w-3.5" />
+              )}
               Consultar EFI
             </Button>
           </div>
@@ -782,7 +1085,9 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
             <Loader2 className="h-6 w-6 animate-spin text-primary" />
           </div>
         ) : invoices.length === 0 ? (
-          <p className="text-center text-muted-foreground py-8">Nenhuma cobrança encontrada.</p>
+          <p className="text-center text-muted-foreground py-8">
+            Nenhuma cobrança encontrada.
+          </p>
         ) : (
           <div className="rounded-lg border">
             <Table>
@@ -797,86 +1102,182 @@ export default function CustomerDetailDialog({ open, onOpenChange, customer, onC
               </TableHeader>
               <TableBody>
                 {invoices.map((inv) => {
-                  const st = statusConfig[inv.status] || { label: inv.status, variant: "outline" as const };
+                  const st = statusConfig[inv.status] || {
+                    label: inv.status,
+                    variant: "outline" as const,
+                  };
                   return (
                     <TableRow key={inv.id}>
                       <TableCell className="text-sm">{inv.descricao}</TableCell>
-                      <TableCell className="text-sm">{new Date(inv.vencimento + "T12:00:00").toLocaleDateString("pt-BR")}</TableCell>
-                      <TableCell className="text-sm font-mono">{formatCurrency(inv.valor_centavos)}</TableCell>
+                      <TableCell className="text-sm">
+                        {new Date(
+                          inv.vencimento + "T12:00:00",
+                        ).toLocaleDateString("pt-BR")}
+                      </TableCell>
+                      <TableCell className="text-sm font-mono">
+                        {formatCurrency(inv.valor_centavos)}
+                      </TableCell>
                       <TableCell>
-                        <Badge variant={st.variant} className="text-xs">{st.label}</Badge>
+                        <Badge variant={st.variant} className="text-xs">
+                          {st.label}
+                        </Badge>
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1 flex-wrap">
                           {inv.efi_link && (
-                            <Button variant="outline" size="sm" className="h-7 text-xs px-2" asChild>
-                              <a href={inv.efi_link} target="_blank" rel="noopener noreferrer" title="Abrir boleto">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 text-xs px-2"
+                              asChild
+                            >
+                              <a
+                                href={inv.efi_link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title="Abrir boleto"
+                              >
                                 <ExternalLink className="h-3 w-3 mr-1" /> Boleto
                               </a>
                             </Button>
                           )}
                           {inv.efi_pix_copiacola && (
-                            <Button variant="outline" size="sm" className="h-7 text-xs px-2" onClick={() => copyToClipboard(inv.efi_pix_copiacola!)} title="Copiar PIX Copia e Cola">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 text-xs px-2"
+                              onClick={() =>
+                                copyToClipboard(inv.efi_pix_copiacola!)
+                              }
+                              title="Copiar PIX Copia e Cola"
+                            >
                               <Copy className="h-3 w-3 mr-1" /> PIX
                             </Button>
                           )}
                           {inv.efi_barcode && (
-                            <Button variant="outline" size="sm" className="h-7 text-xs px-2" onClick={() => copyToClipboard(inv.efi_barcode!)} title="Copiar código de barras">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 text-xs px-2"
+                              onClick={() => copyToClipboard(inv.efi_barcode!)}
+                              title="Copiar código de barras"
+                            >
                               <Copy className="h-3 w-3 mr-1" /> Barras
                             </Button>
                           )}
-                          {inv.status !== "paid" && inv.status !== "cancelled" && (
-                            <>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7 text-green-600 hover:text-green-700"
-                                title="Marcar como pago"
-                                onClick={async () => {
-                                  const { error } = await supabase.from("invoices").update({ status: "paid", paid_at: new Date().toISOString() }).eq("id", inv.id);
-                                  if (error) { toast.error("Erro ao marcar como pago"); return; }
-                                  toast.success("Fatura marcada como paga"); fetchInvoices(); onCustomerUpdated?.();
-                                  try {
-                                    const { data: sd } = await supabase.auth.getSession();
-                                    const tk = sd?.session?.access_token;
-                                    if (tk) {
-                                      const pid = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-                                      // Cancel on EFI if has charge_id
-                                      if (inv.efi_charge_id) {
-                                        try {
-                                          const cr = await fetch(`https://${pid}.supabase.co/functions/v1/efi-boleto/cancel`, {
-                                            method: "POST", headers: { Authorization: `Bearer ${tk}`, "Content-Type": "application/json", apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
-                                            body: JSON.stringify({ charge_id: inv.efi_charge_id }),
-                                          });
-                                          if (cr.ok) toast.success("Cobrança cancelada na EFI");
-                                        } catch (e) { console.warn("EFI cancel failed:", e); }
-                                      }
-                                      // WhatsApp notification
-                                      const r = await fetch(`https://${pid}.supabase.co/functions/v1/whatsapp-send/notify-invoice`, {
-                                        method: "POST", headers: { Authorization: `Bearer ${tk}`, "Content-Type": "application/json", apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
-                                        body: JSON.stringify({ invoice_id: inv.id, type: "pagamento_confirmado" }),
-                                      });
-                                      if (r.ok) toast.success("Confirmação enviada ao cliente!");
+                          {inv.status !== "paid" &&
+                            inv.status !== "cancelled" && (
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 text-green-600 hover:text-green-700"
+                                  title="Marcar como pago"
+                                  onClick={async () => {
+                                    const { error } = await supabase
+                                      .from("invoices")
+                                      .update({
+                                        status: "paid",
+                                        paid_at: new Date().toISOString(),
+                                      })
+                                      .eq("id", inv.id);
+                                    if (error) {
+                                      toast.error("Erro ao marcar como pago");
+                                      return;
                                     }
-                                  } catch (e) { console.warn("Notify failed:", e); }
-                                }}
-                              >
-                                <CheckCircle2 className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7 text-destructive hover:text-destructive"
-                                title="Cancelar fatura"
-                                onClick={async () => {
-                                  const { error } = await supabase.from("invoices").update({ status: "cancelled" }).eq("id", inv.id);
-                                  if (error) { toast.error("Erro ao cancelar"); } else { toast.success("Fatura cancelada"); fetchInvoices(); onCustomerUpdated?.(); }
-                                }}
-                              >
-                                <XCircle className="h-3.5 w-3.5" />
-                              </Button>
-                            </>
-                          )}
+                                    toast.success("Fatura marcada como paga");
+                                    fetchInvoices();
+                                    onCustomerUpdated?.();
+                                    try {
+                                      const { data: sd } =
+                                        await supabase.auth.getSession();
+                                      const tk = sd?.session?.access_token;
+                                      if (tk) {
+                                        const pid = import.meta.env
+                                          .VITE_SUPABASE_PROJECT_ID;
+                                        // Cancel on EFI if has charge_id
+                                        if (inv.efi_charge_id) {
+                                          try {
+                                            const cr = await fetch(
+                                              `https://${pid}.supabase.co/functions/v1/efi-boleto/cancel`,
+                                              {
+                                                method: "POST",
+                                                headers: {
+                                                  Authorization: `Bearer ${tk}`,
+                                                  "Content-Type":
+                                                    "application/json",
+                                                  apikey: import.meta.env
+                                                    .VITE_SUPABASE_PUBLISHABLE_KEY,
+                                                },
+                                                body: JSON.stringify({
+                                                  charge_id: inv.efi_charge_id,
+                                                }),
+                                              },
+                                            );
+                                            if (cr.ok)
+                                              toast.success(
+                                                "Cobrança cancelada na EFI",
+                                              );
+                                          } catch (e) {
+                                            console.warn(
+                                              "EFI cancel failed:",
+                                              e,
+                                            );
+                                          }
+                                        }
+                                        // WhatsApp notification
+                                        const r = await fetch(
+                                          `https://${pid}.supabase.co/functions/v1/whatsapp-send/notify-invoice`,
+                                          {
+                                            method: "POST",
+                                            headers: {
+                                              Authorization: `Bearer ${tk}`,
+                                              "Content-Type":
+                                                "application/json",
+                                              apikey: import.meta.env
+                                                .VITE_SUPABASE_PUBLISHABLE_KEY,
+                                            },
+                                            body: JSON.stringify({
+                                              invoice_id: inv.id,
+                                              type: "pagamento_confirmado",
+                                            }),
+                                          },
+                                        );
+                                        if (r.ok)
+                                          toast.success(
+                                            "Confirmação enviada ao cliente!",
+                                          );
+                                      }
+                                    } catch (e) {
+                                      console.warn("Notify failed:", e);
+                                    }
+                                  }}
+                                >
+                                  <CheckCircle2 className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 text-destructive hover:text-destructive"
+                                  title="Cancelar fatura"
+                                  onClick={async () => {
+                                    const { error } = await supabase
+                                      .from("invoices")
+                                      .update({ status: "cancelled" })
+                                      .eq("id", inv.id);
+                                    if (error) {
+                                      toast.error("Erro ao cancelar");
+                                    } else {
+                                      toast.success("Fatura cancelada");
+                                      fetchInvoices();
+                                      onCustomerUpdated?.();
+                                    }
+                                  }}
+                                >
+                                  <XCircle className="h-3.5 w-3.5" />
+                                </Button>
+                              </>
+                            )}
                         </div>
                       </TableCell>
                     </TableRow>
