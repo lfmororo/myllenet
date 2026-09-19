@@ -644,6 +644,9 @@ export default function MikrotikPage() {
 
       <RecentPppoeConnections />
 
+      <MikrotikCommandQueue />
+
+
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <div>
