@@ -785,6 +785,21 @@ async function checkCustomerCharges(req: Request) {
   }
 }
 
+const DEFAULT_SATISFACTION_URL = "https://app.mororo.tech/satisfacao";
+
+async function getSatisfactionUrl(supabase: any): Promise<string> {
+  try {
+    const { data } = await supabase
+      .from("settings")
+      .select("value")
+      .eq("key", "satisfaction_url")
+      .maybeSingle();
+    return data?.value || DEFAULT_SATISFACTION_URL;
+  } catch {
+    return DEFAULT_SATISFACTION_URL;
+  }
+}
+
 async function sendPaymentNotification(supabase: any, invoiceId: string) {
   try {
     const { data: invoice } = await supabase
