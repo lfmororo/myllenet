@@ -390,11 +390,13 @@ export default function CustomerDetailDialog({
       tx_bytes: Number(log.tx_bytes || 0),
     }));
   const latestUsage = usageLogs[0];
+  // No Mikrotik, na visão do roteador: tx = enviado ao cliente (download dele),
+  // rx = recebido do cliente (upload dele).
   const downloadBytes = Number(
-    mikrotikData?.rx_bytes ?? latestUsage?.rx_bytes ?? 0,
+    mikrotikData?.tx_bytes ?? latestUsage?.tx_bytes ?? 0,
   );
   const uploadBytes = Number(
-    mikrotikData?.tx_bytes ?? latestUsage?.tx_bytes ?? 0,
+    mikrotikData?.rx_bytes ?? latestUsage?.rx_bytes ?? 0,
   );
   const formatBytes = (bytes: number) => {
     if (!Number.isFinite(bytes) || bytes <= 0) return "0 MB";
