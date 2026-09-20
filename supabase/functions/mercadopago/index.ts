@@ -523,7 +523,7 @@ async function testConnection(req: Request) {
     ok: true,
     account: me.nickname || me.email,
     site: me.site_id,
-    live_mode: !String(mpToken()).startsWith("TEST-"),
+    live_mode: !(await mpToken()).startsWith("TEST-"),
   });
 }
 
