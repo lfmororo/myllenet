@@ -261,6 +261,47 @@ export default function Settings() {
     setSaving(false);
   };
 
+  const handleSaveGateway = async () => {
+    setSavingGateway(true);
+    try {
+      await upsertSetting("payment_gateway", paymentGateway);
+      toast.success("Forma de cobrança salva!");
+    } catch (err: any) {
+      toast.error("Erro ao salvar: " + (err.message || "Erro desconhecido"));
+    }
+    setSavingGateway(false);
+  };
+
+  const handleTestMercadoPago = async () => {
+    setTestingMp(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+      const res = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/mercadopago/test`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      const result = await res.json();
+      if (res.ok && result.ok) {
+        toast.success(
+          `Mercado Pago conectado: ${result.account}${result.live_mode ? " (produção)" : " (teste)"}`
+        );
+      } else {
+        toast.error("Falha: " + (result.error || "Erro desconhecido"));
+      }
+    } catch (err: any) {
+      toast.error("Erro ao testar: " + (err.message || "Erro desconhecido"));
+    }
+    setTestingMp(false);
+  };
+
   const handleTestConnection = async () => {
     setTesting(true);
     try {
