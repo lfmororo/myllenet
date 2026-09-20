@@ -158,6 +158,22 @@ export function useInvoicePDF() {
 
       currentY += 20;
 
+      doc.setFillColor(bgColor[0], bgColor[1], bgColor[2]);
+      doc.rect(20, currentY, pageWidth - 40, 25, "F");
+      doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]);
+      doc.rect(20, currentY, pageWidth - 40, 25, "S");
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(lightTextColor[0], lightTextColor[1], lightTextColor[2]);
+      doc.text("QUALIDADE DA CONEXÃO NO PERÍODO", 25, currentY + 7);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(textColor[0], textColor[1], textColor[2]);
+      doc.text(`Desconexões: ${consumption.interruptions}`, 25, currentY + 15);
+      doc.text(`Tempo conectado: ${consumption.connected}`, 75, currentY + 15);
+      doc.text(`Tempo sem conexão: ${consumption.disconnected}`, 140, currentY + 15);
+
+      currentY += 33;
+
       // 4. Financial Highlight Box
       const boxWidth = 65;
       const boxX = pageWidth - 20 - boxWidth;

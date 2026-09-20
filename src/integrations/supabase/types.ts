@@ -887,6 +887,18 @@ export type Database = {
           upload_bytes: number
         }[]
       }
+      get_invoice_network_metrics: {
+        Args: { _customer_id: string; _from: string; _to: string }
+        Returns: {
+          connected_seconds: number
+          disconnect_count: number
+          disconnected_seconds: number
+          download_bytes: number
+          observed_from: string
+          observed_to: string
+          upload_bytes: number
+        }[]
+      }
       get_recent_disconnections: {
         Args: { since_time: string }
         Returns: {
