@@ -130,3 +130,10 @@ a[href*="lovable.dev"][target="_blank"] {
 .dark .logo-high-contrast {
   filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.4)) brightness(1.2);
 }
+
+@media print {
+  .no-print, [data-sidebar="sidebar"], header { display: none !important; }
+  main { padding: 0 !important; overflow: visible !important; }
+  .report-print-area { color: #000; background: #fff; }
+  .report-print-area table { font-size: 9px; }
+}
