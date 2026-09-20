@@ -518,7 +518,6 @@ export default function Settings() {
                     <SelectContent>
                       <SelectItem value="mercadopago">Mercado Pago (Pix com baixa automática)</SelectItem>
                       <SelectItem value="efi">EFI Pay (boleto + Pix)</SelectItem>
-                      <SelectItem value="local">Pix local (chave própria, sem baixa automática)</SelectItem>
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground">
