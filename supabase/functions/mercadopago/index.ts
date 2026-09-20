@@ -537,6 +537,7 @@ Deno.serve(async (req) => {
   try {
     if (path === "/webhook") return await handleWebhook(req);
     if (path === "/create") return await createPix(req);
+    if (path === "/pix-for-invoice") return await pixForInvoice(req);
     if (path === "/check") return await checkInvoice(req);
     if (path === "/bulk-check") return await bulkCheck(req);
     if (path === "/test") return await testConnection(req);
