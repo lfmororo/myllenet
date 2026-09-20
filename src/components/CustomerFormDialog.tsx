@@ -65,6 +65,7 @@ export default function CustomerFormDialog({ open, onOpenChange, customer, onSav
     nome: "", cpf: "", email: "", telefone: "", usuario_pppoe: "", senha_pppoe: "",
     rua: null, numero: null, complemento: null, bairro: null, cidade: null, estado: null, cep: null,
     dia_vencimento: 10, plan_id: null, desconto_especial_centavos: 0, cortesia: false,
+    seller_name: null, preferred_payment_method: null, pop_name: null, cancelled_at: null, cancel_reason: null,
   });
   const [saving, setSaving] = useState(false);
   const [sendingMikrotik, setSendingMikrotik] = useState(false);
@@ -79,12 +80,15 @@ export default function CustomerFormDialog({ open, onOpenChange, customer, onSav
         bairro: customer.bairro || null, cidade: customer.cidade || null, estado: customer.estado || null, cep: customer.cep || null,
         dia_vencimento: customer.dia_vencimento, plan_id: customer.plan_id, desconto_especial_centavos: customer.desconto_especial_centavos,
         cortesia: customer.cortesia ?? false,
+        seller_name: customer.seller_name, preferred_payment_method: customer.preferred_payment_method,
+        pop_name: customer.pop_name, cancelled_at: customer.cancelled_at, cancel_reason: customer.cancel_reason,
       });
     } else {
       setForm({
         nome: "", cpf: "", email: "", telefone: "", usuario_pppoe: "", senha_pppoe: "",
         rua: null, numero: null, complemento: null, bairro: null, cidade: null, estado: null, cep: null,
         dia_vencimento: 10, plan_id: null, desconto_especial_centavos: 0, cortesia: false,
+        seller_name: null, preferred_payment_method: null, pop_name: null, cancelled_at: null, cancel_reason: null,
       });
     }
   }, [customer, open]);
@@ -236,6 +240,21 @@ export default function CustomerFormDialog({ open, onOpenChange, customer, onSav
                   />
                 </div>
                 <p className="text-xs text-muted-foreground">Desconto adicional ao do plano para este cliente</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="seller_name">Vendedor</Label>
+                <Input id="seller_name" value={form.seller_name || ""} onChange={(e) => setForm({ ...form, seller_name: e.target.value || null })} placeholder="Nome do vendedor" />
+              </div>
+              <div className="space-y-2">
+                <Label>Forma de pagamento</Label>
+                <Select value={form.preferred_payment_method || "none"} onValueChange={(v) => setForm({ ...form, preferred_payment_method: v === "none" ? null : v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent><SelectItem value="none">Não informado</SelectItem><SelectItem value="pix">PIX</SelectItem><SelectItem value="boleto">Boleto</SelectItem><SelectItem value="card">Cartão</SelectItem><SelectItem value="cash">Dinheiro</SelectItem></SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="pop_name">Concentrador / POP</Label>
+                <Input id="pop_name" value={form.pop_name || ""} onChange={(e) => setForm({ ...form, pop_name: e.target.value || null })} placeholder="Ex.: POP Centro" />
               </div>
               <div className="flex items-center justify-between sm:col-span-2 rounded-lg border p-3 bg-muted/30">
                 <div>

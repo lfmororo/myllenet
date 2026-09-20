@@ -49,6 +49,7 @@ async function listUsers(req: Request) {
   // Get roles
   const { data: roles } = await admin.from("user_roles").select("user_id, role");
   const { data: profiles } = await admin.from("profiles").select("user_id, full_name");
+  const { data: permissions } = await admin.from("user_report_permissions").select("user_id, report_key");
 
   const rolesMap = new Map<string, string>();
   for (const r of roles || []) rolesMap.set(r.user_id, r.role);
@@ -62,6 +63,7 @@ async function listUsers(req: Request) {
     full_name: profilesMap.get(u.id) || u.user_metadata?.full_name || "",
     phone: u.user_metadata?.phone || u.phone || "",
     role: rolesMap.get(u.id) || "user",
+    report_permissions: (permissions || []).filter(p => p.user_id === u.id).map(p => p.report_key),
     created_at: u.created_at,
     last_sign_in_at: u.last_sign_in_at,
   }));
@@ -73,7 +75,7 @@ async function listUsers(req: Request) {
 
 async function createUser(req: Request) {
   await verifyAdmin(req.headers.get("Authorization"));
-  const { email, password, full_name, role, phone } = await req.json();
+  const { email, password, full_name, role, phone, report_permissions } = await req.json();
 
   if (!email || !password) {
     return new Response(JSON.stringify({ error: "Email e senha obrigatórios" }), {
@@ -101,6 +103,9 @@ async function createUser(req: Request) {
   if (role === "admin" && userData.user) {
     await admin.from("user_roles").insert({ user_id: userData.user.id, role: "admin" });
   }
+  if (userData.user && Array.isArray(report_permissions) && report_permissions.length) {
+    await admin.from("user_report_permissions").insert(report_permissions.map((report_key: string) => ({ user_id: userData.user.id, report_key })));
+  }
 
   return new Response(JSON.stringify({ success: true, user: userData.user }), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -109,7 +114,7 @@ async function createUser(req: Request) {
 
 async function updateUser(req: Request) {
   await verifyAdmin(req.headers.get("Authorization"));
-  const { user_id, email, password, full_name, role, phone } = await req.json();
+  const { user_id, email, password, full_name, role, phone, report_permissions } = await req.json();
 
   if (!user_id) {
     return new Response(JSON.stringify({ error: "user_id obrigatório" }), {
@@ -146,6 +151,12 @@ async function updateUser(req: Request) {
     await admin.from("user_roles").delete().eq("user_id", user_id);
     if (role === "admin") {
       await admin.from("user_roles").insert({ user_id, role: "admin" });
+    }
+  }
+  if (Array.isArray(report_permissions)) {
+    await admin.from("user_report_permissions").delete().eq("user_id", user_id);
+    if (report_permissions.length) {
+      await admin.from("user_report_permissions").insert(report_permissions.map((report_key: string) => ({ user_id, report_key })));
     }
   }
 
