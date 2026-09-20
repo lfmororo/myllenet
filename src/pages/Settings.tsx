@@ -500,42 +500,92 @@ export default function Settings() {
             )}
           </TabsContent>
 
-          <TabsContent value="efi" className="mt-4 space-y-4">
+          <TabsContent value="pagamentos" className="mt-4 space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>Forma de cobrança</CardTitle>
+                <CardTitle>Plataforma de cobrança</CardTitle>
                 <CardDescription>
-                  Escolha qual serviço será usado para gerar as cobranças dos clientes.
+                  Escolha qual plataforma vai gerar as cobranças e o Pix dos clientes.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="payment_gateway">Serviço em uso</Label>
+                  <Label htmlFor="payment_gateway">Plataforma em uso</Label>
                   <Select value={paymentGateway} onValueChange={setPaymentGateway}>
                     <SelectTrigger id="payment_gateway">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="mercadopago">Mercado Pago (Pix com baixa automática)</SelectItem>
                       <SelectItem value="efi">EFI Pay (boleto + Pix)</SelectItem>
-                      <SelectItem value="mercadopago">Mercado Pago (Pix)</SelectItem>
+                      <SelectItem value="local">Pix local (chave própria, sem baixa automática)</SelectItem>
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground">
-                    No Mercado Pago a baixa é automática: o pagamento é confirmado na hora e o cliente é desbloqueado sozinho.
+                    Com o Mercado Pago, cada fatura gera o Pix e o QR Code direto pela plataforma e o pagamento é
+                    confirmado sozinho, liberando o cliente automaticamente.
+                  </p>
+                </div>
+                <Button onClick={handleSaveGateway} disabled={savingGateway}>
+                  {savingGateway && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Salvar plataforma
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Mercado Pago</CardTitle>
+                <CardDescription>
+                  Informe o Access Token de produção (Mercado Pago → Suas integrações → Credenciais de produção).
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="mp_token">Access Token</Label>
+                  <Input
+                    id="mp_token"
+                    type="password"
+                    value={mpAccessToken}
+                    onChange={(e) => setMpAccessToken(e.target.value)}
+                    placeholder={mpTokenSaved ? "Token já configurado — informe outro para substituir" : "APP_USR-..."}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="mp_webhook">URL de notificações (webhook)</Label>
+                  <div className="flex gap-2">
+                    <Input id="mp_webhook" readOnly value={mpWebhookUrl} className="font-mono text-xs" />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        navigator.clipboard.writeText(mpWebhookUrl);
+                        toast.success("URL copiada!");
+                      }}
+                    >
+                      Copiar
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Cadastre esta URL no Mercado Pago, em Webhooks, marcando o evento de Pagamentos. É isso que garante a
+                    baixa imediata das faturas.
                   </p>
                 </div>
                 <div className="flex gap-2">
-                  <Button onClick={handleSaveGateway} disabled={savingGateway}>
-                    {savingGateway && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Salvar
+                  <Button onClick={handleSaveMercadoPago} disabled={savingMp}>
+                    {savingMp && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Salvar credenciais
                   </Button>
                   <Button variant="outline" onClick={handleTestMercadoPago} disabled={testingMp}>
                     {testingMp && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Testar Mercado Pago
+                    Testar conexão
                   </Button>
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="efi" className="mt-4 space-y-4">
             <Card>
               <CardHeader>
                 <CardTitle>Credenciais EFI Pay</CardTitle>
