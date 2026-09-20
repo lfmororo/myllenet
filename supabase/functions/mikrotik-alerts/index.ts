@@ -119,6 +119,13 @@ async function processBlockAlerts(supabase: any) {
         status: "failed",
         error_message: errorMessage,
       });
+      // Fecha o alerta mesmo em falha de envio ao cliente: a falha já ficou
+      // registrada no histórico e o admin não deve receber o mesmo aviso
+      // repetidamente a cada execução.
+      await supabase
+        .from("block_alerts_sent")
+        .update({ processed: true })
+        .eq("id", alert.id);
     }
   }
 
