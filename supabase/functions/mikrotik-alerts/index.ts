@@ -495,6 +495,36 @@ async function processMikrotikErrorAlerts(supabase: any) {
     return ignoredUsernames.some((name: string) => lower.includes(name));
   };
 
+  // Erros registrados ANTES do desbloqueio/reativação de um cliente não devem
+  // ser avisados depois: eram consequência do bloqueio.
+  const { data: recentUnblocks } = await supabase
+    .from("block_history")
+    .select("created_at, new_status, customers(usuario_pppoe)")
+    .gte("created_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+    .order("created_at", { ascending: false })
+    .limit(200);
+
+  const unblockedSince = new Map<string, number>();
+  for (const row of recentUnblocks || []) {
+    if (row.new_status === "blocked") continue;
+    const username = String(row.customers?.usuario_pppoe || "")
+      .toLowerCase()
+      .trim();
+    if (username.length < 3) continue;
+    if (!unblockedSince.has(username)) {
+      unblockedSince.set(username, new Date(row.created_at).getTime());
+    }
+  }
+
+  const isBeforeUnblock = (detail: string, loggedAt: string) => {
+    const lower = detail.toLowerCase();
+    const eventTime = new Date(loggedAt).getTime();
+    for (const [username, unblockTime] of unblockedSince) {
+      if (lower.includes(username) && eventTime < unblockTime) return true;
+    }
+    return false;
+  };
+
   const cfg = await getWhatsAppConfig();
   const processed = new Set<string>();
   let sent = 0;
@@ -502,6 +532,8 @@ async function processMikrotikErrorAlerts(supabase: any) {
 
   for (const candidate of candidates) {
     if (mentionsIgnoredCustomer(candidate.detail)) continue;
+    if (isBeforeUnblock(candidate.detail, candidate.loggedAt)) continue;
+
 
     const normalized =
       `${candidate.host}|${candidate.category}|${candidate.detail}`.toLowerCase();
