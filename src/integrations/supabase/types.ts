@@ -876,6 +876,17 @@ export type Database = {
           customer_id: string
         }[]
       }
+      get_bandwidth_report: {
+        Args: { _from: string; _to: string }
+        Returns: {
+          active_days: number
+          customer_id: string
+          download_bytes: number
+          peak_bytes: number
+          total_bytes: number
+          upload_bytes: number
+        }[]
+      }
       get_recent_disconnections: {
         Args: { since_time: string }
         Returns: {
