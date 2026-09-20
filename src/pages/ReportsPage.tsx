@@ -18,7 +18,14 @@ type Customer = any;
 type Invoice = any;
 type Plan = any;
 type Block = any;
-type Pppoe = any;
+type BandwidthUsage = {
+  customer_id: string;
+  download_bytes: number;
+  upload_bytes: number;
+  total_bytes: number;
+  active_days: number;
+  peak_bytes: number;
+};
 
 const REPORTS: { key: ReportKey; label: string; description: string }[] = [
   { key: "overdue", label: "Clientes em atraso", description: "Inadimplência por faixa, plano e localização" },
@@ -49,7 +56,7 @@ export default function ReportsPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [blocks, setBlocks] = useState<Block[]>([]);
-  const [logs, setLogs] = useState<Pppoe[]>([]);
+  const [bandwidthUsage, setBandwidthUsage] = useState<BandwidthUsage[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const today = new Date();
@@ -76,20 +83,22 @@ export default function ReportsPage() {
       setLoading(true);
       const startIso = `${from}T00:00:00Z`;
       const endIso = `${to}T23:59:59Z`;
-      const [c, i, p, b, l] = await Promise.all([
+      const [c, i, p, b, usage] = await Promise.all([
         supabase.from("customers").select("*"),
         supabase.from("invoices").select("*"),
         supabase.from("plans").select("*"),
         supabase.from("block_history").select("*").gte("created_at", startIso).lte("created_at", endIso),
-        supabase.from("pppoe_logs").select("customer_id,rx_bytes,tx_bytes,logged_at").gte("logged_at", startIso).lte("logged_at", endIso).limit(10000),
+        report === "bandwidth"
+          ? supabase.rpc("get_bandwidth_report", { _from: startIso, _to: endIso })
+          : Promise.resolve({ data: [], error: null }),
       ]);
-      const error = c.error || i.error || p.error;
+      const error = c.error || i.error || p.error || b.error || usage.error;
       if (error) toast.error("Não foi possível carregar os dados do relatório");
-      setCustomers(c.data || []); setInvoices(i.data || []); setPlans(p.data || []); setBlocks(b.data || []); setLogs(l.data || []);
+      setCustomers(c.data || []); setInvoices(i.data || []); setPlans(p.data || []); setBlocks(b.data || []); setBandwidthUsage(usage.data || []);
       setLoading(false);
     };
     if (allowed.length) load(); else setLoading(false);
-  }, [from, to, allowed.length]);
+  }, [from, to, report, allowed.length]);
 
   const planMap = useMemo(() => new Map(plans.map((item) => [item.id, item])), [plans]);
   const customerMap = useMemo(() => new Map(customers.map((item) => [item.id, item])), [customers]);
@@ -126,8 +135,7 @@ export default function ReportsPage() {
       return { columns:[{key:"periodo",label:"Período"},{key:"faturado",label:"Faturado"},{key:"recebido",label:"Recebido"},{key:"aberto",label:"Em aberto"},{key:"vencido",label:"Vencido"},{key:"cancelado",label:"Cancelado"}], rows, totals:[{label:"Faturado",value:money(raw.reduce((s,r)=>s+r.faturado,0))},{label:"Recebido",value:money(raw.reduce((s,r)=>s+r.recebido,0))},{label:"Em aberto",value:money(raw.reduce((s,r)=>s+r.aberto+r.vencido,0))}], chart:raw.map(r=>({periodo:r.periodo,Faturado:r.faturado/100,Recebido:r.recebido/100,"Em aberto":(r.aberto+r.vencido)/100})) };
     }
     if (report === "bandwidth") {
-      const grouped=new Map<string,any>(); logs.forEach((l)=>{const c=customerMap.get(l.customer_id);if(!c||!matchesCustomer(c))return;const r=grouped.get(l.customer_id)||{c,minRx:Number(l.rx_bytes||0),maxRx:0,minTx:Number(l.tx_bytes||0),maxTx:0,peak:0,days:new Set()};const rx=Number(l.rx_bytes||0),tx=Number(l.tx_bytes||0);r.minRx=Math.min(r.minRx,rx);r.maxRx=Math.max(r.maxRx,rx);r.minTx=Math.min(r.minTx,tx);r.maxTx=Math.max(r.maxTx,tx);r.peak=Math.max(r.peak,rx+tx);r.days.add(l.logged_at.slice(0,10));grouped.set(l.customer_id,r);});
-      const raw=[...grouped.values()].map(r=>{const download=Math.max(0,r.maxRx-r.minRx),upload=Math.max(0,r.maxTx-r.minTx),total=download+upload;return{cliente:r.c.nome,plano:planMap.get(r.c.plan_id)?.nome||"Não informado",pop:r.c.pop_name||"Não informado",download,upload,total,media:Math.round(total/Math.max(1,r.days.size)),pico:r.peak};}).sort((a,b)=>b.total-a.total).slice(0,Number(topN));
+      const raw=bandwidthUsage.map((usage)=>{const c=customerMap.get(usage.customer_id);if(!c||!matchesCustomer(c))return null;const download=Number(usage.download_bytes||0),upload=Number(usage.upload_bytes||0),total=Number(usage.total_bytes||0);return{cliente:c.nome,plano:planMap.get(c.plan_id)?.nome||"Não informado",pop:c.pop_name||"Não informado",download,upload,total,media:Math.round(total/Math.max(1,Number(usage.active_days||0))),pico:Number(usage.peak_bytes||0)};}).filter((row): row is NonNullable<typeof row>=>row!==null).sort((a,b)=>b.total-a.total).slice(0,Number(topN));
       const rows=raw.map(r=>({...r,download:bytes(r.download),upload:bytes(r.upload),total:bytes(r.total),media:bytes(r.media),pico:bytes(r.pico)}));
       return { columns:[{key:"cliente",label:"Cliente"},{key:"plano",label:"Plano"},{key:"pop",label:"POP"},{key:"download",label:"Download"},{key:"upload",label:"Upload"},{key:"total",label:"Total"},{key:"media",label:"Média diária"},{key:"pico",label:"Pico registrado"}], rows, totals:[{label:"Clientes com consumo",value:String(rows.length)},{label:"Consumo total",value:bytes(raw.reduce((s,r)=>s+r.total,0))}] };
     }
@@ -138,7 +146,7 @@ export default function ReportsPage() {
     const grouped=new Map<string,any>(); invoices.filter((i)=>inPeriod(i.vencimento)&&(status==="all"||i.status===status)&&(payment==="all"||(i.payment_method||i.gateway)===payment)).forEach((i)=>{const k=`${i.gateway||"local"} / ${i.payment_method||"não informado"}`;const r=grouped.get(k)||{plataforma:k,qtd:0,bruto:0,taxas:0,liquido:0};r.qtd++;r.bruto+=i.valor_centavos;r.taxas+=i.gateway_fee_centavos||0;r.liquido+=i.net_amount_centavos??(i.valor_centavos-(i.gateway_fee_centavos||0));grouped.set(k,r);});
     const raw=[...grouped.values()];const total=raw.reduce((s,r)=>s+r.bruto,0);const rows=raw.map(r=>({plataforma:r.plataforma,qtd:r.qtd,bruto:money(r.bruto),taxas:money(r.taxas),liquido:money(r.liquido),ticket:money(r.qtd?r.bruto/r.qtd:0),participacao:total?`${(r.bruto/total*100).toFixed(1)}%`:"0%"}));
     return {columns:[{key:"plataforma",label:"Plataforma / meio"},{key:"qtd",label:"Cobranças"},{key:"bruto",label:"Valor bruto"},{key:"taxas",label:"Taxas"},{key:"liquido",label:"Valor líquido"},{key:"ticket",label:"Ticket médio"},{key:"participacao",label:"Participação"}],rows,totals:[{label:"Valor bruto",value:money(total)},{label:"Valor líquido",value:money(raw.reduce((s,r)=>s+r.liquido,0))}]};
-  }, [report, customers, invoices, plans, blocks, logs, from, to, plan, status, location, seller, payment, pop, grouping, topN, customerMap, planMap]);
+  }, [report, customers, invoices, plans, blocks, bandwidthUsage, from, to, plan, status, location, seller, payment, pop, grouping, topN, customerMap, planMap]);
 
   const searched = useMemo(() => output.rows.filter((row)=>Object.values(row).some((value)=>String(value).toLowerCase().includes(search.toLowerCase()))), [output.rows, search]);
   const pageCount=Math.max(1,Math.ceil(searched.length/pageSize));
