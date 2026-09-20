@@ -105,7 +105,9 @@ export function useInvoices() {
         return false;
       }
 
-      toast.success("Boleto gerado com sucesso!");
+      toast.success(
+        gateway === "mercadopago" ? "Pix gerado com sucesso!" : "Boleto gerado com sucesso!"
+      );
       fetchInvoices();
 
       // Auto-send WhatsApp notification
