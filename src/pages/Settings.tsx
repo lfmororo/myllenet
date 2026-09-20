@@ -499,7 +499,42 @@ export default function Settings() {
             )}
           </TabsContent>
 
-          <TabsContent value="efi" className="mt-4">
+          <TabsContent value="efi" className="mt-4 space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Forma de cobrança</CardTitle>
+                <CardDescription>
+                  Escolha qual serviço será usado para gerar as cobranças dos clientes.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="payment_gateway">Serviço em uso</Label>
+                  <Select value={paymentGateway} onValueChange={setPaymentGateway}>
+                    <SelectTrigger id="payment_gateway">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="efi">EFI Pay (boleto + Pix)</SelectItem>
+                      <SelectItem value="mercadopago">Mercado Pago (Pix)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    No Mercado Pago a baixa é automática: o pagamento é confirmado na hora e o cliente é desbloqueado sozinho.
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <Button onClick={handleSaveGateway} disabled={savingGateway}>
+                    {savingGateway && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Salvar
+                  </Button>
+                  <Button variant="outline" onClick={handleTestMercadoPago} disabled={testingMp}>
+                    {testingMp && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Testar Mercado Pago
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
             <Card>
               <CardHeader>
                 <CardTitle>Credenciais EFI Pay</CardTitle>
