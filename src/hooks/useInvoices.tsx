@@ -67,8 +67,18 @@ export function useInvoices() {
       }
 
       const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+
+      const { data: gatewaySetting } = await supabase
+        .from("settings")
+        .select("value")
+        .eq("key", "payment_gateway")
+        .maybeSingle();
+      const gateway = gatewaySetting?.value === "mercadopago" ? "mercadopago" : "efi";
+      const endpoint =
+        gateway === "mercadopago" ? "mercadopago/create" : "efi-boleto/create";
+
       const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/efi-boleto/create`,
+        `https://${projectId}.supabase.co/functions/v1/${endpoint}`,
         {
           method: "POST",
           headers: {
