@@ -119,6 +119,13 @@ async function processBlockAlerts(supabase: any) {
         status: "failed",
         error_message: errorMessage,
       });
+      // Fecha o alerta mesmo em falha de envio ao cliente: a falha já ficou
+      // registrada no histórico e o admin não deve receber o mesmo aviso
+      // repetidamente a cada execução.
+      await supabase
+        .from("block_alerts_sent")
+        .update({ processed: true })
+        .eq("id", alert.id);
     }
   }
 
@@ -144,19 +151,25 @@ async function processCustomerDisconnections(supabase: any) {
     .select("customer_id, usuario_pppoe, event_type, logged_at")
     .in("event_type", ["connected", "disconnected"])
     .gt("logged_at", windowStart)
-    .order("logged_at", { ascending: true })
-    .limit(500);
+    .order("logged_at", { ascending: false })
+    .limit(2000);
 
   if (error) throw error;
   if (!events || events.length === 0) return 0;
 
-  // Último evento de cada cliente + última desconexão conhecida
+  // Eventos vêm do mais recente para o mais antigo: o primeiro de cada cliente
+  // já é o último evento dele.
   const lastEvent = new Map<string, any>();
   const lastDisconnect = new Map<string, any>();
   for (const event of events) {
     if (!event.customer_id) continue;
-    lastEvent.set(event.customer_id, event);
-    if (event.event_type === "disconnected") {
+    if (!lastEvent.has(event.customer_id)) {
+      lastEvent.set(event.customer_id, event);
+    }
+    if (
+      event.event_type === "disconnected" &&
+      !lastDisconnect.has(event.customer_id)
+    ) {
       lastDisconnect.set(event.customer_id, event);
     }
   }
@@ -184,6 +197,8 @@ async function processCustomerDisconnections(supabase: any) {
     if (event.event_type === "disconnected") {
       // Aguarda 3 minutos para evitar alarme em quedas instantâneas
       if (now - eventTime < 3 * 60 * 1000) continue;
+      // Evita avisar quedas antigas (ex.: após longa parada do agente)
+      if (now - eventTime > 2 * 60 * 60 * 1000) continue;
 
       const { data: already } = await supabase
         .from("customer_alerts_sent")
