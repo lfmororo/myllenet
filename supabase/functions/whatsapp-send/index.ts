@@ -430,6 +430,46 @@ async function resendPaidNotifications(req: Request) {
   });
 }
 
+async function resendOpenInvoices(req: Request) {
+  const authHeader = req.headers.get("Authorization");
+  await verifyAdmin(authHeader);
+  const supabase = getSupabaseAdmin();
+  const { data: invoices, error } = await supabase
+    .from("invoices")
+    .select("id")
+    .in("status", ["pending", "waiting", "overdue"])
+    .order("vencimento", { ascending: true });
+  if (error) throw error;
+
+  let sent = 0;
+  let failed = 0;
+  const errors: Array<{ invoice_id: string; error: string }> = [];
+  const serviceToken = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+  for (const invoice of invoices || []) {
+    try {
+      const internalRequest = new Request(`${Deno.env.get("SUPABASE_URL")}/functions/v1/whatsapp-send/notify-invoice`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${serviceToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ invoice_id: invoice.id, type: "boleto_gerado" }),
+      });
+      const response = await sendInvoiceNotification(internalRequest);
+      if (!response.ok) {
+        const result = await response.json().catch(() => ({}));
+        throw new Error(result.error || `Falha HTTP ${response.status}`);
+      }
+      sent++;
+    } catch (err) {
+      failed++;
+      errors.push({ invoice_id: invoice.id, error: err instanceof Error ? err.message : String(err) });
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1200));
+  }
+
+  return new Response(JSON.stringify({ success: failed === 0, total: invoices?.length || 0, sent, failed, errors }), {
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -450,6 +490,8 @@ Deno.serve(async (req) => {
         return await sendInvoiceNotification(req);
       case "resend-paid":
         return await resendPaidNotifications(req);
+      case "resend-open-invoices":
+        return await resendOpenInvoices(req);
       case "test": {
         await verifyAdmin(req.headers.get("Authorization"));
         const cfg = await getWhatsAppConfig();

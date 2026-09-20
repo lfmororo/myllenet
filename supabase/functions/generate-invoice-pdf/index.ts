@@ -56,6 +56,25 @@ function maskedCustomerLocation(customer: { bairro?: string | null; cidade?: str
   return location ? `Endereço protegido - ${location}` : "Endereço protegido";
 }
 
+function formatBytes(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  const index = Math.min(Math.floor(Math.log(value) / Math.log(1024)), units.length - 1);
+  return `${(value / Math.pow(1024, index)).toLocaleString("pt-BR", { maximumFractionDigits: 2 })} ${units[index]}`;
+}
+
+function formatDuration(totalSeconds: number): string {
+  const seconds = Math.max(0, Math.round(totalSeconds || 0));
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const parts = [];
+  if (days) parts.push(`${days}d`);
+  if (hours || days) parts.push(`${hours}h`);
+  parts.push(`${minutes}min`);
+  return parts.join(" ");
+}
+
 function generatePixPayload(key: string, name: string, city: string, amount: number, description: string): string {
   const f = (id: string, val: string) => id + val.length.toString().padStart(2, "0") + val;
   const sName = sanitize(name).substring(0, 25);
@@ -111,25 +130,23 @@ Deno.serve(async (req) => {
 
     const pixSettings = Object.fromEntries(settings?.map(s => [s.key, s.value]) || []);
 
-    // Fetch consumption data for the month
-    const startOfMonth = new Date(invoice.vencimento);
-    startOfMonth.setDate(1);
-    startOfMonth.setHours(0, 0, 0, 0);
-    const endOfMonth = new Date(invoice.vencimento);
-    endOfMonth.setMonth(endOfMonth.getMonth() + 1);
-    endOfMonth.setDate(0);
-    endOfMonth.setHours(23, 59, 59, 999);
-
-    const { data: consumptionData } = await supabase
-      .from("pppoe_logs")
-      .select("rx_bytes, tx_bytes, event_type")
-      .eq("customer_id", customer.id)
-      .gte("logged_at", startOfMonth.toISOString())
-      .lte("logged_at", endOfMonth.toISOString());
-
-    const totalDownload = (consumptionData?.reduce((acc, log) => acc + (Number(log.rx_bytes) || 0), 0) || 0) / (1024 * 1024 * 1024);
-    const totalUpload = (consumptionData?.reduce((acc, log) => acc + (Number(log.tx_bytes) || 0), 0) || 0) / (1024 * 1024 * 1024);
-    const interruptions = consumptionData?.filter(log => log.event_type === 'disconnected').length || 0;
+    // Métricas reais do mês de vencimento, limitadas ao momento atual.
+    const [year, month] = String(invoice.vencimento).split("-").map(Number);
+    const startOfMonth = new Date(Date.UTC(year, month - 1, 1, 3, 0, 0));
+    const naturalEnd = new Date(Date.UTC(year, month, 1, 2, 59, 59, 999));
+    const endOfMonth = new Date(Math.min(naturalEnd.getTime(), Date.now()));
+    const { data: metricRows, error: metricsError } = await supabase.rpc("get_invoice_network_metrics", {
+      _customer_id: customer.id,
+      _from: startOfMonth.toISOString(),
+      _to: endOfMonth.toISOString(),
+    });
+    if (metricsError) throw new Error(`Falha ao calcular métricas: ${metricsError.message}`);
+    const metrics = metricRows?.[0] || {};
+    const totalDownloadBytes = Number(metrics.download_bytes || 0);
+    const totalUploadBytes = Number(metrics.upload_bytes || 0);
+    const interruptions = Number(metrics.disconnect_count || 0);
+    const connectedSeconds = Number(metrics.connected_seconds || 0);
+    const disconnectedSeconds = Number(metrics.disconnected_seconds || 0);
 
     const refDate = new Date(invoice.vencimento + "T12:00:00");
     const refMonth = refDate.toLocaleDateString('pt-BR', { month: '2-digit', year: '2-digit' });
@@ -255,9 +272,9 @@ Deno.serve(async (req) => {
 
       currentY += 15;
       doc.setFillColor(248, 250, 252);
-      doc.rect(20, currentY, pageWidth - 40, 25, "F");
+      doc.rect(20, currentY, pageWidth - 40, 34, "F");
       doc.setDrawColor(226, 232, 240);
-      doc.rect(20, currentY, pageWidth - 40, 25, "S");
+      doc.rect(20, currentY, pageWidth - 40, 34, "S");
 
       doc.setFont("helvetica", "bold");
       doc.setFontSize(8);
@@ -265,12 +282,14 @@ Deno.serve(async (req) => {
       doc.text("INFORMAÇÕES TÉCNICAS DO PERÍODO", 25, currentY + 7);
       doc.setFont("helvetica", "normal");
       doc.setTextColor(textColor[0], textColor[1], textColor[2]);
-      doc.text(`Trafego Download: ${totalDownload.toFixed(2)} GB`, 25, currentY + 15);
-      doc.text(`Trafego Upload: ${totalUpload.toFixed(2)} GB`, 80, currentY + 15);
-      doc.text(`Interrupções: ${interruptions}`, 140, currentY + 15);
-      doc.text(`Plano Contratado: ${plan?.nome || "Internet Residencial"}`, 25, currentY + 20);
+      doc.text(`Download: ${formatBytes(totalDownloadBytes)}`, 25, currentY + 15);
+      doc.text(`Upload: ${formatBytes(totalUploadBytes)}`, 85, currentY + 15);
+      doc.text(`Desconexões: ${interruptions}`, 145, currentY + 15);
+      doc.text(`Tempo conectado: ${formatDuration(connectedSeconds)}`, 25, currentY + 22);
+      doc.text(`Tempo sem conexão: ${formatDuration(disconnectedSeconds)}`, 100, currentY + 22);
+      doc.text(`Plano contratado: ${plan?.nome || "Internet Residencial"}`, 25, currentY + 29);
 
-      currentY += 35;
+      currentY += 44;
       doc.setFontSize(12);
       doc.setTextColor(accentColor[0], accentColor[1], accentColor[2]);
       doc.setFont("helvetica", "bold");
@@ -331,9 +350,13 @@ Deno.serve(async (req) => {
         customer,
         plan,
         consumption: {
-          download: totalDownload.toFixed(2),
-          upload: totalUpload.toFixed(2),
-          interruptions
+          download: formatBytes(totalDownloadBytes),
+          upload: formatBytes(totalUploadBytes),
+          interruptions,
+          connected: formatDuration(connectedSeconds),
+          disconnected: formatDuration(disconnectedSeconds),
+          period_start: startOfMonth.toISOString(),
+          period_end: endOfMonth.toISOString()
         },
         pix: {
           payload: pixPayload,
