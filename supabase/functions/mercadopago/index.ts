@@ -348,34 +348,14 @@ async function createPix(req: Request) {
 
   if (!customer) return json({ error: "Cliente não encontrado" }, 404);
 
-  const cpfClean = String(customer.cpf || "").replace(/\D/g, "");
-  const nameParts = String(customer.nome || "Cliente").trim().split(/\s+/);
-
-  // Expira no fim do dia do vencimento (horário de Brasília)
-  const expiration = `${vencimento}T23:59:59.000-03:00`;
-
-  const payment = await mpRequest(
-    "/v1/payments",
-    "POST",
-    {
-      transaction_amount: Number((valor_centavos / 100).toFixed(2)),
-      description: descricao,
-      payment_method_id: "pix",
-      date_of_expiration: expiration,
-      external_reference: `${customer_id}|${vencimento}`,
-      payer: {
-        email: customer.email || `cliente${cpfClean}@mororo.tech`,
-        first_name: nameParts[0],
-        last_name: nameParts.slice(1).join(" ") || nameParts[0],
-        identification: cpfClean
-          ? { type: "CPF", number: cpfClean }
-          : undefined,
-      },
-    },
-    crypto.randomUUID(),
+  const created = await createMpPixPayment(
+    customer,
+    descricao,
+    valor_centavos,
+    vencimento,
   );
+  const payment = created.payment;
 
-  const tx = payment?.point_of_interaction?.transaction_data || {};
   const payload = {
     customer_id,
     plan_id: plan_id || null,
@@ -384,10 +364,10 @@ async function createPix(req: Request) {
     vencimento,
     status: "pending",
     gateway: "mercadopago",
-    mp_payment_id: String(payment.id),
-    mp_pix_qrcode: tx.qr_code || null,
-    mp_pix_copiacola: tx.qr_code || null,
-    mp_link: tx.ticket_url || null,
+    mp_payment_id: created.mp_payment_id,
+    mp_pix_qrcode: created.mp_pix_qrcode,
+    mp_pix_copiacola: created.mp_pix_copiacola,
+    mp_link: created.mp_link,
   };
 
   let { data: invoice, error: invErr } = await supabase
