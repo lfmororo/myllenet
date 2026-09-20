@@ -273,6 +273,23 @@ export default function Settings() {
     setSavingGateway(false);
   };
 
+  const handleSaveMercadoPago = async () => {
+    if (!mpAccessToken.trim()) {
+      toast.error("Informe o Access Token do Mercado Pago.");
+      return;
+    }
+    setSavingMp(true);
+    try {
+      await upsertSetting("mercadopago_access_token", mpAccessToken.trim());
+      setMpTokenSaved(true);
+      setMpAccessToken("");
+      toast.success("Credenciais do Mercado Pago salvas!");
+    } catch (err: any) {
+      toast.error("Erro ao salvar: " + (err.message || "Erro desconhecido"));
+    }
+    setSavingMp(false);
+  };
+
   const handleTestMercadoPago = async () => {
     setTestingMp(true);
     try {
