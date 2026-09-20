@@ -26,6 +26,9 @@ export default function Settings() {
   const { user, isAdmin, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
+  const [paymentGateway, setPaymentGateway] = useState("efi");
+  const [savingGateway, setSavingGateway] = useState(false);
+  const [testingMp, setTestingMp] = useState(false);
   const [clientId, setClientId] = useState("");
   const [clientSecret, setClientSecret] = useState("");
   const [certFile, setCertFile] = useState<File | null>(null);
