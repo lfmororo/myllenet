@@ -64,6 +64,13 @@
       "when": 1789926973897,
       "tag": "0008_reporting_module_access_policies",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1789927368478,
+      "tag": "0009_aggregate_bandwidth_report",
+      "breakpoints": true
     }
   ]
 }
