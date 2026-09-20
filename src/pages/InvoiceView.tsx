@@ -7,6 +7,7 @@ import { Loader2, FileText, Download, ShieldCheck, Copy, Check } from "lucide-re
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { toast } from "sonner";
+import { maskCustomerName, maskDocument, maskedCustomerLocation } from "@/lib/privacy";
 
 const InvoiceView = () => {
   const [copying, setCopying] = useState(false);
@@ -161,6 +162,7 @@ const InvoiceView = () => {
               Mororo.Tech
             </CardTitle>
             <p className="text-sm text-muted-foreground">Fatura de Serviços de Internet</p>
+            <p className="text-xs font-medium text-primary">MylleNet agora é Mororo.Tech</p>
           </div>
           <div className="text-right">
             <span className={`px-3 py-1 rounded-full text-xs font-medium ${
@@ -174,8 +176,9 @@ const InvoiceView = () => {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
               <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Cliente</p>
-              <p className="text-lg font-semibold text-slate-800">{customer?.nome}</p>
-              <p className="text-sm text-slate-600">{customer?.cpf}</p>
+              <p className="text-lg font-semibold text-slate-800">{maskCustomerName(customer?.nome)}</p>
+              <p className="text-sm text-slate-600">CPF/CNPJ: {maskDocument(customer?.cpf)}</p>
+              <p className="text-sm text-slate-600">{maskedCustomerLocation(customer)}</p>
             </div>
             <div className="text-right space-y-1">
               <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Vencimento</p>
@@ -274,6 +277,7 @@ const InvoiceView = () => {
           )}
         </CardContent>
         <CardFooter className="bg-slate-50 border-t flex flex-col items-center p-6 gap-2 text-center rounded-b-xl">
+          <p className="text-sm font-semibold text-slate-800">MylleNet agora é Mororo.Tech</p>
           <p className="text-sm text-slate-600">
             Dúvidas? Entre em contato com nosso suporte:
           </p>
