@@ -50,6 +50,13 @@
       "when": 1789924077233,
       "tag": "0006_add_mercadopago_fields_to_invoices",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1789926948477,
+      "tag": "0007_reporting_module_schema",
+      "breakpoints": true
     }
   ]
 }
