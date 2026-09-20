@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useDiagnosticPDF } from "@/hooks/useDiagnosticPDF";
+import { Checkbox } from "@/components/ui/checkbox";
 
 
 
@@ -84,13 +85,14 @@ export default function Settings() {
     role: string;
     created_at: string;
     last_sign_in_at: string | null;
+    report_permissions: string[];
   }
   const [users, setUsers] = useState<SystemUser[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [userFormOpen, setUserFormOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<SystemUser | null>(null);
   const [deletingUser, setDeletingUser] = useState<SystemUser | null>(null);
-  const [userForm, setUserForm] = useState({ email: "", password: "", full_name: "", role: "user", phone: "" });
+  const [userForm, setUserForm] = useState({ email: "", password: "", full_name: "", role: "user", phone: "", report_permissions: [] as string[] });
   const [savingUser, setSavingUser] = useState(false);
 
   // Plans state
@@ -140,7 +142,7 @@ export default function Settings() {
       const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
 
       if (editingUser) {
-        const body: any = { user_id: editingUser.id, role: userForm.role };
+        const body: any = { user_id: editingUser.id, role: userForm.role, report_permissions: userForm.report_permissions };
         if (userForm.full_name !== editingUser.full_name) body.full_name = userForm.full_name;
         if (userForm.email !== editingUser.email) body.email = userForm.email;
         if (userForm.password) body.password = userForm.password;
@@ -844,7 +846,7 @@ export default function Settings() {
           <TabsContent value="users" className="mt-4 space-y-4">
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">{users.length} usuário{users.length !== 1 ? "s" : ""}</p>
-              <Button onClick={() => { setEditingUser(null); setUserForm({ email: "", password: "", full_name: "", role: "user", phone: "" }); setUserFormOpen(true); }}>
+              <Button onClick={() => { setEditingUser(null); setUserForm({ email: "", password: "", full_name: "", role: "user", phone: "", report_permissions: [] }); setUserFormOpen(true); }}>
                 <Plus className="mr-2 h-4 w-4" /> Novo Usuário
               </Button>
             </div>
@@ -877,7 +879,7 @@ export default function Settings() {
                           <div className="flex justify-end gap-1">
                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {
                               setEditingUser(u);
-                              setUserForm({ email: u.email, password: "", full_name: u.full_name, role: u.role, phone: (u as any).phone || "" });
+                               setUserForm({ email: u.email, password: "", full_name: u.full_name, role: u.role, phone: (u as any).phone || "", report_permissions: u.report_permissions || [] });
                               setUserFormOpen(true);
                             }}>
                               <Pencil className="h-4 w-4" />
@@ -1258,6 +1260,24 @@ export default function Settings() {
                   </SelectContent>
                 </Select>
               </div>
+              {userForm.role !== "admin" && (
+                <div className="space-y-3 border-t pt-4">
+                  <Label>Permissões de relatórios</Label>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {[
+                      ["overdue", "Clientes em atraso"], ["blocked", "Clientes bloqueados"],
+                      ["customers", "Clientes"], ["financial", "Financeiro"],
+                      ["bandwidth", "Consumo de banda"], ["missing_invoice", "Sem fatura"],
+                      ["platforms", "Por plataforma"],
+                    ].map(([key, label]) => (
+                      <label key={key} className="flex items-center gap-2 text-sm">
+                        <Checkbox checked={userForm.report_permissions.includes(key)} onCheckedChange={(checked) => setUserForm({ ...userForm, report_permissions: checked ? [...userForm.report_permissions, key] : userForm.report_permissions.filter((item) => item !== key) })} />
+                        {label}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setUserFormOpen(false)}>Cancelar</Button>

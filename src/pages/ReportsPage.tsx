@@ -111,7 +111,7 @@ export default function ReportsPage() {
       return { columns: [{key:"cliente",label:"Cliente"},{key:"contato",label:"Contato"},{key:"plano",label:"Plano"},{key:"valor",label:"Valor devido"},{key:"faturas",label:"Faturas"},{key:"dias",label:"Dias em atraso"},{key:"vencimento",label:"Vencimento mais antigo"}], rows, totals: [{label:"Clientes",value:String(rows.length)},{label:"Total em aberto",value:money([...map.values()].reduce((s,r)=>s+r.value,0))}] };
     }
     if (report === "blocked") {
-      const latest = new Map<string, Block>(); blocks.filter((b) => b.new_status === "blocked").forEach((b) => { if (!latest.has(b.customer_id) || b.created_at > latest.get(b.customer_id)!.created_at) latest.set(b.customer_id,b); });
+      const latest = new Map<string, Block>(); blocks.filter((b) => b.new_status === "blocked").forEach((b) => { const prior = latest.get(b.customer_id); if (!prior || b.created_at > prior.created_at) latest.set(b.customer_id,b); });
       const rows = customers.filter((c) => c.block_status === "blocked" && matchesCustomer(c)).map((c) => { const b = latest.get(c.id); const open = invoices.filter((i)=>i.customer_id===c.id && ["pending","overdue"].includes(i.status)).reduce((s,i)=>s+i.valor_centavos,0); return { cliente:c.nome, plano:planMap.get(c.plan_id)?.nome||"Não informado", data:dateBR(b?.created_at), motivo:b?.reason||"Manual / não informado", valor:money(open), dias:b?.created_at?daysBetween(b.created_at):"—" }; });
       return { columns:[{key:"cliente",label:"Cliente"},{key:"plano",label:"Plano"},{key:"data",label:"Data do bloqueio"},{key:"motivo",label:"Motivo"},{key:"valor",label:"Valor em aberto"},{key:"dias",label:"Dias bloqueado"}], rows, totals:[{label:"Bloqueados",value:String(rows.length)}] };
     }
