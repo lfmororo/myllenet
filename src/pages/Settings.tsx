@@ -29,6 +29,10 @@ export default function Settings() {
   const [paymentGateway, setPaymentGateway] = useState("efi");
   const [savingGateway, setSavingGateway] = useState(false);
   const [testingMp, setTestingMp] = useState(false);
+  const [savingMp, setSavingMp] = useState(false);
+  const [mpAccessToken, setMpAccessToken] = useState("");
+  const [mpTokenSaved, setMpTokenSaved] = useState(false);
+  const mpWebhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/mercadopago/webhook`;
   const [clientId, setClientId] = useState("");
   const [clientSecret, setClientSecret] = useState("");
   const [certFile, setCertFile] = useState<File | null>(null);
