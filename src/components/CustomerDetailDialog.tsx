@@ -628,19 +628,19 @@ export default function CustomerDetailDialog({
                         }
                         formatter={(val: number, name: string) => [
                           formatBytes(val),
-                          name === "rx_bytes" ? "Download" : "Upload",
+                          name === "tx_bytes" ? "Download" : "Upload",
                         ]}
                       />
                       <Area
                         type="monotone"
-                        dataKey="rx_bytes"
+                        dataKey="tx_bytes"
                         stroke="#0d9488"
                         fillOpacity={1}
                         fill="url(#colorRx)"
                       />
                       <Line
                         type="monotone"
-                        dataKey="tx_bytes"
+                        dataKey="rx_bytes"
                         stroke="hsl(var(--accent-foreground))"
                         dot={false}
                       />
