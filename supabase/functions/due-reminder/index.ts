@@ -102,6 +102,7 @@ Deno.serve(async (req) => {
       }
 
       const nome = customer.nome.split(" ")[0];
+      const pixCopiaCola = (inv as any).mp_pix_copiacola || inv.efi_pix_copiacola;
       const message = `Olá ${nome}! 🌐
 
 ⏰ *Lembrete da Mororo.Tech*: sua fatura vence em *3 dias*!
