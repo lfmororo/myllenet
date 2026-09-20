@@ -57,6 +57,13 @@
       "when": 1789926948477,
       "tag": "0007_reporting_module_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1789926973897,
+      "tag": "0008_reporting_module_access_policies",
+      "breakpoints": true
     }
   ]
 }
