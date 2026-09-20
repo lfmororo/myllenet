@@ -38,7 +38,7 @@ export interface Customer {
   updated_at: string;
 }
 
-export type CustomerInput = Omit<Customer, "id" | "created_at" | "updated_at" | "ativo" | "pago_ate" | "cortesia" | "alert_on_disconnect" | "alert_on_frequent_drops" | "alert_on_abnormal_usage" | "alert_on_block_change" | "block_alerts_enabled" | "block_status"> & { 
+export type CustomerInput = Omit<Customer, "id" | "created_at" | "updated_at" | "ativo" | "pago_ate" | "cortesia" | "alert_on_disconnect" | "alert_on_frequent_drops" | "alert_on_abnormal_usage" | "alert_on_block_change" | "block_alerts_enabled" | "block_status" | "seller_name" | "preferred_payment_method" | "pop_name" | "cancelled_at" | "cancel_reason"> & { 
   cortesia?: boolean; 
   alert_on_disconnect?: boolean; 
   alert_on_frequent_drops?: boolean; 
@@ -46,6 +46,11 @@ export type CustomerInput = Omit<Customer, "id" | "created_at" | "updated_at" | 
   alert_on_block_change?: boolean; 
   block_alerts_enabled?: boolean;
   block_status?: "active" | "blocked" 
+  seller_name?: string | null;
+  preferred_payment_method?: string | null;
+  pop_name?: string | null;
+  cancelled_at?: string | null;
+  cancel_reason?: string | null;
 };
 
 export function useCustomers() {

@@ -1,7 +1,7 @@
 # Roadmap
 
-- [ ] Estruturar dados complementares de clientes, cobranças e permissões de relatórios
-- [ ] Permitir configurar acesso individual aos relatórios para usuários comuns
-- [ ] Criar módulo Relatórios com sete visões, filtros, busca e paginação
-- [ ] Implementar exportações PDF, Excel, CSV e impressão com cabeçalho institucional
+- [x] Estruturar dados complementares de clientes, cobranças e permissões de relatórios
+- [x] Permitir configurar acesso individual aos relatórios para usuários comuns
+- [x] Criar módulo Relatórios com sete visões, filtros, busca e paginação
+- [x] Implementar exportações PDF, Excel, CSV e impressão com cabeçalho institucional
 - [ ] Validar cálculos, permissões, arquivos exportados e visualização responsiva
