@@ -308,6 +308,7 @@ Deno.serve(async (req) => {
         },
         pix: {
           payload: pixPayload,
+          source: pixSource,
           key: pixSettings.pix_key,
           name: pixSettings.pix_name,
           cnpj: pixSettings.company_cnpj,
