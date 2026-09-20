@@ -29,6 +29,11 @@ export interface Customer {
   alert_on_block_change: boolean;
   block_alerts_enabled: boolean;
   block_status: "active" | "blocked";
+  seller_name: string | null;
+  preferred_payment_method: string | null;
+  pop_name: string | null;
+  cancelled_at: string | null;
+  cancel_reason: string | null;
   created_at: string;
   updated_at: string;
 }

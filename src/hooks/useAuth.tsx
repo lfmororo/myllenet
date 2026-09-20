@@ -6,6 +6,7 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   isAdmin: boolean;
+  reportPermissions: string[];
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
@@ -18,6 +19,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [reportPermissions, setReportPermissions] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
   const checkAdminRole = async (userId: string) => {
@@ -28,6 +30,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .eq("role", "admin")
       .maybeSingle();
     setIsAdmin(!!data);
+    const { data: permissions } = await supabase
+      .from("user_report_permissions")
+      .select("report_key")
+      .eq("user_id", userId);
+    setReportPermissions((permissions || []).map((item) => item.report_key));
   };
 
   useEffect(() => {
@@ -39,6 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setTimeout(() => checkAdminRole(session.user.id), 0);
         } else {
           setIsAdmin(false);
+          setReportPermissions([]);
         }
         setLoading(false);
       }
@@ -78,7 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, isAdmin, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ user, session, isAdmin, reportPermissions, loading, signIn, signUp, signOut }}>
       {children}
     </AuthContext.Provider>
   );
