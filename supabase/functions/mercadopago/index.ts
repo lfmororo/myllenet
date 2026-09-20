@@ -24,10 +24,28 @@ function getSupabaseAdmin() {
   );
 }
 
-function mpToken(): string {
-  const token = Deno.env.get("MERCADOPAGO_ACCESS_TOKEN");
-  if (!token) throw new Error("MERCADOPAGO_ACCESS_TOKEN não configurado");
-  return token;
+let cachedToken: string | null = null;
+
+// Prioriza o token salvo nas configurações do sistema; usa o secret como reserva.
+async function mpToken(): Promise<string> {
+  if (cachedToken) return cachedToken;
+  try {
+    const { data } = await getSupabaseAdmin()
+      .from("settings")
+      .select("value")
+      .eq("key", "mercadopago_access_token")
+      .maybeSingle();
+    if (data?.value?.trim()) {
+      cachedToken = data.value.trim();
+      return cachedToken;
+    }
+  } catch (err) {
+    console.error("Falha ao ler token nas configurações:", (err as Error).message);
+  }
+  const envToken = Deno.env.get("MERCADOPAGO_ACCESS_TOKEN");
+  if (!envToken) throw new Error("Access Token do Mercado Pago não configurado");
+  cachedToken = envToken;
+  return cachedToken;
 }
 
 async function mpRequest(
@@ -37,7 +55,7 @@ async function mpRequest(
   idempotencyKey?: string,
 ) {
   const headers: Record<string, string> = {
-    Authorization: `Bearer ${mpToken()}`,
+    Authorization: `Bearer ${await mpToken()}`,
     "Content-Type": "application/json",
   };
   if (idempotencyKey) headers["X-Idempotency-Key"] = idempotencyKey;
@@ -207,6 +225,104 @@ async function settleInvoice(
 }
 
 // ------------------------------------------------------------- criar pix
+async function createMpPixPayment(
+  customer: any,
+  descricao: string,
+  valorCentavos: number,
+  vencimento: string,
+) {
+  const cpfClean = String(customer.cpf || "").replace(/\D/g, "");
+  const nameParts = String(customer.nome || "Cliente").trim().split(/\s+/);
+
+  // Expira no fim do dia do vencimento (horário de Brasília)
+  const expiration = `${vencimento}T23:59:59.000-03:00`;
+
+  const payment = await mpRequest(
+    "/v1/payments",
+    "POST",
+    {
+      transaction_amount: Number((valorCentavos / 100).toFixed(2)),
+      description: descricao,
+      payment_method_id: "pix",
+      date_of_expiration: expiration,
+      external_reference: `${customer.id}|${vencimento}`,
+      payer: {
+        email: customer.email || `cliente${cpfClean}@mororo.tech`,
+        first_name: nameParts[0],
+        last_name: nameParts.slice(1).join(" ") || nameParts[0],
+        identification: cpfClean ? { type: "CPF", number: cpfClean } : undefined,
+      },
+    },
+    crypto.randomUUID(),
+  );
+
+  const tx = payment?.point_of_interaction?.transaction_data || {};
+  return {
+    payment,
+    mp_payment_id: String(payment.id),
+    mp_pix_qrcode: tx.qr_code_base64 || null,
+    mp_pix_copiacola: tx.qr_code || null,
+    mp_link: tx.ticket_url || null,
+  };
+}
+
+// Garante que uma fatura existente tenha um Pix do Mercado Pago
+async function pixForInvoice(req: Request) {
+  const supabase = getSupabaseAdmin();
+  if (!isInternalCron(req)) {
+    await verifyAdmin(req.headers.get("Authorization"));
+  }
+
+  const body = await req.json().catch(() => ({}));
+  const invoiceId = body?.invoice_id;
+  if (!invoiceId) return json({ error: "invoice_id é obrigatório" }, 400);
+
+  const { data: invoice } = await supabase
+    .from("invoices")
+    .select("*, customers(*)")
+    .eq("id", invoiceId)
+    .maybeSingle();
+
+  if (!invoice) return json({ error: "Fatura não encontrada" }, 404);
+
+  if (invoice.mp_pix_copiacola) {
+    return json({
+      copia_cola: invoice.mp_pix_copiacola,
+      qrcode_base64: invoice.mp_pix_qrcode,
+      link: invoice.mp_link,
+      reused: true,
+    });
+  }
+
+  const customer = invoice.customers;
+  if (!customer) return json({ error: "Cliente da fatura não encontrado" }, 404);
+
+  const created = await createMpPixPayment(
+    customer,
+    invoice.descricao,
+    invoice.valor_centavos,
+    invoice.vencimento,
+  );
+
+  await supabase
+    .from("invoices")
+    .update({
+      gateway: "mercadopago",
+      mp_payment_id: created.mp_payment_id,
+      mp_pix_qrcode: created.mp_pix_qrcode,
+      mp_pix_copiacola: created.mp_pix_copiacola,
+      mp_link: created.mp_link,
+    })
+    .eq("id", invoice.id);
+
+  return json({
+    copia_cola: created.mp_pix_copiacola,
+    qrcode_base64: created.mp_pix_qrcode,
+    link: created.mp_link,
+    reused: false,
+  });
+}
+
 async function createPix(req: Request) {
   await verifyAdmin(req.headers.get("Authorization"));
   const supabase = getSupabaseAdmin();
@@ -232,34 +348,14 @@ async function createPix(req: Request) {
 
   if (!customer) return json({ error: "Cliente não encontrado" }, 404);
 
-  const cpfClean = String(customer.cpf || "").replace(/\D/g, "");
-  const nameParts = String(customer.nome || "Cliente").trim().split(/\s+/);
-
-  // Expira no fim do dia do vencimento (horário de Brasília)
-  const expiration = `${vencimento}T23:59:59.000-03:00`;
-
-  const payment = await mpRequest(
-    "/v1/payments",
-    "POST",
-    {
-      transaction_amount: Number((valor_centavos / 100).toFixed(2)),
-      description: descricao,
-      payment_method_id: "pix",
-      date_of_expiration: expiration,
-      external_reference: `${customer_id}|${vencimento}`,
-      payer: {
-        email: customer.email || `cliente${cpfClean}@mororo.tech`,
-        first_name: nameParts[0],
-        last_name: nameParts.slice(1).join(" ") || nameParts[0],
-        identification: cpfClean
-          ? { type: "CPF", number: cpfClean }
-          : undefined,
-      },
-    },
-    crypto.randomUUID(),
+  const created = await createMpPixPayment(
+    customer,
+    descricao,
+    valor_centavos,
+    vencimento,
   );
+  const payment = created.payment;
 
-  const tx = payment?.point_of_interaction?.transaction_data || {};
   const payload = {
     customer_id,
     plan_id: plan_id || null,
@@ -268,10 +364,10 @@ async function createPix(req: Request) {
     vencimento,
     status: "pending",
     gateway: "mercadopago",
-    mp_payment_id: String(payment.id),
-    mp_pix_qrcode: tx.qr_code || null,
-    mp_pix_copiacola: tx.qr_code || null,
-    mp_link: tx.ticket_url || null,
+    mp_payment_id: created.mp_payment_id,
+    mp_pix_qrcode: created.mp_pix_qrcode,
+    mp_pix_copiacola: created.mp_pix_copiacola,
+    mp_link: created.mp_link,
   };
 
   let { data: invoice, error: invErr } = await supabase
@@ -427,7 +523,7 @@ async function testConnection(req: Request) {
     ok: true,
     account: me.nickname || me.email,
     site: me.site_id,
-    live_mode: !String(mpToken()).startsWith("TEST-"),
+    live_mode: !(await mpToken()).startsWith("TEST-"),
   });
 }
 
@@ -441,6 +537,7 @@ Deno.serve(async (req) => {
   try {
     if (path === "/webhook") return await handleWebhook(req);
     if (path === "/create") return await createPix(req);
+    if (path === "/pix-for-invoice") return await pixForInvoice(req);
     if (path === "/check") return await checkInvoice(req);
     if (path === "/bulk-check") return await bulkCheck(req);
     if (path === "/test") return await testConnection(req);

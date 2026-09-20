@@ -131,10 +131,11 @@ export default function OverdueNotificationDialog({ open, onOpenChange, customer
       const info = map.get(inv.customer_id);
       if (!info) continue;
 
-      if (inv.efi_link || inv.efi_pix_copiacola) {
+      const pixCopiaCola = (inv as any).mp_pix_copiacola || inv.efi_pix_copiacola;
+      if (inv.efi_link || pixCopiaCola) {
         const linkParts: string[] = [];
         if (inv.efi_link) linkParts.push(`📄 Boleto: ${inv.efi_link}`);
-        if (inv.efi_pix_copiacola) linkParts.push(`💠 PIX Copia e Cola: ${inv.efi_pix_copiacola}`);
+        if (pixCopiaCola) linkParts.push(`💠 PIX Copia e Cola: ${pixCopiaCola}`);
         // Use the first invoice that has a link
         if (!info.link) {
           info.link = linkParts.join("\n");

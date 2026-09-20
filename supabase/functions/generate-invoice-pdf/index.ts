@@ -87,7 +87,7 @@ Deno.serve(async (req) => {
     const { data: settings } = await supabase
       .from("settings")
       .select("key, value")
-      .in("key", ["pix_key", "pix_name", "pix_city", "company_cnpj", "company_phone", "company_address"]);
+      .in("key", ["pix_key", "pix_name", "pix_city", "company_cnpj", "company_phone", "company_address", "payment_gateway"]);
 
     const pixSettings = Object.fromEntries(settings?.map(s => [s.key, s.value]) || []);
 
@@ -116,13 +116,35 @@ Deno.serve(async (req) => {
     const shortName = sanitize(customer.nome || "").split(' ')[0].substring(0, 10);
     const pixDescription = `${shortName}${refMonth.replace('/', '')}`;
 
-    const pixPayload = generatePixPayload(
-      pixSettings.pix_key || "00000000000",
-      pixSettings.pix_name || "Mororo Tech",
-      pixSettings.pix_city || "Ipu",
-      invoice.valor_centavos / 100,
-      pixDescription
-    );
+    // Pix do Mercado Pago quando ele é a plataforma escolhida; Pix local como reserva
+    let pixPayload = invoice.mp_pix_copiacola || "";
+    let pixSource: "mercadopago" | "local" = pixPayload ? "mercadopago" : "local";
+
+    if (!pixPayload && pixSettings.payment_gateway === "mercadopago" && invoice.status !== "paid") {
+      try {
+        const { data: mpPix, error: mpErr } = await supabase.functions.invoke(
+          "mercadopago/pix-for-invoice",
+          { body: { invoice_id: invoice.id } }
+        );
+        if (!mpErr && mpPix?.copia_cola) {
+          pixPayload = mpPix.copia_cola;
+          pixSource = "mercadopago";
+        }
+      } catch (err) {
+        console.error("Falha ao gerar Pix no Mercado Pago:", (err as Error).message);
+      }
+    }
+
+    if (!pixPayload) {
+      pixSource = "local";
+      pixPayload = generatePixPayload(
+        pixSettings.pix_key || "00000000000",
+        pixSettings.pix_name || "Mororo Tech",
+        pixSettings.pix_city || "Ipu",
+        invoice.valor_centavos / 100,
+        pixDescription
+      );
+    }
 
     if (req.method === "GET") {
       // PDF Generation for UAZAPI/Direct Download
@@ -244,9 +266,15 @@ Deno.serve(async (req) => {
 
       doc.setFontSize(9);
       doc.setFont("helvetica", "bold");
-      doc.text("CHAVE PIX:", 80, currentY + 35);
+      doc.text(pixSource === "mercadopago" ? "PAGAMENTO:" : "CHAVE PIX:", 80, currentY + 35);
       doc.setFont("helvetica", "normal");
-      doc.text(pixSettings.pix_key || "N/A", 110, currentY + 35);
+      doc.text(
+        pixSource === "mercadopago"
+          ? "Pix Mercado Pago (baixa automatica)"
+          : pixSettings.pix_key || "N/A",
+        pixSource === "mercadopago" ? 105 : 110,
+        currentY + 35
+      );
 
       currentY += 70;
       doc.setFontSize(8);
@@ -280,6 +308,7 @@ Deno.serve(async (req) => {
         },
         pix: {
           payload: pixPayload,
+          source: pixSource,
           key: pixSettings.pix_key,
           name: pixSettings.pix_name,
           cnpj: pixSettings.company_cnpj,

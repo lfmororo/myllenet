@@ -29,6 +29,10 @@ export default function Settings() {
   const [paymentGateway, setPaymentGateway] = useState("efi");
   const [savingGateway, setSavingGateway] = useState(false);
   const [testingMp, setTestingMp] = useState(false);
+  const [savingMp, setSavingMp] = useState(false);
+  const [mpAccessToken, setMpAccessToken] = useState("");
+  const [mpTokenSaved, setMpTokenSaved] = useState(false);
+  const mpWebhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/mercadopago/webhook`;
   const [clientId, setClientId] = useState("");
   const [clientSecret, setClientSecret] = useState("");
   const [certFile, setCertFile] = useState<File | null>(null);
@@ -188,11 +192,12 @@ export default function Settings() {
     const { data } = await supabase
       .from("settings")
       .select("key, value")
-      .in("key", ["payment_gateway", "efi_client_id", "efi_client_secret", "efi_certificate_path", "uazapi_token", "whatsapp_provider", "evolution_base_url", "evolution_api_key", "evolution_instance", "mikrotik_host", "mikrotik_host_secondary", "mikrotik_username", "mikrotik_password", "mikrotik_api_port", "mikrotik_rest_port", "blocking_days", "pix_key", "pix_name", "pix_city", "mikrotik_alert_offline_minutes", "mikrotik_alert_failure_count"]);
+      .in("key", ["payment_gateway", "mercadopago_access_token", "efi_client_id", "efi_client_secret", "efi_certificate_path", "uazapi_token", "whatsapp_provider", "evolution_base_url", "evolution_api_key", "evolution_instance", "mikrotik_host", "mikrotik_host_secondary", "mikrotik_username", "mikrotik_password", "mikrotik_api_port", "mikrotik_rest_port", "blocking_days", "pix_key", "pix_name", "pix_city", "mikrotik_alert_offline_minutes", "mikrotik_alert_failure_count"]);
 
     if (data) {
       for (const row of data) {
         if (row.key === "payment_gateway") setPaymentGateway(row.value || "efi");
+        if (row.key === "mercadopago_access_token") setMpTokenSaved(!!row.value);
         if (row.key === "efi_client_id") setClientId(row.value || "");
         if (row.key === "efi_client_secret") setClientSecret(row.value || "");
         if (row.key === "efi_certificate_path") setCertUploaded(!!row.value);
@@ -270,6 +275,23 @@ export default function Settings() {
       toast.error("Erro ao salvar: " + (err.message || "Erro desconhecido"));
     }
     setSavingGateway(false);
+  };
+
+  const handleSaveMercadoPago = async () => {
+    if (!mpAccessToken.trim()) {
+      toast.error("Informe o Access Token do Mercado Pago.");
+      return;
+    }
+    setSavingMp(true);
+    try {
+      await upsertSetting("mercadopago_access_token", mpAccessToken.trim());
+      setMpTokenSaved(true);
+      setMpAccessToken("");
+      toast.success("Credenciais do Mercado Pago salvas!");
+    } catch (err: any) {
+      toast.error("Erro ao salvar: " + (err.message || "Erro desconhecido"));
+    }
+    setSavingMp(false);
   };
 
   const handleTestMercadoPago = async () => {
@@ -403,6 +425,7 @@ export default function Settings() {
             <TabsTrigger value="plans">
               <Package className="mr-1.5 h-4 w-4" /> Planos
             </TabsTrigger>
+            <TabsTrigger value="pagamentos">Pagamentos</TabsTrigger>
             <TabsTrigger value="efi">API EFI</TabsTrigger>
             <TabsTrigger value="whatsapp">
               <MessageCircle className="mr-1.5 h-4 w-4" /> WhatsApp
@@ -499,42 +522,91 @@ export default function Settings() {
             )}
           </TabsContent>
 
-          <TabsContent value="efi" className="mt-4 space-y-4">
+          <TabsContent value="pagamentos" className="mt-4 space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>Forma de cobrança</CardTitle>
+                <CardTitle>Plataforma de cobrança</CardTitle>
                 <CardDescription>
-                  Escolha qual serviço será usado para gerar as cobranças dos clientes.
+                  Escolha qual plataforma vai gerar as cobranças e o Pix dos clientes.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="payment_gateway">Serviço em uso</Label>
+                  <Label htmlFor="payment_gateway">Plataforma em uso</Label>
                   <Select value={paymentGateway} onValueChange={setPaymentGateway}>
                     <SelectTrigger id="payment_gateway">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="mercadopago">Mercado Pago (Pix com baixa automática)</SelectItem>
                       <SelectItem value="efi">EFI Pay (boleto + Pix)</SelectItem>
-                      <SelectItem value="mercadopago">Mercado Pago (Pix)</SelectItem>
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground">
-                    No Mercado Pago a baixa é automática: o pagamento é confirmado na hora e o cliente é desbloqueado sozinho.
+                    Com o Mercado Pago, cada fatura gera o Pix e o QR Code direto pela plataforma e o pagamento é
+                    confirmado sozinho, liberando o cliente automaticamente.
+                  </p>
+                </div>
+                <Button onClick={handleSaveGateway} disabled={savingGateway}>
+                  {savingGateway && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Salvar plataforma
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Mercado Pago</CardTitle>
+                <CardDescription>
+                  Informe o Access Token de produção (Mercado Pago → Suas integrações → Credenciais de produção).
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="mp_token">Access Token</Label>
+                  <Input
+                    id="mp_token"
+                    type="password"
+                    value={mpAccessToken}
+                    onChange={(e) => setMpAccessToken(e.target.value)}
+                    placeholder={mpTokenSaved ? "Token já configurado — informe outro para substituir" : "APP_USR-..."}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="mp_webhook">URL de notificações (webhook)</Label>
+                  <div className="flex gap-2">
+                    <Input id="mp_webhook" readOnly value={mpWebhookUrl} className="font-mono text-xs" />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        navigator.clipboard.writeText(mpWebhookUrl);
+                        toast.success("URL copiada!");
+                      }}
+                    >
+                      Copiar
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Cadastre esta URL no Mercado Pago, em Webhooks, marcando o evento de Pagamentos. É isso que garante a
+                    baixa imediata das faturas.
                   </p>
                 </div>
                 <div className="flex gap-2">
-                  <Button onClick={handleSaveGateway} disabled={savingGateway}>
-                    {savingGateway && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Salvar
+                  <Button onClick={handleSaveMercadoPago} disabled={savingMp}>
+                    {savingMp && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Salvar credenciais
                   </Button>
                   <Button variant="outline" onClick={handleTestMercadoPago} disabled={testingMp}>
                     {testingMp && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Testar Mercado Pago
+                    Testar conexão
                   </Button>
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="efi" className="mt-4 space-y-4">
             <Card>
               <CardHeader>
                 <CardTitle>Credenciais EFI Pay</CardTitle>

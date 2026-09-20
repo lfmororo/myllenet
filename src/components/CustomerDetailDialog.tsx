@@ -1143,13 +1143,15 @@ export default function CustomerDetailDialog({
                               </a>
                             </Button>
                           )}
-                          {inv.efi_pix_copiacola && (
+                          {((inv as any).mp_pix_copiacola || inv.efi_pix_copiacola) && (
                             <Button
                               variant="outline"
                               size="sm"
                               className="h-7 text-xs px-2"
                               onClick={() =>
-                                copyToClipboard(inv.efi_pix_copiacola!)
+                                copyToClipboard(
+                                  (inv as any).mp_pix_copiacola || inv.efi_pix_copiacola!
+                                )
                               }
                               title="Copiar PIX Copia e Cola"
                             >

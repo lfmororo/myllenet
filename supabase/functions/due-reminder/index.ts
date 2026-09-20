@@ -102,13 +102,14 @@ Deno.serve(async (req) => {
       }
 
       const nome = customer.nome.split(" ")[0];
+      const pixCopiaCola = (inv as any).mp_pix_copiacola || inv.efi_pix_copiacola;
       const message = `Olá ${nome}! 🌐
 
 ⏰ *Lembrete da Mororo.Tech*: sua fatura vence em *3 dias*!
 
 📋 ${inv.descricao}
 💰 Valor: ${formatCurrency(inv.valor_centavos)}
-📅 Vencimento: ${formatDate(inv.vencimento)}${inv.efi_link ? `\n\n🔗 Boleto: ${inv.efi_link}` : ""}${inv.efi_pix_copiacola ? `\n\n📱 PIX Copia e Cola:\n${inv.efi_pix_copiacola}` : ""}
+📅 Vencimento: ${formatDate(inv.vencimento)}${inv.efi_link ? `\n\n🔗 Boleto: ${inv.efi_link}` : ""}${pixCopiaCola ? `\n\n📱 PIX Copia e Cola:\n${pixCopiaCola}` : ""}
 
 Evite a suspensão do serviço. Pague em dia! 😊
 
