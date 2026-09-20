@@ -24,10 +24,28 @@ function getSupabaseAdmin() {
   );
 }
 
-function mpToken(): string {
-  const token = Deno.env.get("MERCADOPAGO_ACCESS_TOKEN");
-  if (!token) throw new Error("MERCADOPAGO_ACCESS_TOKEN não configurado");
-  return token;
+let cachedToken: string | null = null;
+
+// Prioriza o token salvo nas configurações do sistema; usa o secret como reserva.
+async function mpToken(): Promise<string> {
+  if (cachedToken) return cachedToken;
+  try {
+    const { data } = await getSupabaseAdmin()
+      .from("settings")
+      .select("value")
+      .eq("key", "mercadopago_access_token")
+      .maybeSingle();
+    if (data?.value?.trim()) {
+      cachedToken = data.value.trim();
+      return cachedToken;
+    }
+  } catch (err) {
+    console.error("Falha ao ler token nas configurações:", (err as Error).message);
+  }
+  const envToken = Deno.env.get("MERCADOPAGO_ACCESS_TOKEN");
+  if (!envToken) throw new Error("Access Token do Mercado Pago não configurado");
+  cachedToken = envToken;
+  return cachedToken;
 }
 
 async function mpRequest(
@@ -37,7 +55,7 @@ async function mpRequest(
   idempotencyKey?: string,
 ) {
   const headers: Record<string, string> = {
-    Authorization: `Bearer ${mpToken()}`,
+    Authorization: `Bearer ${await mpToken()}`,
     "Content-Type": "application/json",
   };
   if (idempotencyKey) headers["X-Idempotency-Key"] = idempotencyKey;
