@@ -40,7 +40,14 @@ const InvoiceView = () => {
   });
 
   const generatePix = () => {
-    if (!invoice || !settings) return "";
+    if (!invoice) return "";
+
+    // Pix gerado pelo Mercado Pago tem prioridade
+    const mpPix = (invoice as any).mp_pix_copiacola;
+    if (mpPix) return mpPix as string;
+
+    if (!settings) return "";
+
     
     // Minimal PIX CRC16 implementation for client-side display
     const crc16 = (data: string) => {
