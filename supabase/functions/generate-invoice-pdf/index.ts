@@ -116,13 +116,35 @@ Deno.serve(async (req) => {
     const shortName = sanitize(customer.nome || "").split(' ')[0].substring(0, 10);
     const pixDescription = `${shortName}${refMonth.replace('/', '')}`;
 
-    const pixPayload = generatePixPayload(
-      pixSettings.pix_key || "00000000000",
-      pixSettings.pix_name || "Mororo Tech",
-      pixSettings.pix_city || "Ipu",
-      invoice.valor_centavos / 100,
-      pixDescription
-    );
+    // Pix do Mercado Pago quando ele é a plataforma escolhida; Pix local como reserva
+    let pixPayload = invoice.mp_pix_copiacola || "";
+    let pixSource: "mercadopago" | "local" = pixPayload ? "mercadopago" : "local";
+
+    if (!pixPayload && pixSettings.payment_gateway === "mercadopago" && invoice.status !== "paid") {
+      try {
+        const { data: mpPix, error: mpErr } = await supabase.functions.invoke(
+          "mercadopago/pix-for-invoice",
+          { body: { invoice_id: invoice.id } }
+        );
+        if (!mpErr && mpPix?.copia_cola) {
+          pixPayload = mpPix.copia_cola;
+          pixSource = "mercadopago";
+        }
+      } catch (err) {
+        console.error("Falha ao gerar Pix no Mercado Pago:", (err as Error).message);
+      }
+    }
+
+    if (!pixPayload) {
+      pixSource = "local";
+      pixPayload = generatePixPayload(
+        pixSettings.pix_key || "00000000000",
+        pixSettings.pix_name || "Mororo Tech",
+        pixSettings.pix_city || "Ipu",
+        invoice.valor_centavos / 100,
+        pixDescription
+      );
+    }
 
     if (req.method === "GET") {
       // PDF Generation for UAZAPI/Direct Download
