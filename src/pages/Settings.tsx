@@ -26,6 +26,9 @@ export default function Settings() {
   const { user, isAdmin, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
+  const [paymentGateway, setPaymentGateway] = useState("efi");
+  const [savingGateway, setSavingGateway] = useState(false);
+  const [testingMp, setTestingMp] = useState(false);
   const [clientId, setClientId] = useState("");
   const [clientSecret, setClientSecret] = useState("");
   const [certFile, setCertFile] = useState<File | null>(null);
@@ -185,10 +188,11 @@ export default function Settings() {
     const { data } = await supabase
       .from("settings")
       .select("key, value")
-      .in("key", ["efi_client_id", "efi_client_secret", "efi_certificate_path", "uazapi_token", "whatsapp_provider", "evolution_base_url", "evolution_api_key", "evolution_instance", "mikrotik_host", "mikrotik_host_secondary", "mikrotik_username", "mikrotik_password", "mikrotik_api_port", "mikrotik_rest_port", "blocking_days", "pix_key", "pix_name", "pix_city", "mikrotik_alert_offline_minutes", "mikrotik_alert_failure_count"]);
+      .in("key", ["payment_gateway", "efi_client_id", "efi_client_secret", "efi_certificate_path", "uazapi_token", "whatsapp_provider", "evolution_base_url", "evolution_api_key", "evolution_instance", "mikrotik_host", "mikrotik_host_secondary", "mikrotik_username", "mikrotik_password", "mikrotik_api_port", "mikrotik_rest_port", "blocking_days", "pix_key", "pix_name", "pix_city", "mikrotik_alert_offline_minutes", "mikrotik_alert_failure_count"]);
 
     if (data) {
       for (const row of data) {
+        if (row.key === "payment_gateway") setPaymentGateway(row.value || "efi");
         if (row.key === "efi_client_id") setClientId(row.value || "");
         if (row.key === "efi_client_secret") setClientSecret(row.value || "");
         if (row.key === "efi_certificate_path") setCertUploaded(!!row.value);
@@ -255,6 +259,47 @@ export default function Settings() {
       toast.error("Erro ao salvar: " + (err.message || "Erro desconhecido"));
     }
     setSaving(false);
+  };
+
+  const handleSaveGateway = async () => {
+    setSavingGateway(true);
+    try {
+      await upsertSetting("payment_gateway", paymentGateway);
+      toast.success("Forma de cobrança salva!");
+    } catch (err: any) {
+      toast.error("Erro ao salvar: " + (err.message || "Erro desconhecido"));
+    }
+    setSavingGateway(false);
+  };
+
+  const handleTestMercadoPago = async () => {
+    setTestingMp(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+      const res = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/mercadopago/test`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      const result = await res.json();
+      if (res.ok && result.ok) {
+        toast.success(
+          `Mercado Pago conectado: ${result.account}${result.live_mode ? " (produção)" : " (teste)"}`
+        );
+      } else {
+        toast.error("Falha: " + (result.error || "Erro desconhecido"));
+      }
+    } catch (err: any) {
+      toast.error("Erro ao testar: " + (err.message || "Erro desconhecido"));
+    }
+    setTestingMp(false);
   };
 
   const handleTestConnection = async () => {
@@ -454,7 +499,42 @@ export default function Settings() {
             )}
           </TabsContent>
 
-          <TabsContent value="efi" className="mt-4">
+          <TabsContent value="efi" className="mt-4 space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Forma de cobrança</CardTitle>
+                <CardDescription>
+                  Escolha qual serviço será usado para gerar as cobranças dos clientes.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="payment_gateway">Serviço em uso</Label>
+                  <Select value={paymentGateway} onValueChange={setPaymentGateway}>
+                    <SelectTrigger id="payment_gateway">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="efi">EFI Pay (boleto + Pix)</SelectItem>
+                      <SelectItem value="mercadopago">Mercado Pago (Pix)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    No Mercado Pago a baixa é automática: o pagamento é confirmado na hora e o cliente é desbloqueado sozinho.
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <Button onClick={handleSaveGateway} disabled={savingGateway}>
+                    {savingGateway && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Salvar
+                  </Button>
+                  <Button variant="outline" onClick={handleTestMercadoPago} disabled={testingMp}>
+                    {testingMp && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Testar Mercado Pago
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
             <Card>
               <CardHeader>
                 <CardTitle>Credenciais EFI Pay</CardTitle>

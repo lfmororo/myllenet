@@ -333,7 +333,12 @@ export type Database = {
           efi_link: string | null
           efi_pix_copiacola: string | null
           efi_pix_qrcode: string | null
+          gateway: string
           id: string
+          mp_link: string | null
+          mp_payment_id: string | null
+          mp_pix_copiacola: string | null
+          mp_pix_qrcode: string | null
           paid_at: string | null
           plan_id: string | null
           status: string
@@ -350,7 +355,12 @@ export type Database = {
           efi_link?: string | null
           efi_pix_copiacola?: string | null
           efi_pix_qrcode?: string | null
+          gateway?: string
           id?: string
+          mp_link?: string | null
+          mp_payment_id?: string | null
+          mp_pix_copiacola?: string | null
+          mp_pix_qrcode?: string | null
           paid_at?: string | null
           plan_id?: string | null
           status?: string
@@ -367,7 +377,12 @@ export type Database = {
           efi_link?: string | null
           efi_pix_copiacola?: string | null
           efi_pix_qrcode?: string | null
+          gateway?: string
           id?: string
+          mp_link?: string | null
+          mp_payment_id?: string | null
+          mp_pix_copiacola?: string | null
+          mp_pix_qrcode?: string | null
           paid_at?: string | null
           plan_id?: string | null
           status?: string

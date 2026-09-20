@@ -38,3 +38,6 @@ verify_jwt = false
 
 [functions.satisfaction-survey]
 verify_jwt = false
+
+[functions.mercadopago]
+verify_jwt = false
