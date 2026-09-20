@@ -4,4 +4,4 @@
 - [x] Permitir configurar acesso individual aos relatórios para usuários comuns
 - [x] Criar módulo Relatórios com sete visões, filtros, busca e paginação
 - [x] Implementar exportações PDF, Excel, CSV e impressão com cabeçalho institucional
-- [ ] Validar cálculos, permissões, arquivos exportados e visualização responsiva
+- [x] Validar cálculos, permissões, arquivos exportados e visualização responsiva
