@@ -197,6 +197,8 @@ async function processCustomerDisconnections(supabase: any) {
     if (event.event_type === "disconnected") {
       // Aguarda 3 minutos para evitar alarme em quedas instantâneas
       if (now - eventTime < 3 * 60 * 1000) continue;
+      // Evita avisar quedas antigas (ex.: após longa parada do agente)
+      if (now - eventTime > 2 * 60 * 60 * 1000) continue;
 
       const { data: already } = await supabase
         .from("customer_alerts_sent")
