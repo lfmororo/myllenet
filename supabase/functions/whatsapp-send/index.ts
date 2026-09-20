@@ -433,12 +433,17 @@ async function resendPaidNotifications(req: Request) {
 async function resendOpenInvoices(req: Request) {
   const authHeader = req.headers.get("Authorization");
   await verifyAdmin(authHeader);
+  const body = await req.json().catch(() => ({}));
+  const offset = Math.max(0, Number.isInteger(body.offset) ? body.offset : 0);
+  const limit = Math.min(10, Math.max(1, Number.isInteger(body.limit) ? body.limit : 10));
   const supabase = getSupabaseAdmin();
-  const { data: invoices, error } = await supabase
+  const { data: invoices, error, count } = await supabase
     .from("invoices")
-    .select("id")
+    .select("id", { count: "exact" })
     .in("status", ["pending", "waiting", "overdue"])
-    .order("vencimento", { ascending: true });
+    .order("vencimento", { ascending: true })
+    .order("id", { ascending: true })
+    .range(offset, offset + limit - 1);
   if (error) throw error;
 
   let sent = 0;
@@ -465,7 +470,7 @@ async function resendOpenInvoices(req: Request) {
     await new Promise((resolve) => setTimeout(resolve, 1200));
   }
 
-  return new Response(JSON.stringify({ success: failed === 0, total: invoices?.length || 0, sent, failed, errors }), {
+  return new Response(JSON.stringify({ success: failed === 0, total: count || 0, processed: invoices?.length || 0, offset, next_offset: offset + (invoices?.length || 0), sent, failed, errors }), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 }
