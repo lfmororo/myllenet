@@ -206,6 +206,19 @@ const InvoiceView = () => {
                 </Badge>
               </div>
 
+              {(invoice as any).mp_pix_qrcode && (
+                <div className="flex flex-col items-center gap-2">
+                  <img
+                    src={`data:image/png;base64,${(invoice as any).mp_pix_qrcode}`}
+                    alt="QR Code PIX"
+                    className="h-48 w-48 rounded-lg border bg-white p-2"
+                  />
+                  <p className="text-[10px] text-muted-foreground">
+                    QR Code gerado pelo Mercado Pago
+                  </p>
+                </div>
+              )}
+
               <div className="flex flex-col sm:flex-row gap-3">
                 <Button 
                   onClick={handleCopyPix}
