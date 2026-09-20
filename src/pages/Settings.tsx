@@ -403,6 +403,7 @@ export default function Settings() {
             <TabsTrigger value="plans">
               <Package className="mr-1.5 h-4 w-4" /> Planos
             </TabsTrigger>
+            <TabsTrigger value="pagamentos">Pagamentos</TabsTrigger>
             <TabsTrigger value="efi">API EFI</TabsTrigger>
             <TabsTrigger value="whatsapp">
               <MessageCircle className="mr-1.5 h-4 w-4" /> WhatsApp
