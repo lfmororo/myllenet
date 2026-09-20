@@ -268,7 +268,13 @@ Deno.serve(async (req) => {
       doc.setFont("helvetica", "bold");
       doc.text(pixSource === "mercadopago" ? "PAGAMENTO:" : "CHAVE PIX:", 80, currentY + 35);
       doc.setFont("helvetica", "normal");
-      doc.text(pixSettings.pix_key || "N/A", 110, currentY + 35);
+      doc.text(
+        pixSource === "mercadopago"
+          ? "Pix Mercado Pago (baixa automatica)"
+          : pixSettings.pix_key || "N/A",
+        pixSource === "mercadopago" ? 105 : 110,
+        currentY + 35
+      );
 
       currentY += 70;
       doc.setFontSize(8);
