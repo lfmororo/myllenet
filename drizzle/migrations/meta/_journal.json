@@ -43,6 +43,13 @@
       "when": 1789844932714,
       "tag": "0005_create_customer_feedback",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1789924077233,
+      "tag": "0006_add_mercadopago_fields_to_invoices",
+      "breakpoints": true
     }
   ]
 }
