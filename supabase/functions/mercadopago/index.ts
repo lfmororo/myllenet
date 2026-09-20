@@ -417,6 +417,15 @@ async function syncPayment(supabase: any, mpPaymentId: string) {
     .maybeSingle();
 
   if (!invoice) return { found: false, status: payment.status };
+  const feeCentavos = Math.round((payment.fee_details || []).reduce((sum: number, fee: any) => sum + Number(fee.amount || 0), 0) * 100);
+  const netCentavos = payment.transaction_details?.net_received_amount != null
+    ? Math.round(Number(payment.transaction_details.net_received_amount) * 100)
+    : Math.max(0, invoice.valor_centavos - feeCentavos);
+  await supabase.from("invoices").update({
+    payment_method: payment.payment_method_id || "pix",
+    gateway_fee_centavos: feeCentavos,
+    net_amount_centavos: netCentavos,
+  }).eq("id", invoice.id);
   if (invoice.status === "paid") return { found: true, status: "paid", changed: false };
 
   if (payment.status === "approved") {

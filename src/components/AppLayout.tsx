@@ -26,6 +26,7 @@ import {
   Router,
   Server,
   Star,
+  ChartNoAxesCombined,
 
 } from "lucide-react";
 import logoImg from "@/assets/logo.png";
@@ -38,6 +39,7 @@ const navItems = [
   { title: "Mikrotik", url: "/mikrotik", icon: Router },
   { title: "Agente VPS", url: "/agente", icon: Server },
   { title: "Avaliações", url: "/avaliacoes", icon: Star },
+  { title: "Relatórios", url: "/relatorios", icon: ChartNoAxesCombined },
 
   { title: "Logs EFI", url: "/logs-efi", icon: AlertTriangle },
   { title: "Configurações", url: "/settings", icon: Settings },
@@ -50,12 +52,14 @@ const pageTitles: Record<string, string> = {
   "/notificacoes": "Notificações",
   "/mikrotik": "Mikrotik - Gestão",
   "/avaliacoes": "Avaliações de Clientes",
+  "/relatorios": "Relatórios",
   "/logs-efi": "Logs EFI",
   "/settings": "Configurações",
 };
 
 function AppSidebar() {
-  const { signOut, user } = useAuth();
+  const { signOut, user, isAdmin, reportPermissions } = useAuth();
+  const visibleItems = isAdmin ? navItems : navItems.filter((item) => item.url === "/relatorios" && reportPermissions.length > 0);
 
   return (
     <Sidebar collapsible="offcanvas" className="border-r border-sidebar-border">
@@ -73,7 +77,7 @@ function AppSidebar() {
           <p className="text-[10px] font-bold uppercase tracking-widest text-sidebar-foreground/40 px-3 mb-2">Navegação</p>
           <SidebarGroupContent>
             <SidebarMenu className="space-y-0.5">
-              {navItems.map((item) => (
+              {visibleItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
                     <NavLink
@@ -108,7 +112,7 @@ function AppSidebar() {
 }
 
 export default function AppLayout() {
-  const { user, isAdmin, loading: authLoading, signOut } = useAuth();
+  const { user, isAdmin, reportPermissions, loading: authLoading, signOut } = useAuth();
   const location = useLocation();
   const currentTitle = pageTitles[location.pathname] || "";
 
@@ -125,7 +129,7 @@ export default function AppLayout() {
 
   if (!user) return <Navigate to="/auth" replace />;
 
-  if (!isAdmin) {
+  if (!isAdmin && !(location.pathname === "/relatorios" && reportPermissions.length > 0)) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-4">
         <div className="text-center space-y-4 max-w-md">

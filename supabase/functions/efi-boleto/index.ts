@@ -416,6 +416,11 @@ async function checkPayment(req: Request) {
       pix: !!billet.pix,
     }));
     const updatePayload: Record<string, any> = { status: newStatus, paid_at: paidAt };
+    const grossCentavos = Math.round(Number(chargeData.total || invoice.valor_centavos / 100) * 100);
+    const netCentavos = chargeData.net_value != null ? Math.round(Number(chargeData.net_value) * 100) : grossCentavos;
+    updatePayload.payment_method = billet.pix ? "pix" : "boleto";
+    updatePayload.gateway_fee_centavos = Math.max(0, grossCentavos - netCentavos);
+    updatePayload.net_amount_centavos = netCentavos;
     
     // Fill in missing billet data
     if (billet.barcode && !invoice.efi_barcode) updatePayload.efi_barcode = billet.barcode;
@@ -1212,6 +1217,11 @@ async function bulkCheckPayments(req: Request) {
         // Marca a verificação para o rodízio de checagem
         updated_at: new Date().toISOString(),
       };
+      const grossCentavos = Math.round(Number(chargeData.total || inv.valor_centavos / 100) * 100);
+      const netCentavos = chargeData.net_value != null ? Math.round(Number(chargeData.net_value) * 100) : grossCentavos;
+      updatePayload.payment_method = billet.pix ? "pix" : "boleto";
+      updatePayload.gateway_fee_centavos = Math.max(0, grossCentavos - netCentavos);
+      updatePayload.net_amount_centavos = netCentavos;
 
       if (billet.barcode && !inv.efi_barcode) updatePayload.efi_barcode = billet.barcode;
       if (billet.pix?.qrcode && !inv.efi_pix_qrcode) updatePayload.efi_pix_qrcode = billet.pix.qrcode;

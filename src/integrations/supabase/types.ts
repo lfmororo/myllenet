@@ -195,6 +195,8 @@ export type Database = {
           bairro: string | null
           block_alerts_enabled: boolean | null
           block_status: string | null
+          cancel_reason: string | null
+          cancelled_at: string | null
           cep: string | null
           cidade: string | null
           complemento: string | null
@@ -210,7 +212,10 @@ export type Database = {
           numero: string | null
           pago_ate: string | null
           plan_id: string | null
+          pop_name: string | null
+          preferred_payment_method: string | null
           rua: string | null
+          seller_name: string | null
           senha_pppoe: string
           telefone: string | null
           updated_at: string
@@ -224,6 +229,8 @@ export type Database = {
           bairro?: string | null
           block_alerts_enabled?: boolean | null
           block_status?: string | null
+          cancel_reason?: string | null
+          cancelled_at?: string | null
           cep?: string | null
           cidade?: string | null
           complemento?: string | null
@@ -239,7 +246,10 @@ export type Database = {
           numero?: string | null
           pago_ate?: string | null
           plan_id?: string | null
+          pop_name?: string | null
+          preferred_payment_method?: string | null
           rua?: string | null
+          seller_name?: string | null
           senha_pppoe: string
           telefone?: string | null
           updated_at?: string
@@ -253,6 +263,8 @@ export type Database = {
           bairro?: string | null
           block_alerts_enabled?: boolean | null
           block_status?: string | null
+          cancel_reason?: string | null
+          cancelled_at?: string | null
           cep?: string | null
           cidade?: string | null
           complemento?: string | null
@@ -268,7 +280,10 @@ export type Database = {
           numero?: string | null
           pago_ate?: string | null
           plan_id?: string | null
+          pop_name?: string | null
+          preferred_payment_method?: string | null
           rua?: string | null
+          seller_name?: string | null
           senha_pppoe?: string
           telefone?: string | null
           updated_at?: string
@@ -334,12 +349,15 @@ export type Database = {
           efi_pix_copiacola: string | null
           efi_pix_qrcode: string | null
           gateway: string
+          gateway_fee_centavos: number
           id: string
           mp_link: string | null
           mp_payment_id: string | null
           mp_pix_copiacola: string | null
           mp_pix_qrcode: string | null
+          net_amount_centavos: number | null
           paid_at: string | null
+          payment_method: string | null
           plan_id: string | null
           status: string
           updated_at: string
@@ -356,12 +374,15 @@ export type Database = {
           efi_pix_copiacola?: string | null
           efi_pix_qrcode?: string | null
           gateway?: string
+          gateway_fee_centavos?: number
           id?: string
           mp_link?: string | null
           mp_payment_id?: string | null
           mp_pix_copiacola?: string | null
           mp_pix_qrcode?: string | null
+          net_amount_centavos?: number | null
           paid_at?: string | null
+          payment_method?: string | null
           plan_id?: string | null
           status?: string
           updated_at?: string
@@ -378,12 +399,15 @@ export type Database = {
           efi_pix_copiacola?: string | null
           efi_pix_qrcode?: string | null
           gateway?: string
+          gateway_fee_centavos?: number
           id?: string
           mp_link?: string | null
           mp_payment_id?: string | null
           mp_pix_copiacola?: string | null
           mp_pix_qrcode?: string | null
+          net_amount_centavos?: number | null
           paid_at?: string | null
+          payment_method?: string | null
           plan_id?: string | null
           status?: string
           updated_at?: string
@@ -724,6 +748,27 @@ export type Database = {
         }
         Relationships: []
       }
+      user_report_permissions: {
+        Row: {
+          created_at: string
+          id: string
+          report_key: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          report_key: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          report_key?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -839,6 +884,10 @@ export type Database = {
           nome: string
           usuario_pppoe: string
         }[]
+      }
+      has_report_access: {
+        Args: { _report_key: string; _user_id: string }
+        Returns: boolean
       }
       has_role: {
         Args: {

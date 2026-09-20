@@ -19,6 +19,7 @@ import InvoiceView from "./pages/InvoiceView";
 import AgentPage from "./pages/AgentPage";
 import SatisfactionPage from "./pages/SatisfactionPage";
 import FeedbackPage from "./pages/FeedbackPage";
+import ReportsPage from "./pages/ReportsPage";
 
 
 const queryClient = new QueryClient();
@@ -44,6 +45,7 @@ const App = () => (
               <Route path="/mikrotik" element={<MikrotikPage />} />
               <Route path="/agente" element={<AgentPage />} />
               <Route path="/avaliacoes" element={<FeedbackPage />} />
+              <Route path="/relatorios" element={<ReportsPage />} />
 
               <Route path="/settings" element={<Settings />} />
             </Route>

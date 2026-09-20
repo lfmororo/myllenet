@@ -18,6 +18,10 @@ export interface Invoice {
   paid_at: string | null;
   created_at: string;
   updated_at: string;
+  gateway?: string;
+  payment_method?: string | null;
+  gateway_fee_centavos?: number;
+  net_amount_centavos?: number | null;
   // joined
   customers?: { nome: string; cpf: string; usuario_pppoe: string };
 }
