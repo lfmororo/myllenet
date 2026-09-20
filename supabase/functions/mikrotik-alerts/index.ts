@@ -151,19 +151,25 @@ async function processCustomerDisconnections(supabase: any) {
     .select("customer_id, usuario_pppoe, event_type, logged_at")
     .in("event_type", ["connected", "disconnected"])
     .gt("logged_at", windowStart)
-    .order("logged_at", { ascending: true })
-    .limit(500);
+    .order("logged_at", { ascending: false })
+    .limit(2000);
 
   if (error) throw error;
   if (!events || events.length === 0) return 0;
 
-  // Último evento de cada cliente + última desconexão conhecida
+  // Eventos vêm do mais recente para o mais antigo: o primeiro de cada cliente
+  // já é o último evento dele.
   const lastEvent = new Map<string, any>();
   const lastDisconnect = new Map<string, any>();
   for (const event of events) {
     if (!event.customer_id) continue;
-    lastEvent.set(event.customer_id, event);
-    if (event.event_type === "disconnected") {
+    if (!lastEvent.has(event.customer_id)) {
+      lastEvent.set(event.customer_id, event);
+    }
+    if (
+      event.event_type === "disconnected" &&
+      !lastDisconnect.has(event.customer_id)
+    ) {
       lastDisconnect.set(event.customer_id, event);
     }
   }
