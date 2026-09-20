@@ -193,6 +193,7 @@ export default function Settings() {
     if (data) {
       for (const row of data) {
         if (row.key === "payment_gateway") setPaymentGateway(row.value || "efi");
+        if (row.key === "mercadopago_access_token") setMpTokenSaved(!!row.value);
         if (row.key === "efi_client_id") setClientId(row.value || "");
         if (row.key === "efi_client_secret") setClientSecret(row.value || "");
         if (row.key === "efi_certificate_path") setCertUploaded(!!row.value);
