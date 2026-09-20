@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { jsPDF } from "jspdf";
 import QRCode from "qrcode";
+import { maskCustomerName, maskDocument, maskedCustomerLocation } from "@/lib/privacy";
 
 
 export function useInvoicePDF() {
@@ -82,6 +83,10 @@ export function useInvoicePDF() {
       doc.setTextColor(textColor[0], textColor[1], textColor[2]);
       doc.text(`#${invoiceId.substring(0, 8).toUpperCase()}`, pageWidth - 20, 37, { align: "right" });
 
+      doc.setFontSize(8);
+      doc.setTextColor(accentColor[0], accentColor[1], accentColor[2]);
+      doc.text("MylleNet agora é Mororo.Tech", pageWidth - 20, 43, { align: "right" });
+
       let currentY = 75;
 
       // 2. Client & Issuer Info (Grid)
@@ -106,13 +111,15 @@ export function useInvoicePDF() {
       // Client Column
       doc.setFont("helvetica", "bold");
       doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-      doc.text(customer.nome, 110, currentY);
+      doc.text(maskCustomerName(customer.nome), 110, currentY);
       
       doc.setFont("helvetica", "normal");
       doc.setTextColor(textColor[0], textColor[1], textColor[2]);
-      doc.text(`CPF/CNPJ: ${customer.cpf}`, 110, currentY + 6);
-      doc.text(`${customer.rua || ""}, ${customer.numero || ""}`, 110, currentY + 11);
-      doc.text(`${customer.bairro || ""} - ${customer.cidade || ""}`, 110, currentY + 16);
+      doc.text(`CPF/CNPJ: ${maskDocument(customer.cpf)}`, 110, currentY + 6);
+      doc.text(maskedCustomerLocation(customer), 110, currentY + 11);
+      doc.setFontSize(7.5);
+      doc.setTextColor(lightTextColor[0], lightTextColor[1], lightTextColor[2]);
+      doc.text("Dados pessoais parcialmente ocultos para sua segurança.", 110, currentY + 16);
 
       currentY += 35;
 
@@ -261,7 +268,10 @@ export function useInvoicePDF() {
       doc.setFontSize(7);
       doc.setTextColor(lightTextColor[0], lightTextColor[1], lightTextColor[2]);
       const footerY = pageHeight - 12;
-      doc.text("ESTA É UMA FATURA DE SERVIÇOS DE COMUNICAÇÃO MULTIMÍDIA.", 20, footerY);
+      doc.text("ESTA É UMA FATURA DE SERVIÇOS DE COMUNICAÇÃO MULTIMÍDIA.", 20, footerY - 4);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(accentColor[0], accentColor[1], accentColor[2]);
+      doc.text("MylleNet agora é Mororo.Tech", 20, footerY);
       doc.setFont("helvetica", "bold");
       doc.text("Mororo.Tech © 2026", pageWidth - 20, footerY, { align: "right" });
 

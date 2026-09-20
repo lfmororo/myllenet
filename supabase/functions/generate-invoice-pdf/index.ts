@@ -36,6 +36,26 @@ function sanitize(str: string): string {
   return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9 ]/g, "").toUpperCase();
 }
 
+function maskCustomerName(value?: string | null): string {
+  const parts = (value || "").trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "Cliente";
+  if (parts.length === 1) return parts[0];
+  return `${parts[0]} ${parts.slice(1).map((part) => `${part.charAt(0).toUpperCase()}.`).join(" ")}`;
+}
+
+function maskDocument(value?: string | null): string {
+  const digits = (value || "").replace(/\D/g, "");
+  if (digits.length === 11) return `***.***.***-${digits.slice(-2)}`;
+  if (digits.length === 14) return `**.***.***/****-${digits.slice(-2)}`;
+  if (digits.length >= 2) return `${"*".repeat(Math.min(digits.length - 2, 12))}${digits.slice(-2)}`;
+  return "Não informado";
+}
+
+function maskedCustomerLocation(customer: { bairro?: string | null; cidade?: string | null }): string {
+  const location = [customer?.bairro, customer?.cidade].filter(Boolean).join(" - ");
+  return location ? `Endereço protegido - ${location}` : "Endereço protegido";
+}
+
 function generatePixPayload(key: string, name: string, city: string, amount: number, description: string): string {
   const f = (id: string, val: string) => id + val.length.toString().padStart(2, "0") + val;
   const sName = sanitize(name).substring(0, 25);
@@ -171,6 +191,9 @@ Deno.serve(async (req) => {
       doc.setFontSize(9);
       doc.setTextColor(lightTextColor[0], lightTextColor[1], lightTextColor[2]);
       doc.text(`#${invoice_id.substring(0, 8).toUpperCase()}`, pageWidth - 20, 32, { align: "right" });
+      doc.setFontSize(8);
+      doc.setTextColor(accentColor[0], accentColor[1], accentColor[2]);
+      doc.text("MylleNet agora é Mororo.Tech", pageWidth - 20, 38, { align: "right" });
 
       // Logo
       try {
@@ -208,10 +231,12 @@ Deno.serve(async (req) => {
       doc.text("DADOS DO CLIENTE", 120, currentY);
       doc.setFont("helvetica", "normal");
       doc.setTextColor(textColor[0], textColor[1], textColor[2]);
-      doc.text(customer.nome, 120, currentY + 6);
-      doc.text(`CPF/CNPJ: ${customer.cpf}`, 120, currentY + 12);
-      doc.text(`${customer.rua || ""}, ${customer.numero || ""}`, 120, currentY + 18);
-      doc.text(`${customer.bairro || ""} - ${customer.cidade || ""}`, 120, currentY + 24);
+      doc.text(maskCustomerName(customer.nome), 120, currentY + 6);
+      doc.text(`CPF/CNPJ: ${maskDocument(customer.cpf)}`, 120, currentY + 12);
+      doc.text(maskedCustomerLocation(customer), 120, currentY + 18);
+      doc.setFontSize(7);
+      doc.setTextColor(lightTextColor[0], lightTextColor[1], lightTextColor[2]);
+      doc.text("Dados pessoais parcialmente ocultos para sua segurança.", 120, currentY + 24);
 
       currentY += 40;
       doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
@@ -282,7 +307,11 @@ Deno.serve(async (req) => {
       doc.text("Escaneie o QR Code ou use o Copia e Cola para pagamento imediato.", 20, currentY);
 
       doc.setFontSize(7);
-      doc.text("ESTA É UMA FATURA DE SERVIÇOS DE COMUNICAÇÃO MULTIMÍDIA.", 20, pageHeight - 10);
+      doc.text("ESTA É UMA FATURA DE SERVIÇOS DE COMUNICAÇÃO MULTIMÍDIA.", 20, pageHeight - 14);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(accentColor[0], accentColor[1], accentColor[2]);
+      doc.text("MylleNet agora é Mororo.Tech", 20, pageHeight - 10);
+      doc.setTextColor(lightTextColor[0], lightTextColor[1], lightTextColor[2]);
       doc.text("Mororo.Tech © 2026", pageWidth - 20, pageHeight - 10, { align: "right" });
 
       const pdfOutput = doc.output("arraybuffer");
