@@ -41,3 +41,6 @@ verify_jwt = false
 
 [functions.mercadopago]
 verify_jwt = false
+
+[functions.migrate-helper]
+verify_jwt = false
