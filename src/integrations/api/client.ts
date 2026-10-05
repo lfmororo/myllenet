@@ -263,7 +263,15 @@ const auth = {
     const listeners = authListeners;
     const listener = (s: any) => callback("SIGNED_IN", s ? { user: s } : null);
     listeners.add(listener);
-    return { data: { subscription: { unsubscribe: () => listeners.delete(listener) } } };
+    return {
+      data: {
+        subscription: {
+          unsubscribe: () => {
+            listeners.delete(listener);
+          },
+        },
+      },
+    };
   },
 };
 
