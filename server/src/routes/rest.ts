@@ -42,14 +42,14 @@ function coerceValue(table: string, column: string, value: unknown): unknown {
   return value;
 }
 
-function buildInsert(table: string, row: Record<string, unknown>): { sql: string; params: unknown[] } {
+function buildInsert(table: string, row: Record<string, unknown>): { sql: string; params: unknown[]; id: string } {
   const cols = tableColumns(table) ?? [];
   const data: Record<string, unknown> = { ...row };
   if (!data.id) data.id = randomUUID();
   const keys = Object.keys(data).filter((k) => cols.includes(k));
   const params = keys.map((k) => coerceValue(table, k, data[k]));
   const sql = `INSERT INTO \`${table}\` (${keys.map((k) => `\`${k}\``).join(", ")}) VALUES (${keys.map(() => "?").join(", ")})`;
-  return { sql, params };
+  return { sql, params, id: data.id as string };
 }
 
 function buildUpdate(table: string, values: Record<string, unknown>, filters: Filter[]): { sql: string; params: unknown[] } {
@@ -231,11 +231,11 @@ export async function registerRestRoutes(app: FastifyInstance) {
     const arr = Array.isArray(rows) ? rows : [rows];
     const inserted: Record<string, unknown>[] = [];
     for (const r of arr) {
-      const { sql, params } = buildInsert(table, r);
+      const { sql, params, id } = buildInsert(table, r);
       await execute(sql, params);
       const fresh = await query<Record<string, unknown>[]>(
         `SELECT * FROM \`${table}\` WHERE id = ?`,
-        [params[0]]
+        [id]
       );
       if (fresh[0]) inserted.push(serializeRow(table, fresh[0]));
     }
