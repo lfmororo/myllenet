@@ -23,7 +23,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: { subscription } } = api.auth.onAuthStateChange((_event, session) => {
       const u = session?.user ?? null;
       setUser(u);
-      setSession(session ? { access_token: session.access_token ?? "", user: u! } : null);
+      setSession(session && u ? { access_token: session.access_token ?? "", user: u } : null);
       setLoading(false);
     });
 

@@ -173,19 +173,21 @@ export default function MikrotikPage() {
   const saveAlertSettings = async () => {
     setUpdatingSettings(true);
     try {
-      const { error: err1 } = await api
-        .from("settings")
-        .upsert(
-          { key: "mikrotik_speed_threshold_mbps", value: speedThreshold },
-          { onConflict: "key" },
-        );
+      const saveSetting = async (key: string, value: string) => {
+        const { data: existing, error: selectError } = await api
+          .from("settings")
+          .select("id")
+          .eq("key", key)
+          .maybeSingle();
+        if (selectError) return selectError;
+        const { error } = existing
+          ? await api.from("settings").update({ value }).eq("key", key)
+          : await api.from("settings").insert({ key, value });
+        return error;
+      };
 
-      const { error: err2 } = await api
-        .from("settings")
-        .upsert(
-          { key: "mikrotik_alert_interval_minutes", value: alertInterval },
-          { onConflict: "key" },
-        );
+      const err1 = await saveSetting("mikrotik_speed_threshold_mbps", speedThreshold);
+      const err2 = await saveSetting("mikrotik_alert_interval_minutes", alertInterval);
 
       if (err1 || err2) throw new Error("Falha ao salvar");
 
