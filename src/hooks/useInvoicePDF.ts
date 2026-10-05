@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/integrations/api/client";
 import { toast } from "sonner";
 import { jsPDF } from "jspdf";
 import QRCode from "qrcode";
@@ -12,7 +12,7 @@ export function useInvoicePDF() {
   const generatePDF = async (invoiceId: string, open = true) => {
     setGenerating(true);
     try {
-      const { data, error } = await supabase.functions.invoke("generate-invoice-pdf", {
+      const { data, error } = await api.functions.invoke("generate-invoice-pdf", {
         body: { invoice_id: invoiceId },
         method: 'POST'
       });

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/integrations/api/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -31,7 +31,7 @@ export default function FeedbackPage() {
 
   useEffect(() => {
     const load = async () => {
-      const { data, error } = await supabase
+      const { data, error } = await api
         .from("customer_feedback")
         .select("*")
         .order("created_at", { ascending: false })
@@ -52,7 +52,7 @@ export default function FeedbackPage() {
       return;
     setSending(true);
     toast.info("Enviando... isso pode levar alguns minutos.");
-    const { data, error } = await supabase.functions.invoke("satisfaction-survey", {
+    const { data, error } = await api.functions.invoke("satisfaction-survey", {
       body: { url: publicUrl },
     });
     setSending(false);

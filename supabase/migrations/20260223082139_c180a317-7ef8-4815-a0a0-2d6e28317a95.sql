@@ -1,1 +1,0 @@
-ALTER TABLE public.customers ADD COLUMN cortesia boolean NOT NULL DEFAULT false;

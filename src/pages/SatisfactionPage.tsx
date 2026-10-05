@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { z } from "zod";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/integrations/api/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -43,7 +43,7 @@ export default function SatisfactionPage() {
       return;
     }
     setLoading(true);
-    const { error } = await supabase.from("customer_feedback").insert({
+    const { error } = await api.from("customer_feedback").insert({
       nome: nome.trim() || null,
       telefone: telefone.trim() || null,
       rating,

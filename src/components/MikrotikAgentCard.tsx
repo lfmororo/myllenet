@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import JSZip from "jszip";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/integrations/api/client";
 import { toast } from "sonner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -41,7 +41,7 @@ export function MikrotikAgentCard() {
   const [wanInterfaces, setWanInterfaces] = useState("BrisanetPPoe,pppoe-out1");
 
   const loadAgents = async () => {
-    const { data } = await supabase
+    const { data } = await api
       .from("agent_tokens")
       .select("*")
       .order("created_at", { ascending: false });
@@ -55,7 +55,7 @@ export function MikrotikAgentCard() {
   const createAgent = async () => {
     if (!name.trim()) return toast.error("Informe um nome para o agente");
     setLoading(true);
-    const { error } = await supabase
+    const { error } = await api
       .from("agent_tokens")
       .insert({ name: name.trim(), token: newToken() });
     setLoading(false);
@@ -65,7 +65,7 @@ export function MikrotikAgentCard() {
   };
 
   const revokeAgent = async (id: string) => {
-    const { error } = await supabase.from("agent_tokens").delete().eq("id", id);
+    const { error } = await api.from("agent_tokens").delete().eq("id", id);
     if (error) return toast.error(error.message);
     toast.success("Agente revogado");
     loadAgents();
@@ -74,7 +74,7 @@ export function MikrotikAgentCard() {
   const downloadPackage = async (agent: AgentToken) => {
     setLoading(true);
     try {
-      const { data: rows } = await supabase
+      const { data: rows } = await api
         .from("settings")
         .select("key,value")
         .in("key", [
@@ -98,7 +98,7 @@ export function MikrotikAgentCard() {
         `# Agente: ${agent.name} - ${new Date().toLocaleString("pt-BR")}`,
         "",
         "# Backend do sistema",
-        `SUPABASE_URL=${import.meta.env.VITE_SUPABASE_URL}`,
+        `API_URL=${import.meta.env.VITE_API_URL || "http://localhost:3333"}`,
         `AGENT_TOKEN=${agent.token}`,
         "",
         "# Mikrotik (cadastrado nas configurações do sistema)",

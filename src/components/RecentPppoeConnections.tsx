@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { ArrowDownCircle, ArrowUpCircle, History, Loader2 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/integrations/api/client";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -41,7 +41,7 @@ export function RecentPppoeConnections() {
   const [loading, setLoading] = useState(true);
 
   const fetchEvents = useCallback(async () => {
-    const { data, error } = await supabase
+    const { data, error } = await api
       .from("pppoe_logs")
       .select(
         "id, customer_id, usuario_pppoe, event_type, ip_address, uptime, logged_at",
@@ -63,7 +63,7 @@ export function RecentPppoeConnections() {
       ...new Set(recentEvents.map((event) => event.customer_id)),
     ];
     if (customerIds.length > 0) {
-      const { data: customers } = await supabase
+      const { data: customers } = await api
         .from("customers")
         .select("id, nome")
         .in("id", customerIds);
@@ -84,20 +84,19 @@ export function RecentPppoeConnections() {
 
   useEffect(() => {
     fetchEvents();
-    const channel = supabase
+    const channel = api
       .channel("mikrotik_recent_pppoe_events")
       .on(
         "postgres_changes" as any,
         { event: "INSERT", schema: "public", table: "pppoe_logs" },
         (payload: any) => {
-          if (["connected", "disconnected"].includes(payload.new?.event_type))
-            fetchEvents();
+          fetchEvents();
         },
       )
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      api.removeChannel(channel);
     };
   }, [fetchEvents]);
 

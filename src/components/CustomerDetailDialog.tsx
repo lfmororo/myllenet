@@ -17,7 +17,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/integrations/api/client";
 import {
   Loader2,
   ExternalLink,
@@ -107,7 +107,7 @@ export default function CustomerDetailDialog({
     if (!customer) return;
     setMikrotikAction(action);
     try {
-      const { data, error } = await supabase.functions.invoke(
+      const { data, error } = await api.functions.invoke(
         "mikrotik-customer",
         {
           body: { customer_id: customer.id, action },
@@ -136,7 +136,7 @@ export default function CustomerDetailDialog({
       const from = isLoadMore ? logs.length : 0;
       const to = from + 49;
 
-      const { data, error } = await supabase
+      const { data, error } = await api
         .from("pppoe_logs")
         .select("*")
         .eq("customer_id", customer.id)
@@ -159,7 +159,7 @@ export default function CustomerDetailDialog({
   const fetchBlockHistory = useCallback(async () => {
     if (!customer) return;
     setLoadingBlockHistory(true);
-    const { data, error } = await supabase
+    const { data, error } = await api
       .from("block_history" as any)
       .select("*")
       .eq("customer_id", customer.id)
@@ -175,7 +175,7 @@ export default function CustomerDetailDialog({
   const fetchInvoices = useCallback(() => {
     if (!customer) return;
     setLoading(true);
-    supabase
+    api
       .from("invoices")
       .select("*")
       .eq("customer_id", customer.id)
@@ -197,8 +197,8 @@ export default function CustomerDetailDialog({
       fetchBlockHistory();
       setPagoAte(customer.pago_ate || "");
 
-      // Escutar mudanças em tempo real na tabela de logs para este cliente
-      const channel = supabase
+      // Polling simples: atualiza os logs periodicamente
+      const channel = api
         .channel(`pppoe_logs_${customer.id}`)
         .on(
           "postgres_changes",
@@ -208,14 +208,14 @@ export default function CustomerDetailDialog({
             table: "pppoe_logs",
             filter: `customer_id=eq.${customer.id}`,
           },
-          (payload) => {
-            setLogs((prev) => [payload.new, ...prev].slice(0, 100));
+          () => {
+            fetchLogs();
           },
         )
         .subscribe();
 
       return () => {
-        supabase.removeChannel(channel);
+        api.removeChannel(channel);
       };
     } else {
       setInvoices([]);
@@ -228,7 +228,7 @@ export default function CustomerDetailDialog({
   const handleSavePagoAte = async () => {
     if (!customer) return;
     setSavingPagoAte(true);
-    const { error } = await supabase
+    const { error } = await api
       .from("customers")
       .update({ pago_ate: pagoAte || null } as any)
       .eq("id", customer.id);
@@ -243,7 +243,7 @@ export default function CustomerDetailDialog({
 
   const updateCustomer = async (updates: Partial<Customer>) => {
     if (!customer) return;
-    const { error } = await supabase
+    const { error } = await api
       .from("customers")
       .update(updates as any)
       .eq("id", customer.id);
@@ -259,7 +259,7 @@ export default function CustomerDetailDialog({
     if (!customer) return;
     setUnlocking(true);
     try {
-      const { error } = await supabase
+      const { error } = await api
         .from("customers")
         .update({ block_status: "active" } as any)
         .eq("id", customer.id);
@@ -269,8 +269,8 @@ export default function CustomerDetailDialog({
       // Log the manual unlock
       const {
         data: { user },
-      } = await supabase.auth.getUser();
-      await supabase.from("block_history" as any).insert({
+      } = await api.auth.getUser();
+      await api.from("block_history" as any).insert({
         customer_id: customer.id,
         old_status: customer.block_status,
         new_status: "active",
@@ -283,15 +283,7 @@ export default function CustomerDetailDialog({
       onCustomerUpdated?.();
 
       // Request Mikrotik sync
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData?.session?.access_token;
-      if (token) {
-        const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-        fetch(`https://${projectId}.supabase.co/functions/v1/mikrotik-sync`, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${token}` },
-        }).catch((e) => console.error("Sync error:", e));
-      }
+      api.functions.invoke("mikrotik-sync", { body: {} }).catch((e) => console.error("Sync error:", e));
     } catch (err) {
       console.error(err);
       toast.error("Erro ao desbloquear cliente");
@@ -311,28 +303,12 @@ export default function CustomerDetailDialog({
     if (!customer) return;
     setCheckingEfi(true);
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData?.session?.access_token;
-      if (!token) {
-        toast.error("Sessão expirada");
-        setCheckingEfi(false);
-        return;
-      }
+      const { data: result, error } = await api.functions.invoke("efi-boleto/check-customer", {
+        body: { customer_id: customer.id },
+      });
 
-      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/efi-boleto/check-customer?customer_id=${customer.id}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-          },
-        },
-      );
-
-      const result = await response.json();
-      if (!response.ok) {
-        toast.error(result.error || "Erro ao consultar EFI");
+      if (error) {
+        toast.error(error.message || "Erro ao consultar EFI");
       } else {
         toast.success(
           `Encontrados: ${result.total_found} | Importados: ${result.imported} | Já existentes: ${result.skipped}`,
@@ -813,7 +789,7 @@ export default function CustomerDetailDialog({
             )}
             <div className="rounded-lg border p-3 bg-muted/10">
               <span className="text-xs font-semibold text-muted-foreground uppercase block mb-1">
-                Dados Supabase
+                Dados api
               </span>
               <div className="space-y-1 text-xs">
                 <div className="flex justify-between">
@@ -1178,7 +1154,7 @@ export default function CustomerDetailDialog({
                                   className="h-7 w-7 text-green-600 hover:text-green-700"
                                   title="Marcar como pago"
                                   onClick={async () => {
-                                    const { error } = await supabase
+                                    const { error } = await api
                                       .from("invoices")
                                       .update({
                                         status: "paid",
@@ -1193,65 +1169,21 @@ export default function CustomerDetailDialog({
                                     fetchInvoices();
                                     onCustomerUpdated?.();
                                     try {
-                                      const { data: sd } =
-                                        await supabase.auth.getSession();
-                                      const tk = sd?.session?.access_token;
-                                      if (tk) {
-                                        const pid = import.meta.env
-                                          .VITE_SUPABASE_PROJECT_ID;
-                                        // Cancel on EFI if has charge_id
-                                        if (inv.efi_charge_id) {
-                                          try {
-                                            const cr = await fetch(
-                                              `https://${pid}.supabase.co/functions/v1/efi-boleto/cancel`,
-                                              {
-                                                method: "POST",
-                                                headers: {
-                                                  Authorization: `Bearer ${tk}`,
-                                                  "Content-Type":
-                                                    "application/json",
-                                                  apikey: import.meta.env
-                                                    .VITE_SUPABASE_PUBLISHABLE_KEY,
-                                                },
-                                                body: JSON.stringify({
-                                                  charge_id: inv.efi_charge_id,
-                                                }),
-                                              },
-                                            );
-                                            if (cr.ok)
-                                              toast.success(
-                                                "Cobrança cancelada na EFI",
-                                              );
-                                          } catch (e) {
-                                            console.warn(
-                                              "EFI cancel failed:",
-                                              e,
-                                            );
-                                          }
+                                      // Cancel on EFI if has charge_id
+                                      if (inv.efi_charge_id) {
+                                        try {
+                                          await api.functions.invoke("efi-boleto/cancel", {
+                                            body: { charge_id: inv.efi_charge_id },
+                                          });
+                                        } catch (e) {
+                                          console.warn("EFI cancel failed:", e);
                                         }
-                                        // WhatsApp notification
-                                        const r = await fetch(
-                                          `https://${pid}.supabase.co/functions/v1/whatsapp-send/notify-invoice`,
-                                          {
-                                            method: "POST",
-                                            headers: {
-                                              Authorization: `Bearer ${tk}`,
-                                              "Content-Type":
-                                                "application/json",
-                                              apikey: import.meta.env
-                                                .VITE_SUPABASE_PUBLISHABLE_KEY,
-                                            },
-                                            body: JSON.stringify({
-                                              invoice_id: inv.id,
-                                              type: "pagamento_confirmado",
-                                            }),
-                                          },
-                                        );
-                                        if (r.ok)
-                                          toast.success(
-                                            "Confirmação enviada ao cliente!",
-                                          );
                                       }
+                                      // WhatsApp notification
+                                      const { error: notifyErr } = await api.functions.invoke("whatsapp-send/notify-invoice", {
+                                        body: { invoice_id: inv.id, type: "pagamento_confirmado" },
+                                      });
+                                      if (!notifyErr) toast.success("Confirmação enviada ao cliente!");
                                     } catch (e) {
                                       console.warn("Notify failed:", e);
                                     }
@@ -1265,7 +1197,7 @@ export default function CustomerDetailDialog({
                                   className="h-7 w-7 text-destructive hover:text-destructive"
                                   title="Cancelar fatura"
                                   onClick={async () => {
-                                    const { error } = await supabase
+                                    const { error } = await api
                                       .from("invoices")
                                       .update({ status: "cancelled" })
                                       .eq("id", inv.id);

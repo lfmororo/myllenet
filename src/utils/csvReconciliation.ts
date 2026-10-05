@@ -1,4 +1,4 @@
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/integrations/api/client";
 import { format, parse } from "date-fns";
 
 /**
@@ -45,13 +45,13 @@ export async function reconcileInvoicesFromCSV(csvContent: string) {
 
       // Find the invoice in our DB
       // Strategy: Match by efi_charge_id OR (CPF + Vencimento)
-      let query = supabase.from("invoices").select("id, status");
+      let query = api.from("invoices").select("id, status");
       
       if (efiChargeId && !isNaN(Number(efiChargeId))) {
         query = query.eq("efi_charge_id", Number(efiChargeId));
       } else {
         // Find customer by CPF first if we don't have a direct charge ID match
-        const { data: customer } = await supabase
+        const { data: customer } = await api
           .from("customers")
           .select("id")
           .eq("cpf", cpf)
@@ -72,7 +72,7 @@ export async function reconcileInvoicesFromCSV(csvContent: string) {
           ? format(parse(pagoEmRaw, "dd/MM/yyyy", new Date()), "yyyy-MM-dd'T'HH:mm:ss")
           : new Date().toISOString();
 
-        const { error: updateError } = await supabase
+        const { error: updateError } = await api
           .from("invoices")
           .update({
             status: "paid",

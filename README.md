@@ -1,6 +1,6 @@
 # Client Connect Pro
 
-Sistema de cadastro de clientes provedor de internet, com banco em supabase
+Sistema de cadastro de clientes provedor de internet, com backend Fastify + PostgreSQL
 
 This project was built with [Lovable](https://lovable.dev).
 

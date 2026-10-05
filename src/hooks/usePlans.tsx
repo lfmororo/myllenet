@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/integrations/api/client";
 import { toast } from "sonner";
 
 export interface Plan {
@@ -26,7 +26,7 @@ export function usePlans() {
 
   const fetchPlans = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    const { data, error } = await api
       .from("plans")
       .select("*")
       .order("nome");
@@ -45,7 +45,7 @@ export function usePlans() {
   }, [fetchPlans]);
 
   const addPlan = async (plan: PlanInput) => {
-    const { error } = await supabase.from("plans").insert(plan);
+    const { error } = await api.from("plans").insert(plan);
     if (error) {
       toast.error("Erro ao cadastrar plano");
       return false;
@@ -56,7 +56,7 @@ export function usePlans() {
   };
 
   const updatePlan = async (id: string, plan: Partial<PlanInput>) => {
-    const { error } = await supabase.from("plans").update(plan).eq("id", id);
+    const { error } = await api.from("plans").update(plan).eq("id", id);
     if (error) {
       toast.error("Erro ao atualizar plano");
       return false;
@@ -67,7 +67,7 @@ export function usePlans() {
   };
 
   const deletePlan = async (id: string) => {
-    const { error } = await supabase.from("plans").delete().eq("id", id);
+    const { error } = await api.from("plans").delete().eq("id", id);
     if (error) {
       toast.error("Erro ao excluir plano");
       return false;

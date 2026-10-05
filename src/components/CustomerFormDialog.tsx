@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, AlertCircle, UploadCloud } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/integrations/api/client";
 
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
@@ -127,7 +127,7 @@ export default function CustomerFormDialog({ open, onOpenChange, customer, onSav
       const phoneDigits = form.telefone ? form.telefone.replace(/\D/g, "") : "";
       const ok = await onUpdate(customer.id, { ...form, cpf: cpfClean, telefone: phoneDigits || null });
       if (!ok) return;
-      const { data, error } = await supabase.functions.invoke("mikrotik-customer", {
+      const { data, error } = await api.functions.invoke("mikrotik-customer", {
         body: { customer_id: customer.id, action: "sync" },
       });
       if (error) throw error;

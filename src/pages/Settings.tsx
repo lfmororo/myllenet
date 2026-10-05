@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/integrations/api/client";
 import { Navigate, useNavigate } from "react-router-dom";
 import { usePlans } from "@/hooks/usePlans";
 import type { Plan } from "@/hooks/usePlans";
@@ -33,7 +33,8 @@ export default function Settings() {
   const [savingMp, setSavingMp] = useState(false);
   const [mpAccessToken, setMpAccessToken] = useState("");
   const [mpTokenSaved, setMpTokenSaved] = useState(false);
-  const mpWebhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/mercadopago/webhook`;
+  const API_URL = (import.meta.env.VITE_API_URL as string) || "http://localhost:3333";
+  const mpWebhookUrl = `${API_URL}/api/functions/mercadopago/webhook`;
   const [clientId, setClientId] = useState("");
   const [clientSecret, setClientSecret] = useState("");
   const [certFile, setCertFile] = useState<File | null>(null);
@@ -107,27 +108,12 @@ export default function Settings() {
     }
   }, [user, isAdmin]);
 
-  const getAuthHeaders = async () => {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const token = sessionData?.session?.access_token;
-    if (!token) { toast.error("Sessão expirada"); return null; }
-    return {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-      apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-    };
-  };
-
   const fetchUsers = async () => {
     setUsersLoading(true);
     try {
-      const headers = await getAuthHeaders();
-      if (!headers) return;
-      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-      const res = await fetch(`https://${projectId}.supabase.co/functions/v1/user-management/list`, { headers });
-      const data = await res.json();
-      if (res.ok) setUsers(data);
-      else console.error("Fetch users error:", data);
+      const { data, error } = await api.functions.invoke("user-management/list", { body: {} });
+      if (!error && data) setUsers(data);
+      else console.error("Fetch users error:", error);
     } catch (err) {
       console.error(err);
     }
@@ -137,10 +123,6 @@ export default function Settings() {
   const handleSaveUser = async () => {
     setSavingUser(true);
     try {
-      const headers = await getAuthHeaders();
-      if (!headers) { setSavingUser(false); return; }
-      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-
       if (editingUser) {
         const body: any = { user_id: editingUser.id, role: userForm.role, report_permissions: userForm.report_permissions };
         if (userForm.full_name !== editingUser.full_name) body.full_name = userForm.full_name;
@@ -148,18 +130,12 @@ export default function Settings() {
         if (userForm.password) body.password = userForm.password;
         body.phone = userForm.phone;
 
-        const res = await fetch(`https://${projectId}.supabase.co/functions/v1/user-management/update`, {
-          method: "POST", headers, body: JSON.stringify(body),
-        });
-        const result = await res.json();
-        if (!res.ok) { toast.error(result.error); setSavingUser(false); return; }
+        const { error } = await api.functions.invoke("user-management/update", { body });
+        if (error) { toast.error(error.message); setSavingUser(false); return; }
         toast.success("Usuário atualizado!");
       } else {
-        const res = await fetch(`https://${projectId}.supabase.co/functions/v1/user-management/create`, {
-          method: "POST", headers, body: JSON.stringify(userForm),
-        });
-        const result = await res.json();
-        if (!res.ok) { toast.error(result.error); setSavingUser(false); return; }
+        const { error } = await api.functions.invoke("user-management/create", { body: userForm });
+        if (error) { toast.error(error.message); setSavingUser(false); return; }
         toast.success("Usuário criado!");
       }
       setUserFormOpen(false);
@@ -173,14 +149,8 @@ export default function Settings() {
   const handleDeleteUser = async () => {
     if (!deletingUser) return;
     try {
-      const headers = await getAuthHeaders();
-      if (!headers) return;
-      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-      const res = await fetch(`https://${projectId}.supabase.co/functions/v1/user-management/delete`, {
-        method: "POST", headers, body: JSON.stringify({ user_id: deletingUser.id }),
-      });
-      const result = await res.json();
-      if (!res.ok) { toast.error(result.error); return; }
+      const { error } = await api.functions.invoke("user-management/delete", { body: { user_id: deletingUser.id } });
+      if (error) { toast.error(error.message); return; }
       toast.success("Usuário excluído!");
       setDeletingUser(null);
       fetchUsers();
@@ -191,7 +161,7 @@ export default function Settings() {
 
   const loadSettings = async () => {
     setLoadingSettings(true);
-    const { data } = await supabase
+    const { data } = await api
       .from("settings")
       .select("key, value")
       .in("key", ["payment_gateway", "mercadopago_access_token", "efi_client_id", "efi_client_secret", "efi_certificate_path", "uazapi_token", "whatsapp_provider", "evolution_base_url", "evolution_api_key", "evolution_instance", "mikrotik_host", "mikrotik_host_secondary", "mikrotik_username", "mikrotik_password", "mikrotik_api_port", "mikrotik_rest_port", "blocking_days", "pix_key", "pix_name", "pix_city", "mikrotik_alert_offline_minutes", "mikrotik_alert_failure_count"]);
@@ -227,16 +197,16 @@ export default function Settings() {
   };
 
   const upsertSetting = async (key: string, value: string) => {
-    const { data: existing } = await supabase
+    const { data: existing } = await api
       .from("settings")
       .select("id")
       .eq("key", key)
       .maybeSingle();
 
     if (existing) {
-      await supabase.from("settings").update({ value }).eq("key", key);
+      await api.from("settings").update({ value }).eq("key", key);
     } else {
-      await supabase.from("settings").insert({ key, value });
+      await api.from("settings").insert({ key, value });
     }
   };
 
@@ -247,17 +217,7 @@ export default function Settings() {
       await upsertSetting("efi_client_secret", clientSecret);
 
       if (certFile) {
-        const filePath = `efi/certificate.p12`;
-        const { error: uploadError } = await supabase.storage
-          .from("certificates")
-          .upload(filePath, certFile, { upsert: true });
-
-        if (uploadError) {
-          toast.error("Erro ao enviar certificado: " + uploadError.message);
-          setSaving(false);
-          return;
-        }
-        await upsertSetting("efi_certificate_path", filePath);
+        await upsertSetting("efi_certificate_path", certFile.name);
         setCertUploaded(true);
       }
 
@@ -299,26 +259,11 @@ export default function Settings() {
   const handleTestMercadoPago = async () => {
     setTestingMp(true);
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token;
-      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-      const res = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/mercadopago/test`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-      const result = await res.json();
-      if (res.ok && result.ok) {
-        toast.success(
-          `Mercado Pago conectado: ${result.account}${result.live_mode ? " (produção)" : " (teste)"}`
-        );
+      const { data: result, error } = await api.functions.invoke("mercadopago/test", { body: {} });
+      if (!error && result.ok) {
+        toast.success(`Mercado Pago conectado: ${result.account}`);
       } else {
-        toast.error("Falha: " + (result.error || "Erro desconhecido"));
+        toast.error("Falha: " + (result?.error || error?.message || "Erro desconhecido"));
       }
     } catch (err: any) {
       toast.error("Erro ao testar: " + (err.message || "Erro desconhecido"));
@@ -329,24 +274,11 @@ export default function Settings() {
   const handleTestConnection = async () => {
     setTesting(true);
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token;
-      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-      const res = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/efi-boleto/test`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-      const result = await res.json();
-      if (result.success) {
-        toast.success(result.message);
+      const { data: result, error } = await api.functions.invoke("efi-boleto/test", { body: {} });
+      if (!error && result.success) {
+        toast.success("Conexão com a EFI estabelecida com sucesso!");
       } else {
-        toast.error("Falha: " + (result.error || "Erro desconhecido"));
+        toast.error("Falha: " + (result?.error || error?.message || "Erro desconhecido"));
       }
     } catch (err: any) {
       toast.error("Erro ao testar: " + (err.message || "Erro desconhecido"));
@@ -357,21 +289,11 @@ export default function Settings() {
   const handleDownloadDiagnosticReport = async (format: 'json' | 'pdf' = 'json') => {
     setGeneratingReport(true);
     try {
-      const headers = await getAuthHeaders();
-      if (!headers) { setGeneratingReport(false); return; }
-      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-      const res = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/api-diagnostic-report?start=${reportDates.start}T00:00:00Z&end=${reportDates.end}T23:59:59Z`,
-        { headers }
-      );
-      
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.error || "Erro ao gerar relatório");
-      }
-      
-      const data = await res.json();
-      
+      const { data, error } = await api.functions.invoke("api-diagnostic-report", {
+        body: { start: `${reportDates.start}T00:00:00Z`, end: `${reportDates.end}T23:59:59Z` },
+      });
+      if (error) throw error;
+
       if (format === 'pdf') {
         await downloadPDF(data);
       } else {
@@ -811,15 +733,9 @@ export default function Settings() {
                         onClick={async () => {
                           setTestingWhatsapp(true);
                           try {
-                            const headers = await getAuthHeaders();
-                            if (!headers) { setTestingWhatsapp(false); return; }
-                            const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-                            const res = await fetch(`https://${projectId}.supabase.co/functions/v1/whatsapp-send/test`, {
-                              method: "POST", headers,
-                            });
-                            const result = await res.json();
-                            if (result.success) toast.success(`Conexão OK (${result.provider}) - ${result.state ?? "ativo"}`);
-                            else toast.error("Falha: " + (result.error || "Erro desconhecido"));
+                            const { data: result, error } = await api.functions.invoke("whatsapp-send/test", { body: {} });
+                            if (!error && result.success) toast.success(`Conexão OK (${result.provider}) - ${result.state ?? "ativo"}`);
+                            else toast.error("Falha: " + (result?.error || error?.message || "Erro desconhecido"));
                           } catch (err: any) {
                             toast.error("Erro ao testar: " + (err.message || "Erro desconhecido"));
                           }

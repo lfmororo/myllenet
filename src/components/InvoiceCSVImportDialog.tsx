@@ -9,7 +9,7 @@ import { Upload, FileText, AlertTriangle, CheckCircle, Loader2, X, RefreshCw } f
 import { toast } from "sonner";
 import type { Plan } from "@/hooks/usePlans";
 import type { CustomerInput } from "@/hooks/useCustomers";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/integrations/api/client";
 import { reconcileInvoicesFromCSV } from "@/utils/csvReconciliation";
 
 interface Props {
@@ -330,7 +330,7 @@ export default function InvoiceCSVImportDialog({ open, onOpenChange, customers, 
         }
       }
 
-      const { data: freshCustomers } = await supabase.from("customers").select("id, cpf");
+      const { data: freshCustomers } = await api.from("customers").select("id, cpf");
       const freshCpfMap = new Map((freshCustomers || []).map(c => [cleanCPF(c.cpf), c.id]));
       const resolvedRows = validRows.map(row => {
         if (row.customer_id === "__pending__" && row._cpf) {

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/integrations/api/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -31,7 +31,7 @@ export function MikrotikHostStatus() {
   const fetchData = async () => {
     try {
       // 1. Fetch history for all hosts
-      const { data, error } = await supabase
+      const { data, error } = await api
         .from("mikrotik_status_history")
         .select("host, online, logged_at, message, diagnostics")
         .order("logged_at", { ascending: false })
@@ -58,7 +58,7 @@ export function MikrotikHostStatus() {
 
   useEffect(() => {
     fetchData();
-    const channel = supabase
+    const channel = api
       .channel("host-status-changes")
       .on(
         "postgres_changes",
@@ -72,7 +72,7 @@ export function MikrotikHostStatus() {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      api.removeChannel(channel);
     };
   }, []);
 

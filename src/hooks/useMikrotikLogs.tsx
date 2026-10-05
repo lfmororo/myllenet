@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/integrations/api/client";
 
 export const useMikrotikLogs = () => {
   const [wanLogs, setWanLogs] = useState<any[]>([]);
@@ -8,7 +8,7 @@ export const useMikrotikLogs = () => {
   const [loading, setLoading] = useState(true);
 
   const fetchWanHistory = async () => {
-    const { data, error } = await supabase
+    const { data, error } = await api
       .from("wan_status_history")
       .select("*")
       .order("created_at", { ascending: false })
@@ -20,7 +20,7 @@ export const useMikrotikLogs = () => {
   };
 
   const fetchWanLogs = async () => {
-    const { data, error } = await supabase
+    const { data, error } = await api
       .from("wan_logs" as any)
       .select("*")
       .order("created_at", { ascending: false })
@@ -108,7 +108,7 @@ export const useMikrotikLogs = () => {
   useEffect(() => {
     fetchWanLogs();
     fetchWanHistory();
-    const channel = supabase
+    const channel = api
       .channel("wan_updates_mikrotik_page")
       .on(
         "postgres_changes" as any,
@@ -127,7 +127,7 @@ export const useMikrotikLogs = () => {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      api.removeChannel(channel);
     };
   }, []);
 

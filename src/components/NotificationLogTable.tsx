@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/integrations/api/client";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -45,7 +45,7 @@ export default function NotificationLogTable() {
 
   const fetchLogs = async () => {
     setLoading(true);
-    let query = supabase
+    let query = api
       .from("notification_logs")
       .select("*", { count: "exact" })
       .order("created_at", { ascending: false })

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/integrations/api/client";
 import { useCustomers } from "@/hooks/useCustomers";
 import { useInvoices } from "@/hooks/useInvoices";
 import { usePlans } from "@/hooks/usePlans";
@@ -25,7 +25,7 @@ export default function DashboardHome() {
     let cancelled = false;
 
     const checkAgent = async () => {
-      const { data, error } = await supabase
+      const { data, error } = await api
         .from("agent_tokens")
         .select("last_seen_at")
         .eq("active", true)
@@ -46,7 +46,7 @@ export default function DashboardHome() {
 
     checkAgent();
     const timer = window.setInterval(checkAgent, 30000);
-    const channel = supabase
+    const channel = api
       .channel("dashboard_agent_status")
       .on(
         "postgres_changes",
@@ -58,13 +58,13 @@ export default function DashboardHome() {
     return () => {
       cancelled = true;
       window.clearInterval(timer);
-      supabase.removeChannel(channel);
+      api.removeChannel(channel);
     };
   }, []);
 
   useEffect(() => {
     const fetchWanLogs = async () => {
-      const { data, error } = await supabase
+      const { data, error } = await api
         .from('wan_logs' as any)
         .select('*')
         .order('created_at', { ascending: false })
@@ -85,14 +85,14 @@ export default function DashboardHome() {
 
     fetchWanLogs();
     
-    const channel = supabase
+    const channel = api
       .channel('wan_updates')
       .on('postgres_changes' as any, { event: 'INSERT', schema: 'public', table: 'wan_logs' }, () => {
         fetchWanLogs();
       })
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => { api.removeChannel(channel); };
   }, []);
 
   const wanInterfaces = useMemo(() => {
@@ -112,7 +112,7 @@ export default function DashboardHome() {
     let cancelled = false;
     const check = async () => {
       try {
-        const { data, error } = await supabase.functions.invoke("mikrotik-status");
+        const { data, error } = await api.functions.invoke("mikrotik-status");
         if (cancelled) return;
         setRouterStatus(!error && data?.online ? "online" : "offline");
         setOnlineUsers(typeof data?.activeUsers === "number" ? data.activeUsers : null);

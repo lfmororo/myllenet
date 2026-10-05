@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/integrations/api/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -110,7 +110,7 @@ export default function MikrotikPage() {
     if (!silent) setLoading(true);
     try {
       const { data, error } =
-        await supabase.functions.invoke("mikrotik-status");
+        await api.functions.invoke("mikrotik-status");
       if (error) throw error;
       setStatus(data);
       if (!silent) {
@@ -131,7 +131,7 @@ export default function MikrotikPage() {
   const syncWithMikrotik = async () => {
     setSyncing(true);
     try {
-      const { data, error } = await supabase.functions.invoke("mikrotik-sync");
+      const { data, error } = await api.functions.invoke("mikrotik-sync");
       if (error) throw error;
       toast.success("Sincronização com Mikrotik concluída com sucesso!");
     } catch (err: any) {
@@ -149,7 +149,7 @@ export default function MikrotikPage() {
 
   const fetchAlertSettings = async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await api
         .from("settings")
         .select("key, value")
         .in("key", [
@@ -173,14 +173,14 @@ export default function MikrotikPage() {
   const saveAlertSettings = async () => {
     setUpdatingSettings(true);
     try {
-      const { error: err1 } = await supabase
+      const { error: err1 } = await api
         .from("settings")
         .upsert(
           { key: "mikrotik_speed_threshold_mbps", value: speedThreshold },
           { onConflict: "key" },
         );
 
-      const { error: err2 } = await supabase
+      const { error: err2 } = await api
         .from("settings")
         .upsert(
           { key: "mikrotik_alert_interval_minutes", value: alertInterval },
@@ -439,7 +439,7 @@ export default function MikrotikPage() {
           <Button
             onClick={() => {
               checkStatus();
-              supabase.functions
+              api.functions
                 .invoke("mikrotik-speedtest")
                 .then(({ data, error }) => {
                   if (error) toast.error("Erro ao realizar speedtest");

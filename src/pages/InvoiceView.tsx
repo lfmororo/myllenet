@@ -2,43 +2,32 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/integrations/supabase/client";
 import { Loader2, FileText, Download, ShieldCheck, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { toast } from "sonner";
+import { jsPDF } from "jspdf";
+import QRCode from "qrcode";
 import { maskCustomerName, maskDocument, maskedCustomerLocation } from "@/lib/privacy";
+
+const API_URL = (import.meta.env.VITE_API_URL as string) || "http://localhost:3333";
 
 const InvoiceView = () => {
   const [copying, setCopying] = useState(false);
   const [pixPayload, setPixPayload] = useState<string>("");
   const { id } = useParams<{ id: string }>();
 
-  const { data: invoice, isLoading, error } = useQuery({
+  const { data, isLoading, error } = useQuery({
     queryKey: ["public-invoice", id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("invoices")
-        .select("*, customers(*)")
-        .eq("id", id)
-        .single();
-
-      if (error) throw error;
-      return data;
+      const res = await fetch(`${API_URL}/api/public/invoice/${id}`);
+      if (!res.ok) throw new Error("Fatura não encontrada");
+      return res.json();
     },
   });
 
-  const { data: settings } = useQuery({
-    queryKey: ["pix-settings"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("settings")
-        .select("key, value")
-        .in("key", ["pix_key", "pix_name", "pix_city"]);
-      if (error) throw error;
-      return Object.fromEntries(data.map(s => [s.key, s.value]));
-    },
-  });
+  const invoice = data?.invoice;
+  const settings = data?.settings;
 
   const generatePix = () => {
     if (!invoice) return "";
@@ -99,26 +88,44 @@ const InvoiceView = () => {
 
   const handleDownload = async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const pdfUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-invoice-pdf?invoice_id=${id}`;
-      
-      const response = await fetch(pdfUrl, {
-        headers: session ? {
-          Authorization: `Bearer ${session.access_token}`,
-        } : {},
-      });
+      const payload = generatePix();
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      doc.setFillColor(13, 148, 136);
+      doc.rect(0, 0, pageWidth, 5, "F");
+      doc.setFontSize(20);
+      doc.setTextColor(15, 23, 42);
+      doc.setFont("helvetica", "bold");
+      doc.text("FATURA", 20, 25);
+      doc.setFontSize(10);
+      doc.setTextColor(71, 85, 105);
+      doc.setFont("helvetica", "normal");
+      doc.text(`#${id?.substring(0, 8).toUpperCase()}`, 20, 32);
+      doc.text("Mororo.Tech", pageWidth - 20, 25, { align: "right" });
 
-      if (!response.ok) throw new Error("Falha ao gerar PDF");
+      doc.setFontSize(11);
+      doc.setTextColor(15, 23, 42);
+      doc.setFont("helvetica", "bold");
+      doc.text(maskCustomerName(invoice?.customers?.nome), 20, 45);
+      doc.setFont("helvetica", "normal");
+      doc.text(`CPF/CNPJ: ${maskDocument(invoice?.customers?.cpf)}`, 20, 51);
+      doc.text(maskedCustomerLocation(invoice?.customers), 20, 57);
 
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `Fatura_${invoice?.descricao || "cobranca"}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      doc.text(invoice?.descricao || "", 20, 70);
+      doc.text(`Vencimento: ${new Date(invoice?.vencimento + "T12:00:00").toLocaleDateString("pt-BR")}`, 20, 76);
+      doc.text(`Valor: ${(invoice?.valor_centavos / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`, 20, 82);
+
+      if (payload) {
+        doc.setFont("helvetica", "bold");
+        doc.text("PAGAMENTO VIA PIX", 20, 100);
+        const qr = await QRCode.toDataURL(payload, { margin: 1, width: 200 });
+        doc.addImage(qr, "PNG", 20, 108, 60, 60);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(7);
+        doc.text(doc.splitTextToSize(payload, pageWidth - 100), 90, 115);
+      }
+
+      doc.save(`Fatura_${invoice?.descricao || "cobranca"}.pdf`);
     } catch (err) {
       console.error(err);
       toast.error("Erro ao baixar fatura");

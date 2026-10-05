@@ -39,7 +39,7 @@ node agente.js
 
 | Variável                              | Descrição                                                                   |
 | ------------------------------------- | --------------------------------------------------------------------------- |
-| `SUPABASE_URL`                        | URL do backend do sistema (já preenchida)                                   |
+| `API_URL`                             | URL do backend do sistema (já preenchida)                                   |
 | `AGENT_TOKEN`                         | Token exclusivo deste agente (já preenchido)                                |
 | `MIKROTIK_HOST`                       | IP/host preferencial                                                        |
 | `MIKROTIK_HOST_SECONDARY`             | IP/host secundário (failover automático)                                    |

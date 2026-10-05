@@ -1,10 +1,9 @@
 import { useState, useEffect, createContext, useContext, ReactNode } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import type { User, Session } from "@supabase/supabase-js";
+import { api, type AuthUser } from "@/integrations/api/client";
 
 interface AuthContextType {
-  user: User | null;
-  session: Session | null;
+  user: AuthUser | null;
+  session: { access_token: string; user: AuthUser } | null;
   isAdmin: boolean;
   reportPermissions: string[];
   loading: boolean;
@@ -16,47 +15,22 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [reportPermissions, setReportPermissions] = useState<string[]>([]);
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [session, setSession] = useState<{ access_token: string; user: AuthUser } | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const checkAdminRole = async (userId: string) => {
-    const { data } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", userId)
-      .eq("role", "admin")
-      .maybeSingle();
-    setIsAdmin(!!data);
-    const { data: permissions } = await supabase
-      .from("user_report_permissions")
-      .select("report_key")
-      .eq("user_id", userId);
-    setReportPermissions((permissions || []).map((item) => item.report_key));
-  };
-
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          setTimeout(() => checkAdminRole(session.user.id), 0);
-        } else {
-          setIsAdmin(false);
-          setReportPermissions([]);
-        }
-        setLoading(false);
-      }
-    );
+    const { data: { subscription } } = api.auth.onAuthStateChange((_event, session) => {
+      const u = session?.user ?? null;
+      setUser(u);
+      setSession(session ? { access_token: session.access_token ?? "", user: u! } : null);
+      setLoading(false);
+    });
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+    api.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
-        checkAdminRole(session.user.id);
+        setUser(session.user);
+        setSession({ access_token: session.access_token, user: session.user });
       }
       setLoading(false);
     });
@@ -65,25 +39,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await api.auth.signInWithPassword({ email, password });
+    if (!error && data?.user) {
+      setUser(data.user);
+      setSession({ access_token: data.session.access_token, user: data.user });
+    }
     return { error: error as Error | null };
   };
 
   const signUp = async (email: string, password: string, fullName: string) => {
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await api.auth.signUp({
       email,
       password,
-      options: {
-        data: { full_name: fullName },
-        emailRedirectTo: window.location.origin,
-      },
+      options: { data: { full_name: fullName } },
     });
+    if (!error && data?.user) {
+      setUser(data.user);
+      setSession({ access_token: data.session.access_token, user: data.user });
+    }
     return { error: error as Error | null };
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    await api.auth.signOut();
+    setUser(null);
+    setSession(null);
   };
+
+  const isAdmin = user?.role === "admin";
+  const reportPermissions = user?.report_permissions ?? [];
 
   return (
     <AuthContext.Provider value={{ user, session, isAdmin, reportPermissions, loading, signIn, signUp, signOut }}>

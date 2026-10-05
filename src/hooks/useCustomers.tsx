@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/integrations/api/client";
 import { toast } from "sonner";
 
 export interface Customer {
@@ -60,7 +60,7 @@ export function useCustomers() {
 
   const fetchCustomers = useCallback(async () => {
     setLoading(true);
-    let query = supabase.from("customers").select("*").order("nome");
+    let query = api.from("customers").select("*").order("nome");
 
     if (searchTerm.trim()) {
       const term = `%${searchTerm.trim()}%`;
@@ -82,7 +82,7 @@ export function useCustomers() {
   }, [fetchCustomers]);
 
   const addCustomer = async (customer: CustomerInput) => {
-    const { error, data: inserted } = await supabase.from("customers").insert(customer).select("id").single();
+    const { error, data: inserted } = await api.from("customers").insert(customer).select("id").single();
     if (error) {
       if (error.code === "23505") {
         if (error.message.includes("cpf")) toast.error("CPF já cadastrado");
@@ -105,34 +105,19 @@ export function useCustomers() {
     console.log("Welcome WhatsApp check - telefone:", JSON.stringify(phone), "inserted:", inserted?.id);
     if (phone && phone.trim()) {
       try {
-        const { data: sessionData } = await supabase.auth.getSession();
-        const token = sessionData?.session?.access_token;
-        if (token) {
-          const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-          const message = `Olá ${customer.nome}! 🌐\n\nSeja bem-vindo(a) à *Myllenet*! 🎉\n\nSeu acesso à internet já está ativo.\n\n👤 Usuário: ${customer.usuario_pppoe}\n\nEm caso de dúvidas, estamos à disposição!\nObrigado por escolher a Myllenet! 🚀`;
-          const res = await fetch(
-            `https://${projectId}.supabase.co/functions/v1/whatsapp-send/send-text`,
-            {
-              method: "POST",
-              headers: {
-                Authorization: `Bearer ${token}`,
-                "Content-Type": "application/json",
-                apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-              },
-              body: JSON.stringify({
-                phone,
-                message,
-                customer_id: inserted?.id,
-                customer_name: customer.nome,
-              }),
-            }
-          );
-          if (res.ok) {
-            toast.success("Boas-vindas enviadas via WhatsApp!");
-          } else {
-            const err = await res.json();
-            console.warn("WhatsApp welcome error:", err);
-          }
+        const message = `Olá ${customer.nome}! 🌐\n\nSeja bem-vindo(a) à *Myllenet*! 🎉\n\nSeu acesso à internet já está ativo.\n\n👤 Usuário: ${customer.usuario_pppoe}\n\nEm caso de dúvidas, estamos à disposição!\nObrigado por escolher a Myllenet! 🚀`;
+        const { error: waError } = await api.functions.invoke("whatsapp-send/send-text", {
+          body: {
+            phone,
+            message,
+            customer_id: inserted?.id,
+            customer_name: customer.nome,
+          },
+        });
+        if (!waError) {
+          toast.success("Boas-vindas enviadas via WhatsApp!");
+        } else {
+          console.warn("WhatsApp welcome error:", waError);
         }
       } catch (e) {
         console.warn("Erro ao enviar boas-vindas WhatsApp:", e);
@@ -143,7 +128,7 @@ export function useCustomers() {
   };
 
   const updateCustomer = async (id: string, customer: Partial<CustomerInput>) => {
-    const { error } = await supabase.from("customers").update(customer).eq("id", id);
+    const { error } = await api.from("customers").update(customer).eq("id", id);
     if (error) {
       if (error.code === "23505" && error.message.includes("usuario_pppoe")) {
         toast.error("Usuário PPPoE já em uso por outro cliente ativo");
@@ -161,7 +146,7 @@ export function useCustomers() {
     // If deactivating, cancel all pending invoices and toggle PPPoE on router
     if (!ativo) {
       // Get customer info for PPPoE toggle
-      const { data: customerData } = await supabase
+      const { data: customerData } = await api
         .from("customers")
         .select("usuario_pppoe")
         .eq("id", id)
@@ -169,7 +154,7 @@ export function useCustomers() {
 
       // Placeholder for Mikrotik toggle
       
-      const { data: openInvoices } = await supabase
+      const { data: openInvoices } = await api
         .from("invoices")
         .select("id, efi_charge_id")
         .eq("customer_id", id)
@@ -180,36 +165,20 @@ export function useCustomers() {
         const efiInvoices = openInvoices.filter((inv) => inv.efi_charge_id);
         if (efiInvoices.length > 0) {
           try {
-            const { data: sessionData } = await supabase.auth.getSession();
-            const token = sessionData?.session?.access_token;
-            if (token) {
-              const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-              for (const inv of efiInvoices) {
-                try {
-                  await fetch(
-                    `https://${projectId}.supabase.co/functions/v1/efi-boleto/cancel`,
-                    {
-                      method: "POST",
-                      headers: {
-                        Authorization: `Bearer ${token}`,
-                        "Content-Type": "application/json",
-                        apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-                      },
-                      body: JSON.stringify({ charge_id: inv.efi_charge_id }),
-                    }
-                  );
-                } catch (e) {
-                  console.error("Erro ao cancelar cobrança EFI:", inv.efi_charge_id, e);
-                }
+            for (const inv of efiInvoices) {
+              try {
+                await api.functions.invoke("efi-boleto/cancel", { body: { charge_id: inv.efi_charge_id } });
+              } catch (e) {
+                console.error("Erro ao cancelar cobrança EFI:", inv.efi_charge_id, e);
               }
             }
           } catch (e) {
-            console.error("Erro ao obter sessão para cancelar na EFI:", e);
+            console.error("Erro ao cancelar na EFI:", e);
           }
         }
 
         // Cancel locally
-        const { error: cancelError } = await supabase
+        const { error: cancelError } = await api
           .from("invoices")
           .update({ status: "cancelled" })
           .eq("customer_id", id)
@@ -224,7 +193,7 @@ export function useCustomers() {
       }
     }
 
-    const { error } = await supabase.from("customers").update({ ativo }).eq("id", id);
+    const { error } = await api.from("customers").update({ ativo }).eq("id", id);
     if (error) {
       if (error.code === "23505" && error.message.includes("usuario_pppoe")) {
         toast.error("Não é possível ativar: usuário PPPoE já em uso por outro cliente ativo");
@@ -239,7 +208,7 @@ export function useCustomers() {
   };
 
   const deleteCustomer = async (id: string) => {
-    const { error } = await supabase.from("customers").delete().eq("id", id);
+    const { error } = await api.from("customers").delete().eq("id", id);
     if (error) {
       toast.error("Erro ao excluir cliente");
       return false;
@@ -276,7 +245,7 @@ export function useCustomers() {
     for (const item of items) {
       const cpfClean = item.cpf.replace(/\D/g, "");
       // Check if customer already exists by CPF
-      const { data: existing } = await supabase
+      const { data: existing } = await api
         .from("customers")
         .select("*")
         .eq("cpf", cpfClean)
@@ -297,7 +266,7 @@ export function useCustomers() {
           }
         }
         if (Object.keys(updates).length > 0) {
-          const { error } = await supabase.from("customers").update(updates).eq("id", existing.id);
+          const { error } = await api.from("customers").update(updates).eq("id", existing.id);
           if (error) { console.error("Update error for CPF", cpfClean, error.message); failed++; }
           else success++;
         } else {
@@ -305,7 +274,7 @@ export function useCustomers() {
         }
       } else {
         // New customer — insert
-        const { error } = await supabase.from("customers").insert({ ...item, cpf: cpfClean });
+        const { error } = await api.from("customers").insert({ ...item, cpf: cpfClean });
         if (error) { console.error("Insert error for CPF", cpfClean, error.message); failed++; }
         else success++;
       }

@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/integrations/api/client";
 import { useCustomers } from "@/hooks/useCustomers";
 import { useInvoices } from "@/hooks/useInvoices";
 import { usePlans } from "@/hooks/usePlans";
@@ -83,7 +83,7 @@ export default function CustomersPage() {
   const fetchStatus = useCallback(async () => {
     try {
       const { data, error } =
-        await supabase.functions.invoke("mikrotik-status");
+        await api.functions.invoke("mikrotik-status");
       if (!error) {
         if (data?.activeList) {
           setOnlineUsers(

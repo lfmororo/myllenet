@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/integrations/api/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -84,12 +84,12 @@ export default function ReportsPage() {
       const startIso = `${from}T00:00:00Z`;
       const endIso = `${to}T23:59:59Z`;
       const [c, i, p, b, usage] = await Promise.all([
-        supabase.from("customers").select("*"),
-        supabase.from("invoices").select("*"),
-        supabase.from("plans").select("*"),
-        supabase.from("block_history").select("*").gte("created_at", startIso).lte("created_at", endIso),
+        api.from("customers").select("*"),
+        api.from("invoices").select("*"),
+        api.from("plans").select("*"),
+        api.from("block_history").select("*").gte("created_at", startIso).lte("created_at", endIso),
         report === "bandwidth"
-          ? supabase.rpc("get_bandwidth_report", { _from: startIso, _to: endIso })
+          ? api.rpc("get_bandwidth_report", { _from: startIso, _to: endIso })
           : Promise.resolve({ data: [], error: null }),
       ]);
       const error = c.error || i.error || p.error || b.error || usage.error;

@@ -24,7 +24,7 @@ import { Plus, Search, Download, LogOut, Loader2, ShieldAlert, FileText, Import,
 import logoImg from "@/assets/logo.png";
 import { Navigate, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/integrations/api/client";
 
 export default function Dashboard() {
   const { user, isAdmin, loading: authLoading, signOut } = useAuth();
@@ -434,27 +434,15 @@ export default function Dashboard() {
                     setBulkCheckingEfi(true);
                     setBulkCheckProgress({ done: 0, total: activeCustomers.length, imported: 0 });
 
-                    const { data: sessionData } = await supabase.auth.getSession();
-                    const token = sessionData?.session?.access_token;
-                    if (!token) { toast.error("Sessão expirada"); setBulkCheckingEfi(false); return; }
-
-                    const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
                     let totalImported = 0;
 
                     for (let i = 0; i < activeCustomers.length; i++) {
                       const c = activeCustomers[i];
                       try {
-                        const response = await fetch(
-                          `https://${projectId}.supabase.co/functions/v1/efi-boleto/check-customer?customer_id=${c.id}`,
-                          {
-                            headers: {
-                              Authorization: `Bearer ${token}`,
-                              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-                            },
-                          }
-                        );
-                        const result = await response.json();
-                        if (response.ok && result.imported > 0) {
+                        const { data: result, error } = await api.functions.invoke("efi-boleto/check-customer", {
+                          body: { customer_id: c.id },
+                        });
+                        if (!error && result.imported > 0) {
                           totalImported += result.imported;
                         }
                       } catch (e) {

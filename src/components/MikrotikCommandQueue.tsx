@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/integrations/api/client";
 import {
   Card,
   CardContent,
@@ -48,7 +48,7 @@ export function MikrotikCommandQueue() {
   const [loading, setLoading] = useState(true);
 
   const load = async () => {
-    const { data } = await supabase
+    const { data } = await api
       .from("mikrotik_commands")
       .select(
         "id, usuario_pppoe, action, status, attempts, error_message, created_at, executed_at",
@@ -61,7 +61,7 @@ export function MikrotikCommandQueue() {
 
   useEffect(() => {
     load();
-    const channel = supabase
+    const channel = api
       .channel("mikrotik_command_queue")
       .on(
         "postgres_changes",
@@ -71,7 +71,7 @@ export function MikrotikCommandQueue() {
       .subscribe();
     const timer = setInterval(load, 15000);
     return () => {
-      supabase.removeChannel(channel);
+      api.removeChannel(channel);
       clearInterval(timer);
     };
   }, []);
