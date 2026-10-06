@@ -12,6 +12,8 @@ import {
   getActiveBase, queueMikrotikCommand, restCall, mikrotikConfig,
 } from "../services/mikrotik.js";
 import { config } from "../config.js";
+import { createBackup, listBackups, safeBackupPath } from "../services/backup.js";
+import { createReadStream, existsSync } from "node:fs";
 
 const BOT_DISCLAIMER = "\n\n🤖 _Esta é uma mensagem automática. Para falar com um atendente, entre em contato: (85) 98680-1458_";
 const DEFAULT_SATISFACTION_URL = "https://app.mororo.tech/satisfacao";
@@ -69,6 +71,20 @@ async function sendPaymentNotification(invoiceId: string) {
 }
 
 export async function registerFunctionRoutes(app: FastifyInstance) {
+  // ===================== system-backup =====================
+  app.post("/api/functions/system-backup/run", async (req) => {
+    const isCron = !!config.cronSecret && req.headers["x-cron-secret"] === config.cronSecret;
+    return { success: true, ...(await createBackup(isCron ? "automatico" : "manual")) };
+  });
+  app.post("/api/functions/system-backup/list", async () => ({ backups: await listBackups() }));
+  app.post("/api/functions/system-backup/download", async (req, reply) => {
+    const p = safeBackupPath(String((req.body as any)?.file ?? ""));
+    if (!p || !existsSync(p)) return reply.code(404).send({ error: "Backup não encontrado" });
+    reply.header("Content-Type", "application/zip");
+    reply.header("Content-Disposition", `attachment; filename="${p.split("/").pop()}"`);
+    return reply.send(createReadStream(p));
+  });
+
   // ===================== whatsapp-send =====================
   app.post("/api/functions/whatsapp-send/send-text", async (req, reply) => {
     const { phone, message, customer_id, customer_name } = (req.body ?? {}) as any;
