@@ -129,18 +129,9 @@ export default function AppLayout() {
 
   if (!user) return <Navigate to="/auth" replace />;
 
-  if (!isAdmin && !(location.pathname === "/relatorios" && reportPermissions.length > 0)) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background p-4">
-        <div className="text-center space-y-4 max-w-md">
-          <ShieldAlert className="mx-auto h-16 w-16 text-destructive" />
-          <h1 className="text-2xl font-bold">Acesso Restrito</h1>
-          <p className="text-muted-foreground">Sua conta não possui permissão de administrador.</p>
-          <Button variant="outline" onClick={signOut}>Sair</Button>
-        </div>
-      </div>
-    );
-  }
+  const canAccessCurrentPage =
+    isAdmin ||
+    (location.pathname === "/relatorios" && reportPermissions.length > 0);
 
   return (
     <SidebarProvider>
@@ -152,7 +143,17 @@ export default function AppLayout() {
             <h2 className="text-sm font-semibold text-foreground/80">{currentTitle}</h2>
           </header>
           <main className="flex-1 px-6 py-6 overflow-auto">
-            <Outlet />
+            {canAccessCurrentPage ? (
+              <Outlet />
+            ) : (
+              <div className="flex h-full items-center justify-center">
+                <div className="text-center space-y-4 max-w-md">
+                  <ShieldAlert className="mx-auto h-16 w-16 text-destructive" />
+                  <h1 className="text-2xl font-bold">Acesso Restrito</h1>
+                  <p className="text-muted-foreground">Sua conta não possui permissão para esta página.</p>
+                </div>
+              </div>
+            )}
           </main>
         </div>
       </div>
