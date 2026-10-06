@@ -20,7 +20,6 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useDiagnosticPDF } from "@/hooks/useDiagnosticPDF";
 import { Checkbox } from "@/components/ui/checkbox";
-import BackupPanel from "@/components/BackupPanel";
 
 
 
@@ -362,7 +361,6 @@ export default function Settings() {
               <Router className="mr-1.5 h-4 w-4" /> Mikrotik
             </TabsTrigger>
             <TabsTrigger value="pix">PIX Local</TabsTrigger>
-            <TabsTrigger value="backup">Backup</TabsTrigger>
             <TabsTrigger value="diagnostic">
               <ShieldAlert className="mr-1.5 h-4 w-4" /> Diagnóstico
             </TabsTrigger>
@@ -1029,10 +1027,6 @@ export default function Settings() {
                 </Button>
               </CardContent>
             </Card>
-          </TabsContent>
-
-          <TabsContent value="backup" className="mt-4">
-            <BackupPanel />
           </TabsContent>
 
           <TabsContent value="diagnostic" className="mt-4">

@@ -26,12 +26,6 @@ const app = Fastify({ logger: false, bodyLimit: 20 * 1024 * 1024 });
 await app.register(cors, { origin: true, credentials: true });
 await app.register(jwt, { secret: config.jwtSecret });
 
-app.setErrorHandler((error, req, reply) => {
-  const err = error as Error & { statusCode?: number };
-  console.error(`[error] ${req.method} ${req.url}:`, err.message);
-  reply.code(err.statusCode || 500).send({ error: err.message || "Erro interno" });
-});
-
 app.decorate("authenticate", async (req: any, reply: any) => {
   try {
     const token = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");

@@ -38,8 +38,5 @@ export function registerJobs(app: FastifyInstance) {
   // Geração mensal de faturas (dia 1)
   cron.schedule("0 6 1 * *", () => invoke(app, "/api/functions/monthly-invoice-sender"));
 
-  // Backup geral diário (03:00)
-  cron.schedule("0 3 * * *", () => invoke(app, "/api/functions/system-backup/run"));
-
   console.log("[jobs] Cron agendado.");
 }
