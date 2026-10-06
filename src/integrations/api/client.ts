@@ -337,4 +337,4 @@ export const api = {
   functions,
 };
 
-export { authToken };
+export { authToken, API_URL };

@@ -25,6 +25,7 @@ services:
       DB_NAME: myllenet
       JWT_SECRET: ${JWT_SECRET}
       CRON_SECRET: ${CRON_SECRET}
+      BACKUP_DIR: /app/backups
       PORT: 3333
       APP_BASE_URL: ${APP_BASE_URL}
       EFI_CLIENT_ID: ${EFI_CLIENT_ID}
@@ -36,3 +37,4 @@ services:
 
 volumes:
   pg_data:
+  backups_data:
