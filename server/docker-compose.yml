@@ -32,6 +32,8 @@ services:
       EFI_CLIENT_SECRET: ${EFI_CLIENT_SECRET}
       MERCADOPAGO_ACCESS_TOKEN: ${MERCADOPAGO_ACCESS_TOKEN}
       UAZAPI_TOKEN: ${UAZAPI_TOKEN}
+    volumes:
+      - backups_data:/app/backups
     ports:
       - "3333:3333"
 
