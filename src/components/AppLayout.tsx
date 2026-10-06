@@ -112,7 +112,7 @@ function AppSidebar() {
 }
 
 export default function AppLayout() {
-  const { user, isAdmin, reportPermissions, loading: authLoading, signOut } = useAuth();
+  const { user, isAdmin, reportPermissions, loading: authLoading } = useAuth();
   const location = useLocation();
   const currentTitle = pageTitles[location.pathname] || "";
 
