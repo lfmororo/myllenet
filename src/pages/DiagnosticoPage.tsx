@@ -528,6 +528,23 @@ pause >nul
               </div>
             )}
 
+            {fase === "fim" && ehWindows && (
+              <section className="rounded-2xl border bg-card p-5 space-y-3">
+                <h2 className="text-lg font-bold leading-snug">Está no computador com Windows?</h2>
+                <p className="text-sm text-muted-foreground">
+                  O diagnóstico completo mostra ao suporte o nome do Wi-Fi, a força do sinal, o roteador e o caminho
+                  até a internet. Baixe, abra o arquivo e aguarde cerca de um minuto.
+                </p>
+                <Button variant="outline" className="w-full" onClick={baixarDiagnosticoWindows}>
+                  Baixar diagnóstico completo
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  Se o Windows mostrar um aviso de segurança, clique em 'Mais informações' e depois em 'Executar assim
+                  mesmo'.
+                </p>
+              </section>
+            )}
+
             <ol className="rounded-2xl border bg-card divide-y">
               {etapas.map((e) => (
                 <li key={e.id} className="flex gap-3 p-4">
