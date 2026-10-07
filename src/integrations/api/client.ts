@@ -326,6 +326,7 @@ const postgresApi = {
   functions,
 };
 
-export const api = BACKEND === "supabase" ? supabaseApi : postgresApi;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const api: any = BACKEND === "supabase" ? supabaseApi : postgresApi;
 export const authToken = BACKEND === "supabase" ? supabaseAuthToken : postgresAuthToken;
 export const API_URL = BACKEND === "supabase" ? SUPABASE_URL : POSTGRES_API_URL;
