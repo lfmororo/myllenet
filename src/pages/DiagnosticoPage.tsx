@@ -407,6 +407,57 @@ export default function DiagnosticoPage() {
     rodando.current = false;
   }
 
+  function baixarDiagnosticoWindows() {
+    const url = `${FN_URL}?c=${encodeURIComponent(token)}`;
+    const conteudo = String.raw`@echo off
+chcp 65001 >nul
+title Diagnostico {NOME}
+set "ARQ=%TEMP%\diagnostico-{NOME}.txt"
+echo.
+echo  Coletando informacoes da sua conexao. Aguarde cerca de 1 minuto...
+echo.
+(
+  echo ==== DATA ====
+  echo %DATE% %TIME%
+  echo ==== COMPUTADOR ====
+  echo %COMPUTERNAME%
+  ver
+  echo ==== WI-FI ^(nome, sinal, velocidade do link^) ====
+  netsh wlan show interfaces
+  echo ==== ADAPTADORES ^(IP local, gateway, DNS^) ====
+  ipconfig /all
+  echo ==== ROTAS ====
+  route print -4
+  echo ==== PING AO ROTEADOR ^(gateway^) ====
+  for /f "tokens=3" %%g in ('route print -4 ^| findstr /r /c:"^ *0\.0\.0\.0  *0\.0\.0\.0"') do ping -n 20 %%g
+  echo ==== PING INTERNET ^(8.8.8.8^) ====
+  ping -n 20 8.8.8.8
+  echo ==== DNS ====
+  ipconfig /flushdns
+  nslookup google.com
+  nslookup google.com 8.8.8.8
+  powershell -NoProfile -Command "foreach($d in 'google.com','youtube.com','whatsapp.com'){ $t=(Measure-Command { Resolve-DnsName $d -DnsOnly -NoHostsFile -ErrorAction SilentlyContinue }).TotalMilliseconds; '{0}: {1:N0} ms' -f $d,$t }"
+  echo ==== TRACERT ====
+  tracert -d -w 1000 -h 20 8.8.8.8
+) > "%ARQ%" 2>&1
+echo  Enviando para o suporte...
+curl.exe -s -X POST -H "Content-Type: text/plain; charset=utf-8" --data-binary "@%ARQ%" "{URL}"
+echo.
+echo.
+echo  Pronto! O relatorio foi enviado para a {NOME}. Pode fechar esta janela.
+pause >nul
+`
+      .replaceAll("{NOME}", NOME_PROVEDOR)
+      .replaceAll("{URL}", url)
+      .replace(/\n/g, "\r\n");
+    const blob = new Blob([conteudo], { type: "application/x-bat" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `diagnostico-${NOME_PROVEDOR}.bat`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
   const titulo =
     fase === "pronto" ? "Vamos verificar sua internet" : fase === "rodando" ? "Verificando sua conexão" : TITULOS[veredito!];
   const corTitulo =
