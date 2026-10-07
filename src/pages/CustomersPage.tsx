@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import { api } from "@/integrations/api/client";
 import { useCustomers } from "@/hooks/useCustomers";
 import { useInvoices } from "@/hooks/useInvoices";
@@ -70,6 +71,15 @@ export default function CustomersPage() {
   );
   const [csvImportOpen, setCsvImportOpen] = useState(false);
   const [detailCustomer, setDetailCustomer] = useState<Customer | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const id = searchParams.get("cliente");
+    if (!id || !customers.length) return;
+    const c = customers.find((x) => x.id === id);
+    if (c) setDetailCustomer(c);
+    searchParams.delete("cliente");
+    setSearchParams(searchParams, { replace: true });
+  }, [customers, searchParams, setSearchParams]);
   const [filterNoBoleto, setFilterNoBoleto] = useState(false);
   const [filterNoPlan, setFilterNoPlan] = useState(false);
   const [notifyNoBoletoOpen, setNotifyNoBoletoOpen] = useState(false);

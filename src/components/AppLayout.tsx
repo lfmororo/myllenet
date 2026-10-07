@@ -27,7 +27,7 @@ import {
   Server,
   Star,
   ChartNoAxesCombined,
-
+  Stethoscope,
 } from "lucide-react";
 import logoImg from "@/assets/logo.png";
 
@@ -39,6 +39,7 @@ const navItems = [
   { title: "Mikrotik", url: "/mikrotik", icon: Router },
   { title: "Agente VPS", url: "/agente", icon: Server },
   { title: "Avaliações", url: "/avaliacoes", icon: Star },
+  { title: "Diagnósticos", url: "/diagnosticos", icon: Stethoscope },
   { title: "Relatórios", url: "/relatorios", icon: ChartNoAxesCombined },
 
   { title: "Logs EFI", url: "/logs-efi", icon: AlertTriangle },
@@ -53,6 +54,7 @@ const pageTitles: Record<string, string> = {
   "/mikrotik": "Mikrotik - Gestão",
   "/avaliacoes": "Avaliações de Clientes",
   "/relatorios": "Relatórios",
+  "/diagnosticos": "Diagnósticos",
   "/logs-efi": "Logs EFI",
   "/settings": "Configurações",
 };
