@@ -41,7 +41,9 @@ import {
   Power,
   PowerOff,
   Trash2,
+  MessageCircle,
 } from "lucide-react";
+import { useWhatsApp } from "@/hooks/useWhatsApp";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -100,6 +102,13 @@ export default function CustomerDetailDialog({
   const [hasMoreLogs, setHasMoreLogs] = useState(true);
   const [unlocking, setUnlocking] = useState(false);
   const [mikrotikAction, setMikrotikAction] = useState<string | null>(null);
+  const [diagLinkInfo, setDiagLinkInfo] = useState<{
+    token: string | null;
+    url: string | null;
+    mensagem: string | null;
+  } | null>(null);
+  const [sendingDiagLink, setSendingDiagLink] = useState(false);
+  const { sendText } = useWhatsApp();
 
   const runMikrotikAction = async (
     action: "sync" | "enable" | "disable" | "remove",
@@ -196,6 +205,26 @@ export default function CustomerDetailDialog({
       fetchLogs();
       fetchBlockHistory();
       setPagoAte(customer.pago_ate || "");
+      setDiagLinkInfo(null);
+
+      // Busca token e configuração do link de diagnóstico
+      (async () => {
+        const { data: cfg } = await api
+          .from("config_diagnostico" as any)
+          .select("url_publica, mensagem_whatsapp")
+          .eq("id", 1)
+          .single();
+        const { data: cust } = await api
+          .from("customers")
+          .select("diagnostico_token")
+          .eq("id", customer.id)
+          .single();
+        setDiagLinkInfo({
+          token: (cust as any)?.diagnostico_token ?? null,
+          url: (cfg as any)?.url_publica ?? null,
+          mensagem: (cfg as any)?.mensagem_whatsapp ?? null,
+        });
+      })();
 
       // Polling simples: atualiza os logs periodicamente
       const channel = api
@@ -222,6 +251,7 @@ export default function CustomerDetailDialog({
       setPagoAte("");
       setLogs([]);
       setBlockHistory([]);
+      setDiagLinkInfo(null);
     }
   }, [open, customer, fetchInvoices, fetchLogs, fetchBlockHistory]);
 
@@ -297,6 +327,26 @@ export default function CustomerDetailDialog({
     await updateCustomer({ pago_ate: null });
     setPagoAte("");
     setSavingPagoAte(false);
+  };
+
+  const handleSendDiagLink = async () => {
+    if (!customer || !diagLinkInfo?.token) return;
+    if (!customer.telefone) {
+      toast.error("Cliente sem telefone cadastrado");
+      return;
+    }
+    const base = (diagLinkInfo.url || window.location.origin).replace(/\/$/, "");
+    const link = `${base}/diagnostico?c=${diagLinkInfo.token}`;
+    const firstName = customer.nome.split(" ")[0];
+    const template =
+      diagLinkInfo.mensagem ||
+      "Olá {nome}! Para analisarmos sua conexão, abra este link conectado ao Wi-Fi de casa e toque em Iniciar diagnóstico: {link}";
+    const message = template
+      .replace(/\{nome\}/g, firstName)
+      .replace(/\{link\}/g, link);
+    setSendingDiagLink(true);
+    await sendText(customer.telefone, message);
+    setSendingDiagLink(false);
   };
 
   const handleCheckEfi = async () => {
@@ -535,12 +585,38 @@ export default function CustomerDetailDialog({
                       <Trash2 className="h-3 w-3 mr-1" />
                     )}
                     Remover
-                  </Button>
-                </div>
-              </div>
-            </div>
+                   </Button>
+                 </div>
+               </div>
+             </div>
 
-            {/* Consumo de Banda (Chart) */}
+             {/* Diagnóstico de Conexão */}
+             <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+               <h3 className="text-sm font-semibold flex items-center gap-2">
+                 <MessageCircle className="h-4 w-4 text-primary" />
+                 Diagnóstico de Conexão
+               </h3>
+               <p className="text-xs text-muted-foreground">
+                 Envia ao cliente um link para testar a internet pelo WhatsApp,
+                 conectado ao Wi-Fi de casa.
+               </p>
+               <Button
+                 size="sm"
+                 variant="outline"
+                 className="h-8 text-xs"
+                 disabled={sendingDiagLink || !diagLinkInfo?.token}
+                 onClick={handleSendDiagLink}
+               >
+                 {sendingDiagLink ? (
+                   <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                 ) : (
+                   <MessageCircle className="h-3 w-3 mr-1" />
+                 )}
+                 Enviar link por WhatsApp
+               </Button>
+             </div>
+
+             {/* Consumo de Banda (Chart) */}
             <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
               <h3 className="text-sm font-semibold flex items-center gap-2">
                 <Activity className="h-4 w-4 text-primary" />
