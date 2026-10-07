@@ -8,6 +8,13 @@
       "when": 1791335802047,
       "tag": "0000_speed_up_monitoring_queries",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1791336858595,
+      "tag": "0001_diagnostico_conexao",
+      "breakpoints": true
     }
   ]
 }

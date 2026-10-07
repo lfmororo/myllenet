@@ -127,6 +127,42 @@ export type Database = {
           },
         ]
       }
+      config_diagnostico: {
+        Row: {
+          dns_curinga: string | null
+          duracao_ms: number | null
+          faixas_ip: string[] | null
+          fluxos: number | null
+          id: number
+          mensagem_whatsapp: string | null
+          sites: Json | null
+          speedtest_url: string | null
+          url_publica: string | null
+        }
+        Insert: {
+          dns_curinga?: string | null
+          duracao_ms?: number | null
+          faixas_ip?: string[] | null
+          fluxos?: number | null
+          id?: number
+          mensagem_whatsapp?: string | null
+          sites?: Json | null
+          speedtest_url?: string | null
+          url_publica?: string | null
+        }
+        Update: {
+          dns_curinga?: string | null
+          duracao_ms?: number | null
+          faixas_ip?: string[] | null
+          fluxos?: number | null
+          id?: number
+          mensagem_whatsapp?: string | null
+          sites?: Json | null
+          speedtest_url?: string | null
+          url_publica?: string | null
+        }
+        Relationships: []
+      }
       customer_alerts_sent: {
         Row: {
           alert_type: string
@@ -205,6 +241,7 @@ export type Database = {
           created_at: string
           desconto_especial_centavos: number
           dia_vencimento: number
+          diagnostico_token: string | null
           email: string
           estado: string | null
           id: string
@@ -239,6 +276,7 @@ export type Database = {
           created_at?: string
           desconto_especial_centavos?: number
           dia_vencimento?: number
+          diagnostico_token?: string | null
           email: string
           estado?: string | null
           id?: string
@@ -273,6 +311,7 @@ export type Database = {
           created_at?: string
           desconto_especial_centavos?: number
           dia_vencimento?: number
+          diagnostico_token?: string | null
           email?: string
           estado?: string | null
           id?: string
@@ -295,6 +334,77 @@ export type Database = {
             columns: ["plan_id"]
             isOneToOne: false
             referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      diagnosticos: {
+        Row: {
+          atualizado_em: string | null
+          atualizado_por: string | null
+          cliente_id: string
+          criado_em: string
+          dados: Json
+          download_mbps: number | null
+          id: string
+          ip_publico: string | null
+          jitter_ms: number | null
+          latencia_ms: number | null
+          na_rede_provedor: boolean | null
+          observacao: string | null
+          origem: string
+          perda_pct: number | null
+          status: string
+          upload_mbps: number | null
+          user_agent: string | null
+          veredito: string | null
+        }
+        Insert: {
+          atualizado_em?: string | null
+          atualizado_por?: string | null
+          cliente_id: string
+          criado_em?: string
+          dados: Json
+          download_mbps?: number | null
+          id?: string
+          ip_publico?: string | null
+          jitter_ms?: number | null
+          latencia_ms?: number | null
+          na_rede_provedor?: boolean | null
+          observacao?: string | null
+          origem: string
+          perda_pct?: number | null
+          status?: string
+          upload_mbps?: number | null
+          user_agent?: string | null
+          veredito?: string | null
+        }
+        Update: {
+          atualizado_em?: string | null
+          atualizado_por?: string | null
+          cliente_id?: string
+          criado_em?: string
+          dados?: Json
+          download_mbps?: number | null
+          id?: string
+          ip_publico?: string | null
+          jitter_ms?: number | null
+          latencia_ms?: number | null
+          na_rede_provedor?: boolean | null
+          observacao?: string | null
+          origem?: string
+          perda_pct?: number | null
+          status?: string
+          upload_mbps?: number | null
+          user_agent?: string | null
+          veredito?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "diagnosticos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
             referencedColumns: ["id"]
           },
         ]
