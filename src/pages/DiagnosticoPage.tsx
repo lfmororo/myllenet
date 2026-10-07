@@ -447,8 +447,8 @@ echo.
 echo  Pronto! O relatorio foi enviado para a {NOME}. Pode fechar esta janela.
 pause >nul
 `
-      .replaceAll("{NOME}", NOME_PROVEDOR)
-      .replaceAll("{URL}", url)
+      .replace(/\{NOME\}/g, NOME_PROVEDOR)
+      .replace(/\{URL\}/g, url)
       .replace(/\n/g, "\r\n");
     const blob = new Blob([conteudo], { type: "application/x-bat" });
     const a = document.createElement("a");
