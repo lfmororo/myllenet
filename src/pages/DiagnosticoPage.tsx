@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import logoImg from "@/assets/logo.png";
 
 const FN_URL = `https://${import.meta.env.VITE_SUPABASE_PROJECT_ID}.supabase.co/functions/v1/diagnostico`;
+const NOME_PROVEDOR = "Mororo.Tech";
+const ehWindows = typeof navigator !== "undefined" && navigator.userAgent.includes("Windows");
 
 type Estado = "aguardando" | "testando" | "ok" | "alerta" | "falha";
 type Veredito = "ok" | "alerta" | "falha";
@@ -405,6 +407,57 @@ export default function DiagnosticoPage() {
     rodando.current = false;
   }
 
+  function baixarDiagnosticoWindows() {
+    const url = `${FN_URL}?c=${encodeURIComponent(token)}`;
+    const conteudo = String.raw`@echo off
+chcp 65001 >nul
+title Diagnostico {NOME}
+set "ARQ=%TEMP%\diagnostico-{NOME}.txt"
+echo.
+echo  Coletando informacoes da sua conexao. Aguarde cerca de 1 minuto...
+echo.
+(
+  echo ==== DATA ====
+  echo %DATE% %TIME%
+  echo ==== COMPUTADOR ====
+  echo %COMPUTERNAME%
+  ver
+  echo ==== WI-FI ^(nome, sinal, velocidade do link^) ====
+  netsh wlan show interfaces
+  echo ==== ADAPTADORES ^(IP local, gateway, DNS^) ====
+  ipconfig /all
+  echo ==== ROTAS ====
+  route print -4
+  echo ==== PING AO ROTEADOR ^(gateway^) ====
+  for /f "tokens=3" %%g in ('route print -4 ^| findstr /r /c:"^ *0\.0\.0\.0  *0\.0\.0\.0"') do ping -n 20 %%g
+  echo ==== PING INTERNET ^(8.8.8.8^) ====
+  ping -n 20 8.8.8.8
+  echo ==== DNS ====
+  ipconfig /flushdns
+  nslookup google.com
+  nslookup google.com 8.8.8.8
+  powershell -NoProfile -Command "foreach($d in 'google.com','youtube.com','whatsapp.com'){ $t=(Measure-Command { Resolve-DnsName $d -DnsOnly -NoHostsFile -ErrorAction SilentlyContinue }).TotalMilliseconds; '{0}: {1:N0} ms' -f $d,$t }"
+  echo ==== TRACERT ====
+  tracert -d -w 1000 -h 20 8.8.8.8
+) > "%ARQ%" 2>&1
+echo  Enviando para o suporte...
+curl.exe -s -X POST -H "Content-Type: text/plain; charset=utf-8" --data-binary "@%ARQ%" "{URL}"
+echo.
+echo.
+echo  Pronto! O relatorio foi enviado para a {NOME}. Pode fechar esta janela.
+pause >nul
+`
+      .replace(/\{NOME\}/g, NOME_PROVEDOR)
+      .replace(/\{URL\}/g, url)
+      .replace(/\n/g, "\r\n");
+    const blob = new Blob([conteudo], { type: "application/x-bat" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `diagnostico-${NOME_PROVEDOR}.bat`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
   const titulo =
     fase === "pronto" ? "Vamos verificar sua internet" : fase === "rodando" ? "Verificando sua conexão" : TITULOS[veredito!];
   const corTitulo =
@@ -473,6 +526,23 @@ export default function DiagnosticoPage() {
               <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-sm">
                 Não conseguimos enviar o resultado. Tire um print desta tela e mande para o nosso suporte.
               </div>
+            )}
+
+            {fase === "fim" && ehWindows && (
+              <section className="rounded-2xl border bg-card p-5 space-y-3">
+                <h2 className="text-lg font-bold leading-snug">Está no computador com Windows?</h2>
+                <p className="text-sm text-muted-foreground">
+                  O diagnóstico completo mostra ao suporte o nome do Wi-Fi, a força do sinal, o roteador e o caminho
+                  até a internet. Baixe, abra o arquivo e aguarde cerca de um minuto.
+                </p>
+                <Button variant="outline" className="w-full" onClick={baixarDiagnosticoWindows}>
+                  Baixar diagnóstico completo
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  Se o Windows mostrar um aviso de segurança, clique em 'Mais informações' e depois em 'Executar assim
+                  mesmo'.
+                </p>
+              </section>
             )}
 
             <ol className="rounded-2xl border bg-card divide-y">
