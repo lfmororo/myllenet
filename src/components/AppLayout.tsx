@@ -54,6 +54,7 @@ const pageTitles: Record<string, string> = {
   "/mikrotik": "Mikrotik - Gestão",
   "/avaliacoes": "Avaliações de Clientes",
   "/relatorios": "Relatórios",
+  "/diagnosticos": "Diagnósticos",
   "/logs-efi": "Logs EFI",
   "/settings": "Configurações",
 };
