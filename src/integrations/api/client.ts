@@ -1,7 +1,13 @@
-// Cliente de API apontando para o backend Fastify + PostgreSQL.
-// Mantém uma superfície de uso familiar (from/rpc/functions/auth) no frontend.
+// Cliente unificado: alterna entre Supabase (padrão) e backend Fastify + PostgreSQL.
+// Flag: VITE_BACKEND=supabase (padrão) | postgres
+import { supabaseApi, supabaseAuthToken, SUPABASE_URL } from "@/integrations/api/supabaseAdapter";
+import type { AuthUser } from "@/integrations/types";
 
-const API_URL =
+export type { AuthUser };
+
+const BACKEND = (import.meta.env.VITE_BACKEND as string) || "supabase";
+
+const POSTGRES_API_URL =
   (import.meta.env.VITE_API_URL as string) ||
   (typeof window !== "undefined"
     ? `${window.location.protocol}//${window.location.hostname}:3333`
@@ -12,15 +18,6 @@ const TOKEN_KEY = "myllenet_token";
 let currentToken: string | null = typeof window !== "undefined" ? localStorage.getItem(TOKEN_KEY) : null;
 let currentUser: AuthUser | null = null;
 
-export interface AuthUser {
-  id: string;
-  email: string;
-  full_name: string | null;
-  phone: string | null;
-  role: "admin" | "user";
-  report_permissions: string[];
-}
-
 function setToken(token: string | null) {
   currentToken = token;
   if (typeof window === "undefined") return;
@@ -28,7 +25,7 @@ function setToken(token: string | null) {
   else localStorage.removeItem(TOKEN_KEY);
 }
 
-function authToken() {
+function postgresAuthToken() {
   return currentToken;
 }
 
@@ -39,7 +36,7 @@ interface HttpResponse {
 
 async function http(method: string, path: string, body?: unknown): Promise<HttpResponse> {
   try {
-    const res = await fetch(`${API_URL}${path}`, {
+    const res = await fetch(`${POSTGRES_API_URL}${path}`, {
       method,
       headers: {
         "Content-Type": "application/json",
@@ -320,7 +317,7 @@ function from(table: string) {
   return new QueryBuilder(table);
 }
 
-export const api = {
+const postgresApi = {
   from,
   rpc,
   auth,
@@ -329,4 +326,6 @@ export const api = {
   functions,
 };
 
-export { authToken };
+export const api = BACKEND === "supabase" ? supabaseApi : postgresApi;
+export const authToken = BACKEND === "supabase" ? supabaseAuthToken : postgresAuthToken;
+export const API_URL = BACKEND === "supabase" ? SUPABASE_URL : POSTGRES_API_URL;
