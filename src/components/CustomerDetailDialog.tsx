@@ -329,6 +329,26 @@ export default function CustomerDetailDialog({
     setSavingPagoAte(false);
   };
 
+  const handleSendDiagLink = async () => {
+    if (!customer || !diagLinkInfo?.token) return;
+    if (!customer.telefone) {
+      toast.error("Cliente sem telefone cadastrado");
+      return;
+    }
+    const base = (diagLinkInfo.url || window.location.origin).replace(/\/$/, "");
+    const link = `${base}/diagnostico?c=${diagLinkInfo.token}`;
+    const firstName = customer.nome.split(" ")[0];
+    const template =
+      diagLinkInfo.mensagem ||
+      "Olá {nome}! Para analisarmos sua conexão, abra este link conectado ao Wi-Fi de casa e toque em Iniciar diagnóstico: {link}";
+    const message = template
+      .replace(/\{nome\}/g, firstName)
+      .replace(/\{link\}/g, link);
+    setSendingDiagLink(true);
+    await sendText(customer.telefone, message);
+    setSendingDiagLink(false);
+  };
+
   const handleCheckEfi = async () => {
     if (!customer) return;
     setCheckingEfi(true);
