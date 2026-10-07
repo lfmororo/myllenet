@@ -41,7 +41,9 @@ import {
   Power,
   PowerOff,
   Trash2,
+  MessageCircle,
 } from "lucide-react";
+import { useWhatsApp } from "@/hooks/useWhatsApp";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -100,6 +102,13 @@ export default function CustomerDetailDialog({
   const [hasMoreLogs, setHasMoreLogs] = useState(true);
   const [unlocking, setUnlocking] = useState(false);
   const [mikrotikAction, setMikrotikAction] = useState<string | null>(null);
+  const [diagLinkInfo, setDiagLinkInfo] = useState<{
+    token: string | null;
+    url: string | null;
+    mensagem: string | null;
+  } | null>(null);
+  const [sendingDiagLink, setSendingDiagLink] = useState(false);
+  const { sendText } = useWhatsApp();
 
   const runMikrotikAction = async (
     action: "sync" | "enable" | "disable" | "remove",
