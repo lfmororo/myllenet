@@ -2,3 +2,6 @@ project_id = "bleenvuqsrvkmxwaoswb"
 
 [functions.diagnostico]
 verify_jwt = false
+
+[functions.diagnostico-provedor]
+verify_jwt = false
