@@ -72,7 +72,18 @@ Deno.serve(async (req) => {
 
     const ip = getIp(req);
     const faixas: string[] = cfg?.faixas_ip ?? [];
-    const naRede = !!ip && faixas.some((c) => ipInCidr(ip, c));
+    let naRede = !!ip && faixas.some((c) => ipInCidr(ip, c));
+    if (!naRede && ip) {
+      // Compara com os IPs das sessões PPPoE ativas no MikroTik (últimos 15 min)
+      const desde = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+      const { data: sess } = await supabase
+        .from("pppoe_logs")
+        .select("id")
+        .eq("ip_address", ip)
+        .gte("logged_at", desde)
+        .limit(1);
+      if (sess && sess.length > 0) naRede = true;
+    }
 
     if (req.method === "GET") {
       return json({
