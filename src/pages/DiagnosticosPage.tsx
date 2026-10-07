@@ -312,8 +312,8 @@ function Detalhe({ d, cliente, onSaved, onOpenOther }: { d: Diag; cliente?: Cli;
                     <TableRow key={i}>
                       <TableCell>{h.hop ?? h.salto ?? i + 1}</TableCell>
                       <TableCell className="font-mono text-xs">{h.address ?? h.ip ?? h.host ?? "—"}</TableCell>
-                      <TableCell>{h.loss ?? h.perda ?? "—"}</TableCell>
-                      <TableCell className="text-right">{h.avg ?? h.ms ?? h.last ?? "—"}</TableCell>
+                      <TableCell>{h.perda_pct != null ? `${h.perda_pct}%` : h.loss ?? h.perda ?? "—"}</TableCell>
+                      <TableCell className="text-right">{h.media_ms != null ? `${h.media_ms} ms` : h.avg ?? h.ms ?? h.last ?? "—"}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
