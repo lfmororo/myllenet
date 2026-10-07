@@ -1,0 +1,13 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1791335802047,
+      "tag": "0000_speed_up_monitoring_queries",
+      "breakpoints": true
+    }
+  ]
+}
