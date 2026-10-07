@@ -127,6 +127,7 @@ function Detalhe({ d, cliente, onSaved, onOpenOther }: { d: Diag; cliente?: Cli;
   const [obs, setObs] = useState(d.observacao ?? "");
   const [saving, setSaving] = useState(false);
   const [outros, setOutros] = useState<Diag[]>([]);
+  const [prov, setProv] = useState<Diag | null>(null);
 
   useEffect(() => {
     setStatus(d.status);
@@ -139,6 +140,17 @@ function Detalhe({ d, cliente, onSaved, onOpenOther }: { d: Diag; cliente?: Cli;
       .order("criado_em", { ascending: false })
       .limit(10)
       .then(({ data }) => setOutros((data as Diag[]) ?? []));
+    setProv(null);
+    if (d.origem !== "provedor") {
+      supabase
+        .from("diagnosticos")
+        .select("*")
+        .eq("origem", "provedor")
+        .eq("dados->>diagnostico_origem_id", d.id)
+        .order("criado_em", { ascending: false })
+        .limit(1)
+        .then(({ data }) => setProv(((data as Diag[]) ?? [])[0] ?? null));
+    }
   }, [d.id]);
 
   const dados = d.dados ?? {};
@@ -330,6 +342,41 @@ function Detalhe({ d, cliente, onSaved, onOpenOther }: { d: Diag; cliente?: Cli;
           <Button onClick={salvar} disabled={saving}>{saving && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}Salvar</Button>
         </div>
       </div>
+
+      {prov && (() => {
+        const pd = prov.dados ?? {};
+        const offline = pd?.pppoe?.online === false;
+        const perdaProv = Number(pd?.ping?.perda_pct ?? prov.perda_pct ?? 0);
+        const resumo: string[] = [];
+        if (offline) resumo.push("Cliente não está conectado ao concentrador");
+        if (!offline && perdaProv > 0) resumo.push("Perda de pacotes entre o concentrador e o cliente; verificar enlace/ONU");
+        if (!offline && perdaProv === 0 && prov.veredito === "ok" && d.veredito === "falha")
+          resumo.push("Rede do provedor ok até o cliente; problema provável no roteador ou Wi-Fi da casa");
+        return (
+          <div className="space-y-3 rounded-lg border p-4">
+            <h4 className="text-sm font-semibold">Visão do provedor</h4>
+            {resumo.map((r) => (
+              <div key={r} className="rounded-md border border-primary/30 bg-primary/10 px-3 py-2 text-sm">{r}</div>
+            ))}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">Cliente <VereditoBadge v={d.veredito} /></div>
+                <Info label="Latência" value={`${fmt(d.latencia_ms, 0)} ms`} />
+                <Info label="Perda" value={`${fmt(d.perda_pct, 0)}%`} />
+                <Info label="Download" value={`${fmt(d.download_mbps)} Mbps`} />
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">Provedor <VereditoBadge v={prov.veredito} /></div>
+                <Info label="Ping médio" value={`${fmt(pd?.ping?.media_ms ?? prov.latencia_ms, 0)} ms`} />
+                <Info label="Perda" value={`${fmt(perdaProv, 0)}%`} />
+                <Info label="PPPoE" value={pd?.pppoe?.online === false ? "Offline" : pd?.pppoe?.online ? `Online · ${pd.pppoe.uptime ?? ""}` : "—"} />
+              </div>
+            </div>
+            {pd?.erro && <p className="text-sm text-destructive">Erro do agente: {String(pd.erro)}</p>}
+            <Button size="sm" variant="outline" onClick={() => onOpenOther(prov)}>Abrir diagnóstico do provedor</Button>
+          </div>
+        );
+      })()}
 
       <div>
         <h4 className="mb-2 text-sm font-semibold">Outros diagnósticos deste cliente</h4>
