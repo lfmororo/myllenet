@@ -46,6 +46,7 @@ export default function Settings() {
   // WhatsApp settings
   const [whatsappProvider, setWhatsappProvider] = useState("uazapi");
   const [uazapiToken, setUazapiToken] = useState("");
+  const [adminWhatsapp, setAdminWhatsapp] = useState("");
   const [evolutionBaseUrl, setEvolutionBaseUrl] = useState("");
   const [evolutionApiKey, setEvolutionApiKey] = useState("");
   const [evolutionInstance, setEvolutionInstance] = useState("");
@@ -164,10 +165,11 @@ export default function Settings() {
     const { data } = await api
       .from("settings")
       .select("key, value")
-      .in("key", ["payment_gateway", "mercadopago_access_token", "efi_client_id", "efi_client_secret", "efi_certificate_path", "uazapi_token", "whatsapp_provider", "evolution_base_url", "evolution_api_key", "evolution_instance", "mikrotik_host", "mikrotik_host_secondary", "mikrotik_username", "mikrotik_password", "mikrotik_api_port", "mikrotik_rest_port", "blocking_days", "pix_key", "pix_name", "pix_city", "mikrotik_alert_offline_minutes", "mikrotik_alert_failure_count"]);
+      .in("key", ["payment_gateway", "mercadopago_access_token", "efi_client_id", "efi_client_secret", "efi_certificate_path", "uazapi_token", "whatsapp_provider", "evolution_base_url", "evolution_api_key", "evolution_instance", "mikrotik_host", "mikrotik_host_secondary", "mikrotik_username", "mikrotik_password", "mikrotik_api_port", "mikrotik_rest_port", "blocking_days", "pix_key", "pix_name", "pix_city", "mikrotik_alert_offline_minutes", "mikrotik_alert_failure_count", "admin_whatsapp"]);
 
     if (data) {
       for (const row of data) {
+        if (row.key === "admin_whatsapp") setAdminWhatsapp(row.value || "");
         if (row.key === "payment_gateway") setPaymentGateway(row.value || "efi");
         if (row.key === "mercadopago_access_token") setMpTokenSaved(!!row.value);
         if (row.key === "efi_client_id") setClientId(row.value || "");
@@ -699,12 +701,26 @@ export default function Settings() {
                       </div>
                     )}
 
+                    <div className="space-y-2">
+                      <Label htmlFor="admin_whatsapp">WhatsApp do administrador (avisos de diagnóstico)</Label>
+                      <Input
+                        id="admin_whatsapp"
+                        placeholder="Ex.: 85999999999"
+                        value={adminWhatsapp}
+                        onChange={(e) => setAdminWhatsapp(e.target.value)}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Recebe um resumo sempre que um cliente fizer um diagnóstico. Deixe vazio para não avisar.
+                      </p>
+                    </div>
+
                     <div className="flex flex-wrap gap-2">
                       <Button
                         onClick={async () => {
                           setSavingWhatsapp(true);
                           try {
                             await upsertSetting("whatsapp_provider", whatsappProvider);
+                            await upsertSetting("admin_whatsapp", adminWhatsapp.replace(/\D/g, ""));
                             if (whatsappProvider === "uazapi") {
                               await upsertSetting("uazapi_token", uazapiToken);
                             } else {

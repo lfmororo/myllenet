@@ -44,6 +44,72 @@ const num = (v: unknown): number | null => {
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+function formatPhone(phone: string): string {
+  let d = (phone || "").replace(/\D/g, "");
+  if (!d.startsWith("55")) d = "55" + d;
+  if (d.length === 12) d = `55${d.substring(2, 4)}9${d.substring(4)}`;
+  return d;
+}
+
+// deno-lint-ignore no-explicit-any
+async function notifyAdmin(supabase: any, nome: string, id: string, row: any, ip: string, naRede: boolean) {
+  const { data: rows } = await supabase
+    .from("settings")
+    .select("key, value")
+    .in("key", ["admin_whatsapp", "whatsapp_provider", "uazapi_token", "uazapi_base_url", "evolution_base_url", "evolution_api_key", "evolution_instance"]);
+  const s: Record<string, string> = {};
+  for (const r of rows ?? []) s[r.key] = r.value ?? "";
+  if (!s.admin_whatsapp) return;
+
+  const vered: Record<string, string> = { ok: "✅ Normal", alerta: "⚠️ Com pontos de atenção", falha: "❌ Problema encontrado" };
+  const f = (v: unknown, u: string) => (typeof v === "number" ? `${v.toFixed(1)} ${u}` : "—");
+  const linhas = [
+    `🔎 *Novo diagnóstico de conexão*`,
+    `Cliente: *${nome}*`,
+    `Protocolo: ${id.slice(0, 8).toUpperCase()}`,
+    `Origem: ${row.origem === "windows" ? "Windows (completo)" : "Navegador"}`,
+  ];
+  if (row.origem === "navegador") {
+    linhas.push(
+      `Resultado: ${vered[row.veredito] ?? "—"}`,
+      `Download: ${f(row.download_mbps, "Mbps")}`,
+      `Upload: ${f(row.upload_mbps, "Mbps")}`,
+      `Latência: ${f(row.latencia_ms, "ms")} | Jitter: ${f(row.jitter_ms, "ms")} | Perda: ${f(row.perda_pct, "%")}`,
+    );
+    const tipo = row.dados?.conexao?.tipo;
+    if (tipo) linhas.push(`Conexão do aparelho: ${tipo === "cellular" ? "dados móveis" : tipo}`);
+  }
+  linhas.push(`IP: ${ip || "—"} | Na rede do provedor: ${naRede ? "sim" : "não"}`);
+  const text = linhas.join("\n");
+  const number = formatPhone(s.admin_whatsapp);
+
+  let url: string, headers: Record<string, string>;
+  if (s.whatsapp_provider === "evolution") {
+    if (!s.evolution_base_url || !s.evolution_api_key || !s.evolution_instance) return;
+    url = `${s.evolution_base_url.replace(/\/+$/, "")}/message/sendText/${encodeURIComponent(s.evolution_instance)}`;
+    headers = { apikey: s.evolution_api_key };
+  } else {
+    const token = s.uazapi_token || Deno.env.get("UAZAPI_TOKEN") || "";
+    if (!token) return;
+    url = `${(s.uazapi_base_url || "https://ipazua.uazapi.com").replace(/\/+$/, "")}/send/text`;
+    headers = { token };
+  }
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...headers },
+    body: JSON.stringify({ number, text }),
+  });
+  const body = await res.text();
+  await supabase.from("notification_logs").insert({
+    customer_name: "Administrador",
+    phone: number,
+    type: "diagnostico_admin",
+    message: text,
+    status: res.ok ? "sent" : "error",
+    error_message: res.ok ? null : `[${res.status}] ${body.slice(0, 400)}`,
+  });
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "GET" && req.method !== "POST") return json({ erro: "Método não permitido" }, 405);
@@ -170,6 +236,12 @@ Deno.serve(async (req) => {
       // deno-lint-ignore no-explicit-any
       (globalThis as any).EdgeRuntime?.waitUntil?.(p);
     }
+
+    // Aviso ao administrador via WhatsApp (não bloqueia a resposta)
+    const aviso = notifyAdmin(supabase, cliente.nome, inserted.id, row, ip, naRede)
+      .catch((e) => console.error("admin notify error", e));
+    // deno-lint-ignore no-explicit-any
+    (globalThis as any).EdgeRuntime?.waitUntil?.(aviso);
 
     return json({ ok: true, protocolo: inserted.id.slice(0, 8).toUpperCase() });
   } catch (e) {
