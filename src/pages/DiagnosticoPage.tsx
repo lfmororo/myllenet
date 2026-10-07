@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import logoImg from "@/assets/logo.png";
 
 const FN_URL = `https://${import.meta.env.VITE_SUPABASE_PROJECT_ID}.supabase.co/functions/v1/diagnostico`;
+const NOME_PROVEDOR = "Mororo.Tech";
+const ehWindows = typeof navigator !== "undefined" && navigator.userAgent.includes("Windows");
 
 type Estado = "aguardando" | "testando" | "ok" | "alerta" | "falha";
 type Veredito = "ok" | "alerta" | "falha";
