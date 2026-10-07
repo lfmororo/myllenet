@@ -585,12 +585,38 @@ export default function CustomerDetailDialog({
                       <Trash2 className="h-3 w-3 mr-1" />
                     )}
                     Remover
-                  </Button>
-                </div>
-              </div>
-            </div>
+                   </Button>
+                 </div>
+               </div>
+             </div>
 
-            {/* Consumo de Banda (Chart) */}
+             {/* Diagnóstico de Conexão */}
+             <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+               <h3 className="text-sm font-semibold flex items-center gap-2">
+                 <MessageCircle className="h-4 w-4 text-primary" />
+                 Diagnóstico de Conexão
+               </h3>
+               <p className="text-xs text-muted-foreground">
+                 Envia ao cliente um link para testar a internet pelo WhatsApp,
+                 conectado ao Wi-Fi de casa.
+               </p>
+               <Button
+                 size="sm"
+                 variant="outline"
+                 className="h-8 text-xs"
+                 disabled={sendingDiagLink || !diagLinkInfo?.token}
+                 onClick={handleSendDiagLink}
+               >
+                 {sendingDiagLink ? (
+                   <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                 ) : (
+                   <MessageCircle className="h-3 w-3 mr-1" />
+                 )}
+                 Enviar link por WhatsApp
+               </Button>
+             </div>
+
+             {/* Consumo de Banda (Chart) */}
             <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
               <h3 className="text-sm font-semibold flex items-center gap-2">
                 <Activity className="h-4 w-4 text-primary" />
