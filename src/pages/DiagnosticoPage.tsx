@@ -149,6 +149,11 @@ export default function DiagnosticoPage() {
 
     const cfg = inicial.config;
     const base = (cfg.speedtest_url ?? "").replace(/\/+$/, "");
+    // Sem servidor próprio configurado, usa o servidor público da Cloudflare
+    const CF = "https://speed.cloudflare.com";
+    const urlPing = () => (base ? `${base}/empty.php?cors=true&r=${rnd()}` : `${CF}/__down?bytes=0&r=${rnd()}`);
+    const urlDown = () => (base ? `${base}/garbage.php?cors=true&ckSize=100&r=${rnd()}` : `${CF}/__down?bytes=25000000&r=${rnd()}`);
+    const urlUp = () => (base ? `${base}/empty.php?cors=true&r=${rnd()}` : `${CF}/__up?r=${rnd()}`);
     const fluxos = Math.max(1, cfg.fluxos || 4);
     const duracao = Math.max(1000, cfg.duracao_ms || 8000);
     const estados: Record<string, Estado> = {};
@@ -196,9 +201,14 @@ export default function DiagnosticoPage() {
         idioma: navigator.language,
         tela: `${screen.width}x${screen.height}`,
       };
+      const tipos: Record<string, string> = { wifi: "Wi-Fi", cellular: "Dados móveis", ethernet: "Cabo de rede" };
+      const tipoTxt = tipos[conexao.type] ?? null;
+      conexao.tipo = conexao.type ?? "desconhecido";
+      const ssidTxt = " (o nome do Wi-Fi não é liberado pelo navegador; no Windows use o diagnóstico completo)";
       if (!navigator.onLine) return ["falha", "O aparelho está sem internet."];
-      if (conexao.type === "cellular") return ["alerta", "Usando dados móveis, não o Wi-Fi."];
-      return ["ok", "Aparelho conectado."];
+      if (conexao.type === "cellular") return ["alerta", "Conectado por dados móveis, não pelo Wi-Fi."];
+      if (tipoTxt) return ["ok", `Conectado por ${tipoTxt}.${conexao.type === "wifi" ? ssidTxt : ""}`];
+      return ["ok", "Aparelho conectado. Este navegador não informa se é Wi-Fi ou dados móveis" + ssidTxt + "."];
     });
 
     // 2. Rede do provedor
@@ -211,13 +221,12 @@ export default function DiagnosticoPage() {
 
     // 3. Tempo de resposta
     await etapa("latencia", async () => {
-      if (!base) throw new Error("speedtest_url não configurado");
       const amostras: number[] = [];
       let perdas = 0;
       for (let i = 0; i < 11; i++) {
         const t0 = performance.now();
         try {
-          const r = await fetchTimeout(`${base}/empty.php?cors=true&r=${rnd()}`, { cache: "no-store" }, 5000);
+          const r = await fetchTimeout(urlPing(), { cache: "no-store" }, 5000);
           await r.arrayBuffer();
           if (i > 0) amostras.push(performance.now() - t0);
         } catch {
@@ -248,7 +257,6 @@ export default function DiagnosticoPage() {
 
     // 4. Download
     await etapa("download", async () => {
-      if (!base) throw new Error("speedtest_url não configurado");
       const ctrl = new AbortController();
       let bytes = 0;
       const t0 = performance.now();
@@ -260,7 +268,7 @@ export default function DiagnosticoPage() {
       const loop = async () => {
         while (!ctrl.signal.aborted) {
           try {
-            const r = await fetch(`${base}/garbage.php?cors=true&ckSize=100&r=${rnd()}`, {
+            const r = await fetch(urlDown(), {
               cache: "no-store",
               signal: ctrl.signal,
             });
@@ -289,7 +297,6 @@ export default function DiagnosticoPage() {
 
     // 5. Upload
     await etapa("upload", async () => {
-      if (!base) throw new Error("speedtest_url não configurado");
       const buf = new Uint8Array(1024 * 1024);
       for (let i = 0; i < buf.length; i += 65536) crypto.getRandomValues(buf.subarray(i, i + 65536));
       const blob = new Blob([buf]);
@@ -304,7 +311,7 @@ export default function DiagnosticoPage() {
       const loop = async () => {
         while (!ctrl.signal.aborted) {
           try {
-            const r = await fetch(`${base}/empty.php?cors=true&r=${rnd()}`, {
+            const r = await fetch(urlUp(), {
               method: "POST",
               body: blob,
               cache: "no-store",
