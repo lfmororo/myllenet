@@ -1,0 +1,2 @@
+CREATE INDEX IF NOT EXISTS idx_mikrotik_status_history_logged_at ON public.mikrotik_status_history (logged_at DESC);
+CREATE INDEX IF NOT EXISTS idx_pppoe_logs_event_logged_at ON public.pppoe_logs (event_type, logged_at DESC);

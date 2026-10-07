@@ -331,7 +331,7 @@ export default function InvoiceCSVImportDialog({ open, onOpenChange, customers, 
       }
 
       const { data: freshCustomers } = await api.from("customers").select("id, cpf");
-      const freshCpfMap = new Map((freshCustomers || []).map(c => [cleanCPF(c.cpf), c.id]));
+      const freshCpfMap = new Map<string, string>((freshCustomers || []).map((c: any) => [cleanCPF(c.cpf), c.id as string]));
       const resolvedRows = validRows.map(row => {
         if (row.customer_id === "__pending__" && row._cpf) {
           return { ...row, customer_id: freshCpfMap.get(row._cpf) || "__pending__" };
