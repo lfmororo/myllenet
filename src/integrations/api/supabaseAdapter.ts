@@ -107,10 +107,15 @@ export const supabaseApi = {
       return { data: { user }, error: null };
     },
     onAuthStateChange(cb: (event: string, session: any) => void) {
-      const { data } = client().auth.onAuthStateChange(async (_event, session) => {
+      // Não usar await dentro do callback: chamadas ao banco aqui travam o login.
+      const { data } = client().auth.onAuthStateChange((_event, session) => {
+        _token = session?.access_token ?? null;
         if (session?.user) {
-          const user = await augmentUser(session.user);
-          cb("SIGNED_IN", { access_token: session.access_token, user });
+          setTimeout(() => {
+            augmentUser(session.user).then((user) =>
+              cb("SIGNED_IN", { access_token: session.access_token, user })
+            );
+          }, 0);
         } else {
           cb("SIGNED_OUT", null);
         }
