@@ -205,6 +205,26 @@ export default function CustomerDetailDialog({
       fetchLogs();
       fetchBlockHistory();
       setPagoAte(customer.pago_ate || "");
+      setDiagLinkInfo(null);
+
+      // Busca token e configuração do link de diagnóstico
+      (async () => {
+        const { data: cfg } = await api
+          .from("config_diagnostico" as any)
+          .select("url_publica, mensagem_whatsapp")
+          .eq("id", 1)
+          .single();
+        const { data: cust } = await api
+          .from("customers")
+          .select("diagnostico_token")
+          .eq("id", customer.id)
+          .single();
+        setDiagLinkInfo({
+          token: (cust as any)?.diagnostico_token ?? null,
+          url: (cfg as any)?.url_publica ?? null,
+          mensagem: (cfg as any)?.mensagem_whatsapp ?? null,
+        });
+      })();
 
       // Polling simples: atualiza os logs periodicamente
       const channel = api
@@ -231,6 +251,7 @@ export default function CustomerDetailDialog({
       setPagoAte("");
       setLogs([]);
       setBlockHistory([]);
+      setDiagLinkInfo(null);
     }
   }, [open, customer, fetchInvoices, fetchLogs, fetchBlockHistory]);
 
