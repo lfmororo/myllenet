@@ -21,6 +21,7 @@ import SatisfactionPage from "./pages/SatisfactionPage";
 import FeedbackPage from "./pages/FeedbackPage";
 import ReportsPage from "./pages/ReportsPage";
 import DiagnosticoPage from "./pages/DiagnosticoPage";
+import DiagnosticosPage from "./pages/DiagnosticosPage";
 
 
 const queryClient = new QueryClient();
@@ -48,6 +49,7 @@ const App = () => (
               <Route path="/agente" element={<AgentPage />} />
               <Route path="/avaliacoes" element={<FeedbackPage />} />
               <Route path="/relatorios" element={<ReportsPage />} />
+              <Route path="/diagnosticos" element={<DiagnosticosPage />} />
 
               <Route path="/settings" element={<Settings />} />
             </Route>
