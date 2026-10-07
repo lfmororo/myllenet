@@ -20,6 +20,7 @@ import AgentPage from "./pages/AgentPage";
 import SatisfactionPage from "./pages/SatisfactionPage";
 import FeedbackPage from "./pages/FeedbackPage";
 import ReportsPage from "./pages/ReportsPage";
+import DiagnosticoPage from "./pages/DiagnosticoPage";
 
 
 const queryClient = new QueryClient();
@@ -36,6 +37,7 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/fatura/:id" element={<InvoiceView />} />
             <Route path="/satisfacao" element={<SatisfactionPage />} />
+            <Route path="/diagnostico" element={<DiagnosticoPage />} />
             <Route element={<AppLayout />}>
               <Route path="/dashboard" element={<DashboardHome />} />
               <Route path="/clientes" element={<CustomersPage />} />
