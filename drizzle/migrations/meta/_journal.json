@@ -15,6 +15,13 @@
       "when": 1791336858595,
       "tag": "0001_diagnostico_conexao",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794833207422,
+      "tag": "0002_tighten_open_policies",
+      "breakpoints": true
     }
   ]
 }

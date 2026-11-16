@@ -1,0 +1,13 @@
+DROP POLICY IF EXISTS "Public invoices are viewable by everyone" ON public.invoices;
+DROP POLICY IF EXISTS "Public customers are viewable by everyone" ON public.customers;
+DROP POLICY IF EXISTS "Admins can manage block alerts" ON public.block_alerts_sent;
+CREATE POLICY "Admins can manage block alerts" ON public.block_alerts_sent FOR ALL TO authenticated USING (public.has_role(auth.uid(),'admin')) WITH CHECK (public.has_role(auth.uid(),'admin'));
+DROP POLICY IF EXISTS "Authenticated users can read block history" ON public.block_history;
+CREATE POLICY "Admins can read block history" ON public.block_history FOR SELECT TO authenticated USING (public.has_role(auth.uid(),'admin'));
+DROP POLICY IF EXISTS "Authenticated users can view wan logs" ON public.wan_logs;
+CREATE POLICY "Admins can view wan logs" ON public.wan_logs FOR SELECT TO authenticated USING (public.has_role(auth.uid(),'admin'));
+DROP POLICY IF EXISTS "Authenticated users can select wan_status_history" ON public.wan_status_history;
+CREATE POLICY "Admins can select wan_status_history" ON public.wan_status_history FOR SELECT TO authenticated USING (public.has_role(auth.uid(),'admin'));
+DROP POLICY IF EXISTS "Authenticated users can view PPPoE snapshots" ON public.mikrotik_pppoe_snapshots;
+CREATE POLICY "Admins can view PPPoE snapshots" ON public.mikrotik_pppoe_snapshots FOR SELECT TO authenticated USING (public.has_role(auth.uid(),'admin'));
+ALTER FUNCTION public.get_recent_disconnections(timestamptz) SET search_path = public;
