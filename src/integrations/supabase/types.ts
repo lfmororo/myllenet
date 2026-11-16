@@ -986,6 +986,7 @@ export type Database = {
           customer_id: string
         }[]
       }
+      cleanup_old_logs: { Args: never; Returns: undefined }
       get_bandwidth_report: {
         Args: { _from: string; _to: string }
         Returns: {
