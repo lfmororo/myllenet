@@ -169,9 +169,14 @@ export function useInvoices() {
     // Mark as paid or settle on EFI if it has an efi_charge_id
     if (invoice?.efi_charge_id) {
       try {
-        await api.functions.invoke("efi-boleto/settle", { body: { charge_id: invoice.efi_charge_id } });
+        const { error: settleError } = await api.functions.invoke("efi-boleto/settle", { body: { charge_id: invoice.efi_charge_id } });
+        if (settleError) {
+          const msg = String((settleError as any)?.message || settleError);
+          // Charge already paid/settled/cancelled on Efí — nothing to do there
+          if (!/waiting|unpaid/i.test(msg)) console.info("Efí settle skipped:", msg);
+        }
       } catch (e) {
-        console.warn("EFI settle failed:", e);
+        console.info("Efí settle skipped:", e);
       }
     }
 
