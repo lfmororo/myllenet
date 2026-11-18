@@ -34,7 +34,10 @@ export default function Settings() {
   const [mpAccessToken, setMpAccessToken] = useState("");
   const [mpTokenSaved, setMpTokenSaved] = useState(false);
   const API_URL = (import.meta.env.VITE_API_URL as string) || "http://localhost:3333";
-  const mpWebhookUrl = `${API_URL}/api/functions/mercadopago/webhook`;
+  const IS_SUPABASE = ((import.meta.env.VITE_BACKEND as string) || "supabase") === "supabase";
+  const mpWebhookUrl = IS_SUPABASE
+    ? `${((import.meta.env.VITE_SUPABASE_URL as string) || "").replace(/\/$/, "")}/functions/v1/mercadopago/webhook`
+    : `${API_URL}/api/functions/mercadopago/webhook`;
   const [clientId, setClientId] = useState("");
   const [clientSecret, setClientSecret] = useState("");
   const [certFile, setCertFile] = useState<File | null>(null);

@@ -34,6 +34,8 @@ function loadEnv() {
 loadEnv();
 
 const CFG = {
+  // SUPABASE_URL (backend Supabase, padrão) ou API_URL (backend Fastify)
+  supabaseUrl: (process.env.SUPABASE_URL || "").replace(/\/$/, ""),
   apiUrl: (process.env.API_URL || "").replace(/\/$/, ""),
   agentToken: process.env.AGENT_TOKEN || "",
   hosts: [
@@ -60,8 +62,8 @@ const CFG = {
   maxQueue: 500,
 };
 
-if (!CFG.apiUrl || !CFG.agentToken) {
-  console.error("API_URL e AGENT_TOKEN são obrigatórios no .env");
+if ((!CFG.supabaseUrl && !CFG.apiUrl) || !CFG.agentToken) {
+  console.error("SUPABASE_URL (ou API_URL) e AGENT_TOKEN são obrigatórios no .env");
   process.exit(1);
 }
 if (CFG.hosts.length === 0) {
@@ -69,7 +71,9 @@ if (CFG.hosts.length === 0) {
   process.exit(1);
 }
 
-const INGEST_URL = `${CFG.apiUrl}/api/functions/mikrotik-agent-ingest`;
+const INGEST_URL = CFG.supabaseUrl
+  ? `${CFG.supabaseUrl}/functions/v1/mikrotik-agent-ingest`
+  : `${CFG.apiUrl}/api/functions/mikrotik-agent-ingest`;
 const log = (...a) => console.log(`[${new Date().toISOString()}]`, ...a);
 
 // ---------- Mikrotik REST ----------

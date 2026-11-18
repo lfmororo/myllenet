@@ -1,0 +1,38 @@
+# Rotas do MyLLENET para o Traefik do Easypanel.
+# Acrescente o conteúdo abaixo em /etc/easypanel/traefik/config/custom.yaml,
+# DENTRO das seções http.routers e http.services que já existem
+# (não duplique as chaves "http:", "routers:" ou "services:").
+# O certresolver deve ser o mesmo usado nas rotas do vigilant/RustDesk.
+
+http:
+  routers:
+    myllenet-app:
+      rule: Host(`myllenet.mororo.tech`)
+      entryPoints: [https]
+      service: myllenet-web
+      tls:
+        certResolver: letsencrypt
+    myllenet-api:
+      rule: Host(`api-myllenet.mororo.tech`)
+      entryPoints: [https]
+      service: myllenet-web
+      tls:
+        certResolver: letsencrypt
+    myllenet-http:
+      rule: Host(`myllenet.mororo.tech`) || Host(`api-myllenet.mororo.tech`)
+      entryPoints: [http]
+      service: myllenet-web
+      middlewares: [myllenet-https]
+
+  middlewares:
+    myllenet-https:
+      redirectScheme:
+        scheme: https
+        permanent: true
+
+  services:
+    myllenet-web:
+      loadBalancer:
+        passHostHeader: true
+        servers:
+          - url: http://myllenet-web:80

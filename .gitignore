@@ -25,3 +25,7 @@ front-src.zip
 *.njsproj
 *.sln
 *.sw?
+
+# Migração VPS
+deploy/vps/config.env
+dist.new/
