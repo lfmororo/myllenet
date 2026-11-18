@@ -18,7 +18,11 @@ PGIMG=postgres:17-alpine
 # ---------------------------------------------------------------- 1. credenciais
 if [ ! -s "$EXPORT_JSON" ]; then
   log "Buscando credenciais na função temporária myllenet-export"
-  read -r -s -p "Cole a chave do export (EXPORT_KEY) e tecle Enter: " EXPORT_KEY; echo
+  if [ -s "$SECRETS_DIR/export.key" ]; then
+    EXPORT_KEY=$(tr -d '[:space:]' < "$SECRETS_DIR/export.key")
+  else
+    read -r -s -p "Cole a chave do export (EXPORT_KEY) e tecle Enter: " EXPORT_KEY; echo
+  fi
   [ -n "$EXPORT_KEY" ] || die "Chave vazia"
   code=$(curl -sS -o "$EXPORT_JSON.tmp" -w '%{http_code}' \
     "$OLD_SUPABASE_URL/functions/v1/myllenet-export" \

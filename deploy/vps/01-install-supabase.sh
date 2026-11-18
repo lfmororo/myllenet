@@ -159,7 +159,8 @@ log "Baixando imagens (pode levar alguns minutos)"
 compose pull -q
 
 log "Subindo o Supabase do MyLLENET"
-compose up -d
+# o Studio pode demorar na 1ª inicialização; tenta de novo antes de desistir
+compose up -d || { warn "primeira subida incompleta, tentando de novo em 30s"; sleep 30; compose up -d; }
 for _ in $(seq 1 60); do
   unhealthy=$(compose ps --format '{{.Name}} {{.Health}}' | awk '$2!="healthy" && $2!="" {print $1}')
   [ -z "$unhealthy" ] && break
