@@ -157,13 +157,14 @@ done
 restore_tool pg_restore -L /w/data_public.list --no-owner --no-privileges -f - "/b/$BFILE" \
   | strip_meta | db_psql_replica
 ok "tabelas sem filtro importadas"
-while read -r kt kc kd; do
+# fd 3: o docker run -i / psql dentro do laço não podem consumir a lista
+while read -r kt kc kd <&3; do
   [ -n "$kt" ] || continue
   cutoff=$(date -u -d "$kd days ago" +%Y-%m-%d)
   restore_tool pg_restore -L "/w/keep_$kt.list" --no-owner --no-privileges -f - "/b/$BFILE" \
     | strip_meta | filter_copy_since "$kc" "$cutoff" | db_psql_replica
   ok "$kt: últimos $kd dias (desde $cutoff) — $(db_psql postgres -X -tAc "select count(*) from public.\"$kt\"") linhas"
-done < "$WORK/keep.txt"
+done 3< "$WORK/keep.txt"
 ok "dados importados"
 
 # ---------------------------------------------------------------- 6. gatilhos, realtime, crons
@@ -205,6 +206,9 @@ if [ -s "$WORK/cron.list" ]; then
   grep -q "$OLD_PROJECT_REF" "$WORK/06_cron.sql" && warn "Ainda há referências a $OLD_PROJECT_REF nos crons — revise $WORK/06_cron.sql"
   grep -q 'vault\.' "$WORK/06_cron.sql" && warn "Algum cron usa o vault; ele precisará de ajuste manual ($WORK/06_cron.sql)"
   db_psql postgres -X -q < "$WORK/06_cron.sql" >/dev/null
+  # pausados até a virada, para não duplicar cobranças/WhatsApp com a Lovable
+  db_psql postgres -X -q -c "select cron.alter_job(jobid, active := false) from cron.job" >/dev/null
+  warn "Crons criados PAUSADOS. Na virada: bash crons.sh ligar"
   ok "$(grep -c 'cron.schedule' "$WORK/06_cron.sql") cron(s) recriado(s):"
   db_psql postgres -X -tAc "select '      ' || jobname || '  [' || schedule || ']' from cron.job order by jobid"
 fi
