@@ -28,7 +28,14 @@ if [ ! -s "$EXPORT_JSON" ]; then
     "$OLD_SUPABASE_URL/functions/v1/myllenet-export" \
     -H "apikey: $OLD_ANON_KEY" -H "Authorization: Bearer $OLD_ANON_KEY" \
     -H "x-export-key: $EXPORT_KEY")
-  [ "$code" = "200" ] || { cat "$EXPORT_JSON.tmp" >&2; rm -f "$EXPORT_JSON.tmp"; die "myllenet-export respondeu HTTP $code"; }
+  if [ "$code" != "200" ]; then
+    rm -f "$EXPORT_JSON.tmp"
+    case "$code" in
+      404) die "A função myllenet-export ainda não está publicada na Lovable. Publique e rode de novo." ;;
+      401) die "A função recusou a chave. Rode 'bash gerar-funcao-export.sh', republique o código novo na Lovable e rode de novo." ;;
+      *)   die "myllenet-export respondeu HTTP $code" ;;
+    esac
+  fi
   mv "$EXPORT_JSON.tmp" "$EXPORT_JSON"; chmod 600 "$EXPORT_JSON"
   unset EXPORT_KEY
 fi
