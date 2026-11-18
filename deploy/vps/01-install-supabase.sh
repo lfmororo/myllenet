@@ -21,10 +21,15 @@ done
 ok "portas $API_GW_LOCAL_PORT $EDGE_LOCAL_PORT $POOLER_SESSION_LOCAL_PORT $POOLER_TX_LOCAL_PORT livres"
 
 log "Conferindo conflitos de nomes de containers"
-if docker ps -a --format '{{.Names}}' | grep -qE '^myllenet-'; then
-  die "Já existem containers myllenet-*. Remova-os antes (docker ps -a | grep myllenet-)."
-fi
-ok "nenhum container myllenet-* existente"
+MY_NAMES="myllenet-studio myllenet-envoy myllenet-auth myllenet-rest realtime-dev.myllenet-realtime myllenet-storage myllenet-imgproxy myllenet-meta myllenet-edge-functions myllenet-db myllenet-pooler myllenet-vector myllenet-analytics myllenet-web"
+conflicts=""
+for n in $MY_NAMES; do
+  docker ps -a --format '{{.Names}}' | grep -qxF "$n" && conflicts="$conflicts $n"
+done
+[ -z "$conflicts" ] || die "Já existem containers com os nomes:$conflicts — remova-os antes."
+others=$(docker ps -a --format '{{.Names}}' | grep -E '^myllenet-' | grep -vxF -f <(tr ' ' '\n' <<<"$MY_NAMES") || true)
+[ -n "$others" ] && warn "Outros containers myllenet-* existentes (não serão tocados): $(echo "$others" | tr '\n' ' ')"
+ok "nenhum conflito de nomes"
 
 log "Baixando a configuração oficial do Supabase self-hosted"
 REF="${SUPABASE_REF:-}"
@@ -41,7 +46,7 @@ cp -a "$TMP/sb/docker/." "$SB_DIR/"
 echo "$REF" > "$SB_DIR/.supabase-version"
 ok "Supabase $REF copiado para $SB_DIR"
 
-cd "$SB_DIR"
+cd "$SB_DIR" || exit 1
 cp .env.example .env
 chmod 600 .env
 
