@@ -3,7 +3,10 @@
 # Alternativa ao 02-migrate-data.sh quando não há acesso direto ao banco antigo.
 #
 # Uso: bash 02b-restore-backup.sh /opt/myllenet/secrets/backup/arquivo.backup
-# Opcional: SKIP_DATA="tabela1 tabela2" pula os DADOS dessas tabelas do public (ex.: logs grandes)
+# Opcional: SKIP_DATA="tabela1 tabela2" pula os DADOS dessas tabelas do public
+#           KEEP="tabela:coluna_data:dias ..." restaura só os últimos N dias dessas tabelas
+#           (padrão em DEFAULT_KEEP abaixo; KEEP="" desliga o filtro)
+#           MEASURE=1 só mede o tamanho descomprimido de cada tabela e sai
 #
 # Restaura: estrutura e dados do schema public, auth.users/identities (mesmas senhas),
 # gatilhos de auth.users, publicação realtime e crons (reapontados para a VPS).
@@ -20,6 +23,9 @@ docker inspect -f '{{.State.Running}}' myllenet-db 2>/dev/null | grep -q true ||
 WORK="$SECRETS_DIR/restore"; mkdir -p "$WORK"; chmod 700 "$SECRETS_DIR"
 PGIMG=postgres:18-alpine   # backup gerado por pg_dump 18
 SKIP_DATA="${SKIP_DATA:-}"
+# Logs: o app já guarda só 30 dias (cleanup_old_logs); snapshots não têm limpeza.
+DEFAULT_KEEP="mikrotik_pppoe_snapshots:collected_at:2 mikrotik_status_history:logged_at:7 wan_status_history:created_at:7 wan_logs:created_at:30 pppoe_logs:logged_at:45"
+KEEP="${KEEP-$DEFAULT_KEEP}"
 
 restore_tool() { docker run --rm -i -v "$BDIR":/b:ro -v "$WORK":/w "$PGIMG" "$@"; }
 db_psql_replica() {
@@ -28,6 +34,20 @@ db_psql_replica() {
 }
 # remove metacomandos \restrict/\unrestrict que o pg_dump 18 coloca no SQL gerado
 strip_meta() { sed -E '/^\\(un)?restrict /d'; }
+# Dentro de um bloco COPY, mantém só as linhas cuja coluna de data >= corte (texto ISO compara certo)
+filter_copy_since() {
+  awk -v col="$1" -v cut="$2" 'BEGIN { FS = "\t" }
+    incopy && $0 == "\\." { incopy = 0; print; next }
+    incopy { if (idx == 0 || $idx >= cut || $idx == "\\N") print; next }
+    /^COPY / {
+      incopy = 1; idx = 0
+      h = $0; sub(/^[^(]*\(/, "", h); sub(/\) FROM stdin;$/, "", h)
+      n = split(h, c, ", ")
+      for (i = 1; i <= n; i++) { gsub(/"/, "", c[i]); if (c[i] == col) idx = i }
+      if (idx == 0) print "AVISO: coluna " col " não encontrada; tabela restaurada sem filtro" > "/dev/stderr"
+    }
+    { print }'
+}
 
 # ---------------------------------------------------------------- 0. checagens
 log "Checando o backup e o espaço em disco"
@@ -35,6 +55,15 @@ docker image inspect "$PGIMG" >/dev/null 2>&1 || docker pull -q "$PGIMG" >/dev/n
 restore_tool pg_restore -l "/b/$BFILE" > "$WORK/toc.txt"
 grep -q 'Format: CUSTOM' "$WORK/toc.txt" || die "O arquivo não é um pg_dump em formato custom"
 grep -m1 'Archive created at' "$WORK/toc.txt" | sed 's/^;/   /'
+if [ "${MEASURE:-}" = "1" ]; then
+  log "Medindo o tamanho descomprimido de cada tabela do public (não grava nada)"
+  printf '%-34s %12s %10s\n' TABELA LINHAS~ MB
+  grep -E '; [0-9]+ [0-9]+ TABLE DATA public ' "$WORK/toc.txt" | awk '{print $7}' | while read -r t; do
+    read -r lines bytes < <(restore_tool pg_restore -a -n public -t "$t" -f - "/b/$BFILE" | wc -lc)
+    printf '%-34s %12s %10s\n' "$t" "$lines" "$((bytes/1048576))"
+  done | sort -k3 -n -r
+  exit 0
+fi
 size_kb=$(du -k "$BACKUP" | cut -f1)
 free_kb=$(df -Pk /var/lib/docker 2>/dev/null | awk 'NR==2{print $4}')
 ok "backup: $((size_kb/1024)) MB | livre no disco do Docker: $((free_kb/1024)) MB"
@@ -117,8 +146,24 @@ db_psql supabase_admin -X -q -c "set client_min_messages=warning; drop schema mi
 
 # ---------------------------------------------------------------- 5. dados do public
 log "Restaurando os dados (pode demorar bastante com logs grandes)"
+: > "$WORK/keep.txt"
+for spec in $KEEP; do
+  IFS=: read -r kt kc kd <<<"$spec"
+  grep -qE "; [0-9]+ [0-9]+ TABLE DATA public $kt " "$WORK/data_public.list" || continue
+  grep -E "; [0-9]+ [0-9]+ TABLE DATA public $kt " "$WORK/data_public.list" > "$WORK/keep_$kt.list"
+  sed -i -E "/; [0-9]+ [0-9]+ TABLE DATA public $kt /d" "$WORK/data_public.list"
+  echo "$kt $kc $kd" >> "$WORK/keep.txt"
+done
 restore_tool pg_restore -L /w/data_public.list --no-owner --no-privileges -f - "/b/$BFILE" \
   | strip_meta | db_psql_replica
+ok "tabelas sem filtro importadas"
+while read -r kt kc kd; do
+  [ -n "$kt" ] || continue
+  cutoff=$(date -u -d "$kd days ago" +%Y-%m-%d)
+  restore_tool pg_restore -L "/w/keep_$kt.list" --no-owner --no-privileges -f - "/b/$BFILE" \
+    | strip_meta | filter_copy_since "$kc" "$cutoff" | db_psql_replica
+  ok "$kt: últimos $kd dias (desde $cutoff) — $(db_psql postgres -X -tAc "select count(*) from public.\"$kt\"") linhas"
+done < "$WORK/keep.txt"
 ok "dados importados"
 
 # ---------------------------------------------------------------- 6. gatilhos, realtime, crons
