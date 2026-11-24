@@ -703,15 +703,15 @@ export default function Settings() {
                     )}
 
                     <div className="space-y-2">
-                      <Label htmlFor="admin_whatsapp">WhatsApp do administrador (avisos de diagnóstico)</Label>
+                      <Label htmlFor="admin_whatsapp">WhatsApp dos administradores (diagnósticos e bloqueios)</Label>
                       <Input
                         id="admin_whatsapp"
-                        placeholder="Ex.: 85999999999"
+                        placeholder="Ex.: 85999999999, 88999999999"
                         value={adminWhatsapp}
                         onChange={(e) => setAdminWhatsapp(e.target.value)}
                       />
                       <p className="text-xs text-muted-foreground">
-                        Recebe um resumo sempre que um cliente fizer um diagnóstico. Deixe vazio para não avisar.
+                        Separe vários números por vírgula. Recebem o resumo dos diagnósticos, a lista de quem será bloqueado (véspera) e o aviso na hora de cada bloqueio.
                       </p>
                     </div>
 
@@ -721,7 +721,7 @@ export default function Settings() {
                           setSavingWhatsapp(true);
                           try {
                             await upsertSetting("whatsapp_provider", whatsappProvider);
-                            await upsertSetting("admin_whatsapp", adminWhatsapp.replace(/\D/g, ""));
+                            await upsertSetting("admin_whatsapp", adminWhatsapp.split(/[,;\s]+/).map((n) => n.replace(/\D/g, "")).filter(Boolean).join(","));
                             if (whatsappProvider === "uazapi") {
                               await upsertSetting("uazapi_token", uazapiToken);
                             } else {

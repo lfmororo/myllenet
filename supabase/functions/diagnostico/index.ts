@@ -81,7 +81,6 @@ async function notifyAdmin(supabase: any, nome: string, id: string, row: any, ip
   }
   linhas.push(`IP: ${ip || "—"} | Na rede do provedor: ${naRede ? "sim" : "não"}`);
   const text = linhas.join("\n");
-  const number = formatPhone(s.admin_whatsapp);
 
   let url: string, headers: Record<string, string>;
   if (s.whatsapp_provider === "evolution") {
@@ -94,20 +93,24 @@ async function notifyAdmin(supabase: any, nome: string, id: string, row: any, ip
     url = `${(s.uazapi_base_url || "https://ipazua.uazapi.com").replace(/\/+$/, "")}/send/text`;
     headers = { token };
   }
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...headers },
-    body: JSON.stringify({ number, text }),
-  });
-  const body = await res.text();
-  await supabase.from("notification_logs").insert({
-    customer_name: "Administrador",
-    phone: number,
-    type: "diagnostico_admin",
-    message: text,
-    status: res.ok ? "sent" : "error",
-    error_message: res.ok ? null : `[${res.status}] ${body.slice(0, 400)}`,
-  });
+  const numeros = [...new Set(s.admin_whatsapp.split(/[,;\s]+/).map((n) => n.replace(/\D/g, "")).filter((n) => n.length >= 10))];
+  for (const fone of numeros) {
+    const number = formatPhone(fone);
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...headers },
+      body: JSON.stringify({ number, text }),
+    });
+    const body = await res.text();
+    await supabase.from("notification_logs").insert({
+      customer_name: "Administrador",
+      phone: number,
+      type: "diagnostico_admin",
+      message: text,
+      status: res.ok ? "sent" : "error",
+      error_message: res.ok ? null : `[${res.status}] ${body.slice(0, 400)}`,
+    });
+  }
 }
 
 Deno.serve(async (req) => {

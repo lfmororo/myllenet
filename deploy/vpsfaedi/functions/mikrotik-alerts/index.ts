@@ -36,7 +36,9 @@ async function processBlockAlerts(supabase: any) {
       blocked: `🚫 *CLIENTE BLOQUEADO*\n\nCliente: ${customer.nome}\nTelefone: ${customer.telefone || "não informado"}\n\nO acesso foi bloqueado por pendência financeira.`,
       deactivated: `🛑 *CLIENTE DESATIVADO*\n\nCliente: ${customer.nome}\nTelefone: ${customer.telefone || "não informado"}\n\nO plano foi desativado e o usuário removido do roteador.`,
     };
-    const adminMessage = adminMessages[alert.new_status];
+    // vpsfaedi: o aviso aos administradores agora sai na hora pelo aviso-bloqueio-admin
+    // (trigger em block_alerts_sent), para todos os números de admin_whatsapp
+    const adminMessage: string | undefined = Deno.env.get("ADMIN_BLOCK_ALERT_LEGACY") === "on" ? adminMessages[alert.new_status] : undefined;
     if (adminMessage) {
       try {
         await waSendText(ADMIN_PHONE, adminMessage + BOT_DISCLAIMER, cfg);
