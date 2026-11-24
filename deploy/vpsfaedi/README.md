@@ -5,9 +5,9 @@ Traefik da evolutionapi.
 
 | O quê | Onde |
 |---|---|
-| Painel | https://myllenet.mororo.tech → vpsfaedi:8031 |
-| API + Studio | https://api-myllenet.mororo.tech → vpsfaedi:8030 |
-| Postgres (Supavisor) | vpsfaedi:5472 (sessão) / 6583 (transação) |
+| Painel | https://myllenet.mororo.tech → vpsfaedi:8041 |
+| API + Studio | https://api-myllenet.mororo.tech → vpsfaedi:8040 |
+| Postgres (Supavisor) | vpsfaedi:5482 (sessão) / 6593 (transação) |
 | Arquivos | `/opt/myllenet/{app,supabase,restore}` |
 
 ## Passo a passo (na vpsfaedi, como felipemororo)
