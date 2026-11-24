@@ -77,3 +77,14 @@ Na vpsfaedi, a REST do roteador responde ao host mas não aos containers. O
 `./08-mikrotik-relay.sh 206.42.25.226:8090` sobe um `socat` (network_mode host) em
 `172.17.0.1:18090` e aponta Configurações → MikroTik para `host.docker.internal:18090`.
 O endereço real fica em `MIKROTIK_RELAY_TARGET` no `.env` da stack.
+
+## Backup (11)
+
+`./11-backup.sh` instala o backup diário (03:00, crontab do felipemororo): `pg_dump` do banco
+inteiro (sem os dados dos logs grandes) + `.env` + Storage, criptografado com a senha em
+`/opt/myllenet/.backup-senha`. Retenção 7 diários / 4 semanais / 3 mensais em
+`/opt/myllenet/backups`, cópia no Google Drive (`gdrive:Backups/MyLLENET`, rclone).
+Falha ou mais de 26 h sem backup → aviso no WhatsApp dos admins.
+
+Restaurar: `openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass file:/opt/myllenet/.backup-senha -in ARQ.tar.enc | tar -xf -`
+e depois `./02-restaurar-banco.sh banco.backup` numa stack nova (01).
