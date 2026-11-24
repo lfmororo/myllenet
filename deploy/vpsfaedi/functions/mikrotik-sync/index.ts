@@ -74,6 +74,7 @@ Deno.serve(async (req) => {
       .select("key,value")
       .in("key", [
         "mikrotik_host",
+        "mikrotik_host_secondary",
         "mikrotik_username",
         "mikrotik_password",
         "mikrotik_rest_port",
@@ -83,8 +84,10 @@ Deno.serve(async (req) => {
     const cfg: any = {};
     settings?.forEach((s) => (cfg[s.key] = s.value));
 
-    const host = cfg.mikrotik_host;
-    if (!host) {
+    const hosts = [cfg.mikrotik_host, cfg.mikrotik_host_secondary]
+      .map((h: string) => (h || "").trim())
+      .filter(Boolean);
+    if (!hosts.length) {
       return new Response(
         JSON.stringify({
           success: false,
@@ -101,18 +104,16 @@ Deno.serve(async (req) => {
     const pass = cfg.mikrotik_password || "";
     const port = cfg.mikrotik_rest_port || "80";
     const auth = btoa(`${user}:${pass}`);
-    const base = `http://${host}:${port}`;
-
-    // Fast reachability probe: bail out immediately if the REST API is down,
-    // instead of burning 6s per customer call.
-    const probe = await restCall(
-      base,
-      "/system/resource",
-      auth,
-      "GET",
-      undefined,
-      5000,
-    );
+    // vpsfaedi: tenta o host principal e, se não responder, o secundário
+    let base = "";
+    let probe: any = { ok: false, status: 0 };
+    const tentativas: string[] = [];
+    for (const h of hosts) {
+      const b = `http://${h}:${port}`;
+      probe = await restCall(b, "/system/resource", auth, "GET", undefined, 5000);
+      tentativas.push(`${h}:${port} → ${probe.status || probe.error || "sem resposta"}`);
+      if (probe.ok) { base = b; break; }
+    }
     if (!probe.ok) {
       return new Response(
         JSON.stringify({
@@ -120,6 +121,7 @@ Deno.serve(async (req) => {
           error:
             "API REST do Mikrotik não respondeu. Habilite com /ip service enable www e libere a porta no firewall.",
           status: probe.status,
+          tentativas,
         }),
         {
           status: 200,
