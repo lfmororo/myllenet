@@ -33,7 +33,14 @@ CONHECIDOS = [
     ("check-overdue-blocking", "0 2 * * *", "SELECT public.check_and_block_overdue_customers()"),
     ("mikrotik-sync-every-15min", "*/15 * * * *", http_post("mikrotik-sync")),
     ("mikrotik-periodic-metrics", "0 * * * *", http_post("mikrotik-speedtest")),
-    ("mikrotik-sync-logs", "*/5 * * * *", http_post("mikrotik-sync-logs")),
+    ("mikrotik-sync-logs", "* * * * *", http_post("mikrotik-sync-logs")),
+    ("mikrotik-alerts", "*/5 * * * *", http_post("mikrotik-alerts")),
+    ("evolution-monitor", "*/5 * * * *", http_post("evolution-monitor")),
+    # horários em UTC (Brasília = UTC-3)
+    ("daily-report", "0 10 * * *", http_post("daily-report")),
+    ("due-reminder", "0 11 * * *", http_post("due-reminder")),
+    ("cutoff-warning", "0 12 * * *", http_post("cutoff-warning")),
+    ("monthly-invoice-sender", "0 9 1 * *", http_post("monthly-invoice-sender")),
     ("nightly-log-cleanup", "30 6 * * *", "SELECT public.cleanup_old_logs();"),
 ]
 

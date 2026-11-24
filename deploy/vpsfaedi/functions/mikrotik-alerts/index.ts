@@ -1,6 +1,7 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { getWhatsAppConfig, waSendText } from "../_shared/whatsapp.ts";
+const AGENT_FALLBACK = Deno.env.get("MIKROTIK_AGENT") === "on"; // vpsfaedi: só API REST
 
 const ADMIN_PHONE = "85986801458";
 const BOT_DISCLAIMER =
@@ -586,7 +587,9 @@ Deno.serve(async (req) => {
 
     const blockAlertsSent = await processBlockAlerts(supabase);
     const disconnectAlertsSent = await processCustomerDisconnections(supabase);
-    const agentAlerts = await processAgentCommunicationAlerts(supabase);
+    const agentAlerts = AGENT_FALLBACK
+      ? await processAgentCommunicationAlerts(supabase)
+      : { offlineSent: 0, recoverySent: 0 };
     const mikrotikErrorAlertsSent = await processMikrotikErrorAlerts(supabase);
 
     // 1. Check Mikrotik Connection Alerts with custom settings

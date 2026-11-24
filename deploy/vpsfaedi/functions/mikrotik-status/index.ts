@@ -1,5 +1,6 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
+const AGENT_FALLBACK = Deno.env.get("MIKROTIK_AGENT") === "on"; // vpsfaedi: só API REST
 
 async function tcpCheck(host: string, port: number, timeoutMs = 4000) {
   let conn: Deno.Conn | null = null;
@@ -129,6 +130,7 @@ Deno.serve(async (req) => {
     let temperature: number | null = null;
     let activeUsers: number | null = null;
     let activeList: any[] = [];
+    let pppoeOk = false; // coleta completa de /ppp/active (usada pelo mikrotik-sync-logs)
     let wans: any[] = [];
     let restOk = false;
     let restPort: number | null = null;
@@ -365,7 +367,8 @@ Deno.serve(async (req) => {
           if (Array.isArray(active.data)) {
             const list = active.data as Record<string, string>[];
             activeUsers = list.length;
-            activeList = list.slice(0, 200).map((a) => {
+            pppoeOk = true;
+            activeList = list.map((a) => {
               const iface = interfaces.find(
                 (i) =>
                   i.name === a.name ||
@@ -401,7 +404,7 @@ Deno.serve(async (req) => {
     let online = restOk || reachable;
     let source: "direct" | "agent" | "offline" = online ? "direct" : "offline";
 
-    if (!restOk) {
+    if (!restOk && AGENT_FALLBACK) {
       const twoMinAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
       const { data: agentStatus } = await supabase
         .from("mikrotik_status_history")
@@ -487,7 +490,9 @@ Deno.serve(async (req) => {
     } else if (source === "agent") {
       message = "Conectado via Agente VPS (Conexão direta indisponível)";
     } else {
-      message = "Não foi possível alcançar o Mikrotik (Direto ou Agente)";
+      message = AGENT_FALLBACK
+        ? "Não foi possível alcançar o Mikrotik (Direto ou Agente)"
+        : "Não foi possível alcançar o Mikrotik pela API REST";
     }
 
     const responseData = {
@@ -508,6 +513,7 @@ Deno.serve(async (req) => {
       temperature,
       activeUsers,
       activeList,
+      pppoeOk,
       wans,
       // updateAvailable, // Not used in this response type context
       // latestVersion,  // Not used in this response type context

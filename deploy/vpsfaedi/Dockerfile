@@ -12,7 +12,8 @@ ARG VITE_SUPABASE_PROJECT_ID=myllenet
 ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL \
     VITE_SUPABASE_PUBLISHABLE_KEY=$VITE_SUPABASE_PUBLISHABLE_KEY \
     VITE_SUPABASE_PROJECT_ID=$VITE_SUPABASE_PROJECT_ID \
-    VITE_BACKEND=supabase
+    VITE_BACKEND=supabase \
+    VITE_MIKROTIK_AGENT=off
 # o .env do repo aponta para a Lovable Cloud — não pode entrar no build
 RUN rm -f .env .env.* && npm run build
 

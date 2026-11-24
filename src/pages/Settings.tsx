@@ -20,6 +20,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useDiagnosticPDF } from "@/hooks/useDiagnosticPDF";
 import { Checkbox } from "@/components/ui/checkbox";
+import { MIKROTIK_AGENT_ENABLED } from "@/lib/features";
 
 
 
@@ -988,6 +989,7 @@ export default function Settings() {
               </CardContent>
             </Card>
 
+            {MIKROTIK_AGENT_ENABLED && (
             <div className="mt-4 rounded-lg border bg-muted/40 p-4 text-sm text-muted-foreground">
               Para coletar métricas por uma VPS, use a página{" "}
               <button
@@ -999,6 +1001,7 @@ export default function Settings() {
               </button>
               , com download do pacote pré-configurado e tutorial de instalação.
             </div>
+            )}
 
           </TabsContent>
 

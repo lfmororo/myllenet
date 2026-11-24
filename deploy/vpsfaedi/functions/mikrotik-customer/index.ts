@@ -1,5 +1,6 @@
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors'
 import { createClient } from 'npm:@supabase/supabase-js@2.38.4'
+const AGENT_FALLBACK = Deno.env.get("MIKROTIK_AGENT") === "on"; // vpsfaedi: só API REST
 
 type Action = 'sync' | 'enable' | 'disable' | 'remove'
 
@@ -75,7 +76,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    if (!activeBase) {
+    if (!activeBase && AGENT_FALLBACK) {
       // Cloud has no direct REST access to the router: delegate to the local agent
       const { data: queueCustomer } = await supabase
         .from('customers')
@@ -118,6 +119,10 @@ Deno.serve(async (req) => {
         queued: true,
         message: `Comando enviado ao agente local (${queueCustomer.usuario_pppoe}); será aplicado no Mikrotik em poucos segundos.`,
       })
+    }
+
+    if (!activeBase) {
+      return json({ success: false, error: `MikroTik inacessível pela API REST (${hosts.join(', ')}:${restPort}). Confira IP, porta e o serviço www no roteador.` }, 502)
     }
 
     const { data: customer, error: custErr } = await supabase

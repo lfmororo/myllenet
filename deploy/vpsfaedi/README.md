@@ -56,3 +56,17 @@ cd /opt/myllenet/app/deploy/vpsfaedi && ./04-frontend.sh --pull
   `supabase_service_role_key` na tabela `settings`
 - recria os jobs do pg_cron (do backup, ou da lista das migrations) apontando para
   `http://kong:8000` com a service key nova
+
+## MikroTik só pela API REST (sem agente)
+
+`./05-mikrotik-direto.sh` (depois de um `git pull`):
+
+- as functions param de usar o agente (fila `mikrotik_commands`, dados enviados pelo agente,
+  alerta de "agente offline"). Para voltar a ligar: `MIKROTIK_AGENT=on` no `.env` da stack
+  e no `docker-compose.myllenet.yml`.
+- `mikrotik-sync-logs` roda a cada minuto e gera os eventos `connected`/`disconnected`
+  (snapshot em `mikrotik_pppoe_snapshots`) e os `stats` de consumo a cada 5 minutos.
+- agenda os jobs que faltarem (alertas, monitor da Evolution, lembretes, faturas do mês).
+- o painel é buildado com `VITE_MIKROTIK_AGENT=off`, que esconde o menu "Agente VPS",
+  o card do agente e a fila de comandos.
+- requer RouterOS 7.1+ com o serviço `www` (REST) acessível a partir da vpsfaedi.

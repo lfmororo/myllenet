@@ -7,6 +7,7 @@ import { usePlans } from "@/hooks/usePlans";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, AlertTriangle, DollarSign, TrendingUp, Router, Wifi, WifiOff, Loader2, Activity, Server } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, LineChart, Line } from "recharts";
+import { MIKROTIK_AGENT_ENABLED } from "@/lib/features";
 
 export default function DashboardHome() {
   const { customers } = useCustomers();
@@ -233,12 +234,15 @@ export default function DashboardHome() {
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold tracking-tight">Dashboard</h2>
-        <p className="text-muted-foreground">enviar uma alerta via whatsapp, quando o agente passar ais de 2min sem comunicacao</p>
+        {MIKROTIK_AGENT_ENABLED && (
+          <p className="text-muted-foreground">enviar uma alerta via whatsapp, quando o agente passar ais de 2min sem comunicacao</p>
+        )}
       </div>
 
       {/* KPI Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
         {/* Agent Status */}
+        {MIKROTIK_AGENT_ENABLED && (
         <Card className={`border-l-4 ${agentStatus === "online" ? "border-l-success" : agentStatus === "offline" ? "border-l-destructive" : "border-l-muted"}`}>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Agente</CardTitle>
@@ -261,6 +265,7 @@ export default function DashboardHome() {
             </p>
           </CardContent>
         </Card>
+        )}
         {/* Router Status */}
         <Card className={`border-l-4 ${routerStatus === "online" ? "border-l-success" : routerStatus === "offline" ? "border-l-destructive" : "border-l-muted"}`}>
           <CardHeader className="flex flex-row items-center justify-between pb-2">

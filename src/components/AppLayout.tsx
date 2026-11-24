@@ -30,6 +30,7 @@ import {
   Stethoscope,
 } from "lucide-react";
 import logoImg from "@/assets/logo.png";
+import { MIKROTIK_AGENT_ENABLED } from "@/lib/features";
 
 const navItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
@@ -37,7 +38,7 @@ const navItems = [
   { title: "Cobranças", url: "/cobrancas", icon: FileText },
   { title: "Notificações", url: "/notificacoes", icon: Bell },
   { title: "Mikrotik", url: "/mikrotik", icon: Router },
-  { title: "Agente VPS", url: "/agente", icon: Server },
+  ...(MIKROTIK_AGENT_ENABLED ? [{ title: "Agente VPS", url: "/agente", icon: Server }] : []),
   { title: "Avaliações", url: "/avaliacoes", icon: Star },
   { title: "Diagnósticos", url: "/diagnosticos", icon: Stethoscope },
   { title: "Relatórios", url: "/relatorios", icon: ChartNoAxesCombined },

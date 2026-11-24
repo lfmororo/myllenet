@@ -81,6 +81,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { MIKROTIK_AGENT_ENABLED } from "@/lib/features";
 
 export default function MikrotikPage() {
   const [loading, setLoading] = useState(false);
@@ -644,7 +645,7 @@ export default function MikrotikPage() {
 
       <RecentPppoeConnections />
 
-      <MikrotikCommandQueue />
+      {MIKROTIK_AGENT_ENABLED && <MikrotikCommandQueue />}
 
 
       <Card>
