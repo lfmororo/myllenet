@@ -1,19 +1,20 @@
 #!/usr/bin/env bash
-# 11 — Etapa 3 do plano: backup diário com cópia no Google Drive
+# 11 — Etapa 3 do plano: backup diário com cópia no Google Drive (pode rodar de novo quando quiser)
 #   1. senha de criptografia do backup (gera uma, se você não tiver)
-#   2. rclone + Google Drive (remoto "gdrive", pasta Backups/MyLLENET)
-#   3. tabela public.backup_execucoes + verificação diária (avisa se ficar >26 h sem backup)
-#   4. crontab: backup todo dia às 03:00
-#   5. roda o primeiro backup e testa a restauração num Postgres temporário
+#   2. tabelas: backup_execucoes (histórico), backup_pedidos ("Fazer backup agora" no painel),
+#      integracoes (conexão do Google Drive; o painel não lê)
+#   3. verificação diária (avisa se ficar >26 h sem backup)
+#   4. crontab: backup às 03:00 + checagem de pedido manual a cada minuto
+#   5. roda um backup e testa a restauração num Postgres temporário
+# O Google Drive é conectado pelo painel: Configurações → Backups.
 set -euo pipefail
 cd "$(dirname "$0")"
 source ./config.env
 psql_admin() { (cd "$SB_DIR" && docker compose exec -T db psql -U supabase_admin -d postgres -v ON_ERROR_STOP=1 "$@"); }
-REMOTO_NOME=gdrive
-PASTA_DRIVE="Backups/MyLLENET"
-
-echo "==> Atualizando código e functions (aviso-admin)"
+echo "==> Atualizando código, functions (aviso-admin, google-drive) e painel"
+sed -i "s#^NO_VERIFY_JWT_FUNCTIONS=.*#NO_VERIFY_JWT_FUNCTIONS=$NO_VERIFY_JWT_FUNCTIONS#" "$SB_DIR/.env"
 ./04-frontend.sh --pull
+(cd "$SB_DIR" && docker compose up -d functions)
 
 echo "==> Senha de criptografia do backup"
 if [ -s "$BASE/.backup-senha" ]; then
@@ -31,28 +32,12 @@ else
   read -rp "  Já guardou? (Enter para continuar) " _
 fi
 
-echo "==> rclone (Google Drive)"
-command -v rclone >/dev/null || sudo apt-get install -y -qq rclone >/dev/null
-RCLONE_DESTINO=""
-if rclone listremotes 2>/dev/null | grep -qx "$REMOTO_NOME:"; then
-  rclone mkdir "$REMOTO_NOME:$PASTA_DRIVE" && RCLONE_DESTINO="$REMOTO_NOME:$PASTA_DRIVE"
-  echo "  ok: $RCLONE_DESTINO"
-else
-  cat <<MSG
-  O remoto "$REMOTO_NOME" ainda não existe. O backup vai funcionar só local por enquanto.
-  Para ligar o Google Drive (uma vez):
-    1. rclone config  →  n (novo)  →  nome: $REMOTO_NOME  →  tipo: drive
-       client_id/secret: Enter  →  scope: 3 (drive.file, só os arquivos do rclone)
-       "Use web browser to automatically authenticate?"  →  n
-    2. Ele mostra um comando "rclone authorize ..." — rode no seu PC Windows
-       (baixe o rclone.exe em rclone.org/downloads), entre na conta Google e cole
-       o token de volta no terminal da vpsfaedi.
-    3. Rode este script de novo:  ./11-backup.sh
-MSG
-fi
+# mantém um destino rclone só se você já tinha configurado um (o Drive agora é pelo painel)
+RCLONE_DESTINO=$(grep -E '^RCLONE_DESTINO=' "$BASE/backup.env" 2>/dev/null | cut -d= -f2- || true)
 
 cat > "$BASE/backup.env" <<EOF
 # configuração do backup-diario.sh (gerado pelo 11-backup.sh)
+# Google Drive: conectado pelo painel. RCLONE_DESTINO só se você configurou um remoto rclone.
 RCLONE_DESTINO=$RCLONE_DESTINO
 MANTER_DIARIO=7
 MANTER_SEMANAL=4
@@ -70,7 +55,41 @@ create table if not exists public.backup_execucoes (
   remoto text,
   erro text
 );
+alter table public.backup_execucoes add column if not exists drive_file_id text;
+alter table public.backup_execucoes add column if not exists origem text default 'agendado';
 alter table public.backup_execucoes enable row level security;
+grant select on public.backup_execucoes to authenticated;
+grant all on public.backup_execucoes to service_role, postgres;
+
+create table if not exists public.backup_pedidos (
+  id bigserial primary key,
+  criado_em timestamptz not null default now(),
+  criado_por uuid default auth.uid(),
+  status text not null default 'pendente' check (status in ('pendente', 'rodando', 'concluido', 'falhou')),
+  iniciado_em timestamptz,
+  concluido_em timestamptz
+);
+alter table public.backup_pedidos enable row level security;
+drop policy if exists "Admins pedem backup" on public.backup_pedidos;
+create policy "Admins pedem backup" on public.backup_pedidos for insert to authenticated
+  with check (public.has_role(auth.uid(), 'admin') and status = 'pendente');
+drop policy if exists "Admins veem pedidos" on public.backup_pedidos;
+create policy "Admins veem pedidos" on public.backup_pedidos for select to authenticated
+  using (public.has_role(auth.uid(), 'admin'));
+grant select, insert on public.backup_pedidos to authenticated;
+grant usage on sequence public.backup_pedidos_id_seq to authenticated;
+grant all on public.backup_pedidos to service_role, postgres;
+
+-- segredos de integrações (Google Drive): só a service role lê/escreve
+create table if not exists public.integracoes (
+  chave text primary key,
+  valor jsonb not null,
+  atualizado_em timestamptz not null default now()
+);
+alter table public.integracoes enable row level security;
+revoke all on public.integracoes from anon, authenticated;
+grant all on public.integracoes to service_role;
+
 drop policy if exists "Admins leem backups" on public.backup_execucoes;
 create policy "Admins leem backups" on public.backup_execucoes for select to authenticated
   using (public.has_role(auth.uid(), 'admin'));
@@ -95,13 +114,15 @@ SQL
 psql_admin -tAc "select count(*) from vault.secrets where name = 'myllenet_service_role_key'" | grep -q '^1$' \
   || echo "  atenção: segredo myllenet_service_role_key não está no Vault — rode o 07-aviso-bloqueio.sh"
 
-echo "==> crontab (03:00 todo dia)"
-LINHA="0 3 * * * $APP_DIR/deploy/vpsfaedi/backup-diario.sh >> $BASE/backups/backup.log 2>&1"
+echo "==> crontab (03:00 todo dia + pedido manual a cada minuto)"
+SCRIPT="$APP_DIR/deploy/vpsfaedi/backup-diario.sh"
 mkdir -p "$BASE/backups"
-( crontab -l 2>/dev/null | grep -v 'backup-diario.sh' ; echo "$LINHA" ) | crontab -
+( crontab -l 2>/dev/null | grep -v 'backup-diario.sh'
+  echo "0 3 * * * $SCRIPT >> $BASE/backups/backup.log 2>&1"
+  echo "* * * * * $SCRIPT --pedido >> $BASE/backups/backup.log 2>&1" ) | crontab -
 crontab -l | grep backup-diario
 
-echo "==> Primeiro backup"
+echo "==> Backup agora"
 "$APP_DIR/deploy/vpsfaedi/backup-diario.sh" | tee -a "$BASE/backups/backup.log"
 ULT=$(ls -1t "$BASE/backups/diario/"*.tar.enc | head -n1)
 
@@ -123,4 +144,7 @@ else
   echo; echo "⚠️  Os números não bateram — cole a saída para o Claude."
 fi
 echo "   Arquivo: $ULT ($(du -h "$ULT" | cut -f1))"
-[ -n "$RCLONE_DESTINO" ] && echo "   Google Drive: $RCLONE_DESTINO" || echo "   Google Drive: ainda não configurado (veja as instruções acima)"
+DRV=$(curl -s -m 30 -X POST "http://127.0.0.1:$PORTA_API/functions/v1/google-drive/token" \
+  -H "Authorization: Bearer $(envget SERVICE_ROLE_KEY)" -H "apikey: $(envget SERVICE_ROLE_KEY)" -H "Content-Type: application/json" -d '{}')
+if printf '%s' "$DRV" | grep -q '"conectado":true'; then echo "   Google Drive: conectado (cópia enviada)"
+else echo "   Google Drive: não conectado ainda → painel: Configurações → Backups → Conectar Google Drive"; fi

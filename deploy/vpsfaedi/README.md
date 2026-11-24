@@ -83,7 +83,9 @@ O endereço real fica em `MIKROTIK_RELAY_TARGET` no `.env` da stack.
 `./11-backup.sh` instala o backup diário (03:00, crontab do felipemororo): `pg_dump` do banco
 inteiro (sem os dados dos logs grandes) + `.env` + Storage, criptografado com a senha em
 `/opt/myllenet/.backup-senha`. Retenção 7 diários / 4 semanais / 3 mensais em
-`/opt/myllenet/backups`, cópia no Google Drive (`gdrive:Backups/MyLLENET`, rclone).
+`/opt/myllenet/backups`, cópia no Google Drive, conectado pelo painel (Configurações → Backups, function `google-drive`;
+pasta "MyLLENET Backups"). O painel também mostra o histórico e tem "Fazer backup agora"
+(tabela `backup_pedidos`, checada a cada minuto pelo crontab).
 Falha ou mais de 26 h sem backup → aviso no WhatsApp dos admins.
 
 Restaurar: `openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass file:/opt/myllenet/.backup-senha -in ARQ.tar.enc | tar -xf -`

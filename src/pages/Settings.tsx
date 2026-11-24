@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/integrations/api/client";
-import { Navigate, useNavigate } from "react-router-dom";
+import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
+import BackupsCard from "@/components/BackupsCard";
 import { usePlans } from "@/hooks/usePlans";
 import type { Plan } from "@/hooks/usePlans";
 import PlanFormDialog from "@/components/PlanFormDialog";
@@ -26,6 +27,8 @@ import { MIKROTIK_AGENT_ENABLED } from "@/lib/features";
 
 export default function Settings() {
   const { user, isAdmin, loading: authLoading } = useAuth();
+  const [searchParams] = useSearchParams();
+  const abaInicial = searchParams.get("aba") || "plans";
   const navigate = useNavigate();
 
   const [paymentGateway, setPaymentGateway] = useState("efi");
@@ -349,7 +352,7 @@ export default function Settings() {
       </div>
 
       <div className="max-w-2xl">
-        <Tabs defaultValue="plans">
+        <Tabs defaultValue={abaInicial}>
           <TabsList>
             <TabsTrigger value="plans">
               <Package className="mr-1.5 h-4 w-4" /> Planos
@@ -366,6 +369,7 @@ export default function Settings() {
               <Router className="mr-1.5 h-4 w-4" /> Mikrotik
             </TabsTrigger>
             <TabsTrigger value="pix">PIX Local</TabsTrigger>
+            <TabsTrigger value="backups">Backups</TabsTrigger>
             <TabsTrigger value="diagnostic">
               <ShieldAlert className="mr-1.5 h-4 w-4" /> Diagnóstico
             </TabsTrigger>
@@ -1065,6 +1069,10 @@ export default function Settings() {
                 </Button>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="backups" className="mt-4">
+            <BackupsCard />
           </TabsContent>
 
           <TabsContent value="diagnostic" className="mt-4">
