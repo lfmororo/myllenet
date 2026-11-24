@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import logoImg from "@/assets/logo.png";
 
-const FN_URL = `https://${import.meta.env.VITE_SUPABASE_PROJECT_ID}.supabase.co/functions/v1/diagnostico`;
+const FN_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/diagnostico`;
 const NOME_PROVEDOR = "Mororo.Tech";
 const ehWindows = typeof navigator !== "undefined" && navigator.userAgent.includes("Windows");
 
