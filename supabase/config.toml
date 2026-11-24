@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.diagnostico-provedor]
 verify_jwt = false
+
+[functions.fatura-publica]
+verify_jwt = false

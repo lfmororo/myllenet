@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { waSendText, waSendSupportButton } from "../_shared/whatsapp.ts";
+import { exigir } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -58,6 +59,8 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
+  const negado = await exigir(req, "interno");
+  if (negado) return negado;
 
   try {
     const supabase = getSupabaseAdmin();

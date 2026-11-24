@@ -1,5 +1,6 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { exigir } from "../_shared/auth.ts";
 const AGENT_FALLBACK = Deno.env.get("MIKROTIK_AGENT") === "on"; // vpsfaedi: só API REST
 
 async function tcpCheck(host: string, port: number, timeoutMs = 4000) {
@@ -68,6 +69,8 @@ async function restCall(
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS")
     return new Response("ok", { headers: corsHeaders });
+  const negado = await exigir(req, "usuario");
+  if (negado) return negado;
 
   const json = (body: unknown, status = 200) =>
     new Response(JSON.stringify(body), {

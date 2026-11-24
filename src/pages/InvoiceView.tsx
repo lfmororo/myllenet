@@ -20,6 +20,16 @@ const InvoiceView = () => {
   const { data, isLoading, error } = useQuery({
     queryKey: ["public-invoice", id],
     queryFn: async () => {
+      // Backend Supabase (VPS e Lovable): Edge Function pública fatura-publica
+      if (((import.meta.env.VITE_BACKEND as string) || "supabase") === "supabase") {
+        const base = import.meta.env.VITE_SUPABASE_URL as string;
+        const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
+        const res = await fetch(`${base}/functions/v1/fatura-publica?id=${encodeURIComponent(id || "")}`, {
+          headers: { apikey: key, Authorization: `Bearer ${key}` },
+        });
+        if (!res.ok) throw new Error("Fatura não encontrada");
+        return res.json();
+      }
       const res = await fetch(`${API_URL}/api/public/invoice/${id}`);
       if (!res.ok) throw new Error("Fatura não encontrada");
       return res.json();

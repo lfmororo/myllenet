@@ -1,5 +1,6 @@
 import { corsHeaders } from "https://esm.sh/@supabase/supabase-js@2/cors";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
+import { exigir } from "../_shared/auth.ts";
 
 const START = Date.now();
 const DEADLINE_MS = 100_000; // stay well under the 150s idle limit
@@ -62,6 +63,8 @@ async function runPool<T>(items: T[], worker: (item: T) => Promise<void>) {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS")
     return new Response("ok", { headers: corsHeaders });
+  const negado = await exigir(req, "usuario");
+  if (negado) return negado;
 
   try {
     const supabase = createClient(

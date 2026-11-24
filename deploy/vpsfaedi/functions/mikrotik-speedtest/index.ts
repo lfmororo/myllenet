@@ -1,8 +1,11 @@
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors'
 import { createClient } from 'npm:@supabase/supabase-js@2'
+import { exigir } from "../_shared/auth.ts";
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
+  const negado = await exigir(req, "interno");
+  if (negado) return negado;
 
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,

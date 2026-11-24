@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
+import { exigir } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -15,6 +16,8 @@ function getSupabaseAdmin() {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  const negado = await exigir(req, "interno");
+  if (negado) return negado;
 
   try {
     const supabase = getSupabaseAdmin();

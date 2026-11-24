@@ -7,11 +7,14 @@
 // Agendado no pg_cron a cada minuto.
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors'
 import { createClient } from 'npm:@supabase/supabase-js@2'
+import { exigir } from "../_shared/auth.ts";
 
 const STATS_EVERY_MIN = 5
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
+  const negado = await exigir(req, "interno");
+  if (negado) return negado;
 
   const json = (body: unknown, status = 200) =>
     new Response(JSON.stringify(body), {

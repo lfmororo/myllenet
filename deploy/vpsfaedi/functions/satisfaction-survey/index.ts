@@ -45,7 +45,7 @@ async function verifyAdmin(authHeader: string | null) {
   if (!authHeader) throw new Error("Não autenticado");
   const supabase = admin();
   const token = authHeader.replace("Bearer ", "");
-  if (token === Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || tokenRole(token) === "service_role") {
+  if (token === Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")) { // vpsfaedi: sem aceitar papel lido de token não validado
     return;
   }
   const { data: userData, error } = await supabase.auth.getUser(token);

@@ -43,8 +43,8 @@ async function verifyAdmin(authHeader: string | null) {
 
   // Allow service role key (or any service-role token) for server-to-server calls
   if (
-    token === Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ||
-    tokenRole(token) === "service_role"
+    // vpsfaedi: só a service key de verdade (o papel lido do token sem validar a assinatura podia ser forjado)
+    token === Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
   ) {
     return "service_role";
   }

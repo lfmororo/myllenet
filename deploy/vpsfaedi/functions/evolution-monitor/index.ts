@@ -1,6 +1,7 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { waSendText } from "../_shared/whatsapp.ts";
+import { exigir } from "../_shared/auth.ts";
 
 const ADMIN_PHONE = "85986801458";
 const STATE_KEY = "evolution_instance_states";
@@ -11,6 +12,8 @@ function isConnected(state: string) {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  const negado = await exigir(req, "interno");
+  if (negado) return negado;
 
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,

@@ -1,6 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { jsPDF } from "https://esm.sh/jspdf@2.5.1";
 import QRCode from "https://esm.sh/qrcode@1.5.3";
+import { exigir } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -98,6 +99,8 @@ function generatePixPayload(key: string, name: string, city: string, amount: num
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  const negado = await exigir(req, "usuario");
+  if (negado) return negado;
 
   try {
     let invoice_id = null;
