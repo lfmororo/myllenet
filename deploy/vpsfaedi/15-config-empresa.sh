@@ -25,7 +25,7 @@ psql_admin -c "select key, value from public.settings where key in ('provedor_no
 
 echo "==> Sobrou algum valor fixo nas functions publicadas?"
 SOBRA=$(grep -rn "85986801458\|98680-1458\|Mororo\.Tech\|myllenet\.mororo\.tech" "$SB_DIR/volumes/functions" --include=index.ts \
-  | grep -v "let PROVEDOR = \|let PAINEL = \|ADMIN_PADRAO = \|PAINEL_URL\") ||" || true)
+  | grep -v "let PROVEDOR = \|let PAINEL = \|ADMIN_PADRAO = \|PAINEL_URL\") ||\|SUPABASE_PUBLIC_URL\") ||" || true)
 [ -n "$SOBRA" ] && printf '%s\n' "$SOBRA" | sed 's/^/  /' || echo "  nenhum (só os valores padrão usados se a configuração estiver vazia)"
 
 echo "==> Teste: fatura pública traz os dados da empresa"
