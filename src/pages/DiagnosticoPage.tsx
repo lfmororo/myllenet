@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import logoImg from "@/assets/logo.png";
 
 const FN_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/diagnostico`;
-const NOME_PROVEDOR = "Mororo.Tech";
+const NOME_PROVEDOR_PADRAO = "Mororo.Tech";
 const ehWindows = typeof navigator !== "undefined" && navigator.userAgent.includes("Windows");
 
 type Estado = "aguardando" | "testando" | "ok" | "alerta" | "falha";
@@ -22,6 +22,7 @@ interface Inicial {
   na_rede_provedor: boolean;
   cliente_primeiro_nome: string;
   plano_mbps?: number | null;
+  provedor?: { nome: string; telefone: string; telefone_fmt: string } | null;
   config: Config;
 }
 interface Etapa {
@@ -463,13 +464,13 @@ echo.
 echo  Pronto! O relatorio foi enviado para a {NOME}. Pode fechar esta janela.
 pause >nul
 `
-      .replace(/\{NOME\}/g, NOME_PROVEDOR)
+      .replace(/\{NOME\}/g, inicial?.provedor?.nome || NOME_PROVEDOR_PADRAO)
       .replace(/\{URL\}/g, url)
       .replace(/\n/g, "\r\n");
     const blob = new Blob([conteudo], { type: "application/x-bat" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `diagnostico-${NOME_PROVEDOR}.bat`;
+    a.download = `diagnostico-${(inicial?.provedor?.nome || NOME_PROVEDOR_PADRAO).replace(/[^A-Za-z0-9.-]+/g, "")}.bat`;
     a.click();
     URL.revokeObjectURL(a.href);
   }
@@ -484,7 +485,7 @@ pause >nul
       <main className="mx-auto w-full max-w-[34rem] px-5 py-8 flex flex-col gap-6">
         <header className="flex items-center gap-3">
           <img src={logoImg} alt="" className="h-9 w-auto object-contain logo-high-contrast" />
-          <span className="text-lg font-semibold tracking-tight">Mororo.Tech</span>
+          <span className="text-lg font-semibold tracking-tight">{inicial?.provedor?.nome || NOME_PROVEDOR_PADRAO}</span>
         </header>
 
         {carregando ? (

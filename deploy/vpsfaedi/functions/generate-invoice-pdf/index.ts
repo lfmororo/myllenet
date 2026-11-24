@@ -2,6 +2,11 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { jsPDF } from "https://esm.sh/jspdf@2.5.1";
 import QRCode from "https://esm.sh/qrcode@1.5.3";
 import { exigir } from "../_shared/auth.ts";
+import { carregarConfig } from "../_shared/config.ts";
+let PROVEDOR = "Mororo.Tech";
+let PAINEL = "https://myllenet.mororo.tech";
+let TELEFONE_FMT = "";
+let SLOGAN = "";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -101,6 +106,7 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   const negado = await exigir(req, "usuario");
   if (negado) return negado;
+  { const __c = await carregarConfig(); PROVEDOR = __c.provedor; PAINEL = __c.painel; TELEFONE_FMT = __c.telefoneFmt; SLOGAN = __c.slogan; }
 
   try {
     let invoice_id = null;
@@ -179,7 +185,7 @@ Deno.serve(async (req) => {
       pixSource = "local";
       pixPayload = generatePixPayload(
         pixSettings.pix_key || "00000000000",
-        pixSettings.pix_name || "Mororo Tech",
+        pixSettings.pix_name || `${PROVEDOR}`,
         pixSettings.pix_city || "Ipu",
         invoice.valor_centavos / 100,
         pixDescription
@@ -213,11 +219,11 @@ Deno.serve(async (req) => {
       doc.text(`#${invoice_id.substring(0, 8).toUpperCase()}`, pageWidth - 20, 32, { align: "right" });
       doc.setFontSize(8);
       doc.setTextColor(accentColor[0], accentColor[1], accentColor[2]);
-      doc.text("MylleNet agora é Mororo.Tech", pageWidth - 20, 38, { align: "right" });
+      doc.text(`${SLOGAN}`, pageWidth - 20, 38, { align: "right" });
 
       // Logo
       try {
-        const logoUrl = "https://myllenet.mororo.tech/logo.png";
+        const logoUrl = `${PAINEL}/logo.png`;
         const resp = await fetch(logoUrl, { signal: AbortSignal.timeout(2000) });
         if (resp.ok) {
           const blob = await resp.blob();
@@ -227,24 +233,24 @@ Deno.serve(async (req) => {
         } else {
           doc.setFontSize(16);
           doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-          doc.text("Mororo.Tech", 20, 26);
+          doc.text(`${PROVEDOR}`, 20, 26);
         }
       } catch (e) {
         doc.setFontSize(16);
         doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-        doc.text("Mororo.Tech", 20, 26);
+        doc.text(`${PROVEDOR}`, 20, 26);
       }
 
       let currentY = 60;
       doc.setFontSize(10);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-      doc.text(pixSettings.pix_name || "Mororo.Tech", 20, currentY);
+      doc.text(pixSettings.pix_name || `${PROVEDOR}`, 20, currentY);
       doc.setFont("helvetica", "normal");
       doc.setTextColor(textColor[0], textColor[1], textColor[2]);
       doc.text(`CNPJ: ${pixSettings.company_cnpj || "00.000.000/0000-00"}`, 20, currentY + 6);
       doc.text(pixSettings.company_address || "Ipu - Ceará", 20, currentY + 12);
-      doc.text(`Contato: ${pixSettings.company_phone || "(85) 98680-1458"}`, 20, currentY + 18);
+      doc.text(`Contato: ${pixSettings.company_phone || `${TELEFONE_FMT}`}`, 20, currentY + 18);
 
       doc.setFont("helvetica", "bold");
       doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
@@ -332,9 +338,9 @@ Deno.serve(async (req) => {
       doc.text("ESTA É UMA FATURA DE SERVIÇOS DE COMUNICAÇÃO MULTIMÍDIA.", 20, pageHeight - 14);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(accentColor[0], accentColor[1], accentColor[2]);
-      doc.text("MylleNet agora é Mororo.Tech", 20, pageHeight - 10);
+      doc.text(`${SLOGAN}`, 20, pageHeight - 10);
       doc.setTextColor(lightTextColor[0], lightTextColor[1], lightTextColor[2]);
-      doc.text("Mororo.Tech © 2026", pageWidth - 20, pageHeight - 10, { align: "right" });
+      doc.text(`${PROVEDOR} © ${new Date().getFullYear()}`, pageWidth - 20, pageHeight - 10, { align: "right" });
 
       const pdfOutput = doc.output("arraybuffer");
       return new Response(pdfOutput, {

@@ -2,6 +2,7 @@
 // Substitui a rota /api/public/invoice/:id do backend Fastify, que não está no ar.
 // Devolve só o necessário para exibir e pagar a fatura, com nome e documento já mascarados.
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { carregarConfig } from "../_shared/config.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -63,6 +64,11 @@ Deno.serve(async (req) => {
     const settings: Record<string, string> = {};
     for (const r of rows || []) settings[r.key] = r.value ?? "";
 
+    const prov = await carregarConfig();
+    settings.provedor_nome = prov.provedor;
+    settings.atendimento_telefone = prov.telefone;
+    settings.atendimento_telefone_fmt = prov.telefoneFmt;
+    settings.fatura_slogan = prov.slogan;
     return json({ invoice: fatura, settings });
   } catch (e) {
     console.error("fatura-publica", e);

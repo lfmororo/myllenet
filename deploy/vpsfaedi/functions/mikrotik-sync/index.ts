@@ -1,6 +1,11 @@
 import { corsHeaders } from "https://esm.sh/@supabase/supabase-js@2/cors";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 import { exigir } from "../_shared/auth.ts";
+import { carregarConfig } from "../_shared/config.ts";
+let PROVEDOR = "Mororo.Tech";
+let PAINEL = "https://myllenet.mororo.tech";
+let TELEFONE_FMT = "";
+let SLOGAN = "";
 
 const START = Date.now();
 const DEADLINE_MS = 100_000; // stay well under the 150s idle limit
@@ -65,6 +70,7 @@ Deno.serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   const negado = await exigir(req, "usuario");
   if (negado) return negado;
+  { const __c = await carregarConfig(); PROVEDOR = __c.provedor; PAINEL = __c.painel; TELEFONE_FMT = __c.telefoneFmt; SLOGAN = __c.slogan; }
 
   try {
     const supabase = createClient(
@@ -248,8 +254,8 @@ Deno.serve(async (req) => {
         if (!customer?.telefone) continue;
         const blockingDays = cfg.blocking_days || "15";
         const invoiceUrl = alert.invoice_id
-          ? `https://myllenet.mororo.tech/fatura/${alert.invoice_id}`
-          : "https://myllenet.mororo.tech/clientes";
+          ? `${PAINEL}/fatura/${alert.invoice_id}`
+          : `${PAINEL}/clientes`;
         const message =
           alert.new_status === "blocked"
             ? `⚠️ *Aviso de Bloqueio:* Olá ${customer.nome}, identificamos uma fatura com mais de ${blockingDays} dias de atraso e seu sinal foi suspenso automaticamente. Regularize para restabelecer a conexão.\n\n🔗 *Link da Fatura:* ${invoiceUrl}`

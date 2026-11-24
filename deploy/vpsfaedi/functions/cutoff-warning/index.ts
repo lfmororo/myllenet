@@ -8,13 +8,17 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { waSendText, waSendSupportButton } from "../_shared/whatsapp.ts";
 import { exigir } from "../_shared/auth.ts";
+import { carregarConfig } from "../_shared/config.ts";
+let PROVEDOR = "Mororo.Tech";
+let PAINEL = "https://myllenet.mororo.tech";
+let TELEFONE_FMT = "";
+let SLOGAN = "";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
-const BOT_DISCLAIMER =
-  "\n\n🤖 _Esta é uma mensagem automática. Para falar com um atendente, entre em contato: (85) 98680-1458_";
+let BOT_DISCLAIMER = "";
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -30,6 +34,7 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   const negado = await exigir(req, "interno");
   if (negado) return negado;
+  { const __c = await carregarConfig(); PROVEDOR = __c.provedor; PAINEL = __c.painel; TELEFONE_FMT = __c.telefoneFmt; SLOGAN = __c.slogan; BOT_DISCLAIMER = __c.rodape; }
 
   try {
     const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
@@ -79,11 +84,11 @@ Deno.serve(async (req) => {
 
       const nome = String(c.nome || "").split(" ")[0];
       const linhas = fs.map((f: any) =>
-        `📋 ${f.descricao} — ${brl(f.valor_centavos)} (venc. ${dataBR(f.vencimento)})\n🔗 https://myllenet.mororo.tech/fatura/${f.id}`
+        `📋 ${f.descricao} — ${brl(f.valor_centavos)} (venc. ${dataBR(f.vencimento)})\n🔗 ${PAINEL}/fatura/${f.id}`
       );
       const message = `Olá ${nome}! 🌐
 
-⚠️ *AVISO IMPORTANTE da Mororo.Tech*
+⚠️ *AVISO IMPORTANTE da ${PROVEDOR}*
 
 ${fs.length > 1 ? "Você tem faturas em aberto" : "Sua fatura está em aberto"}:
 
@@ -95,7 +100,7 @@ ${linhas.join("\n\n")}
 
 Pague pelo link acima para evitar a suspensão do serviço.
 
-_Equipe Mororo.Tech_${BOT_DISCLAIMER}`;
+_Equipe ${PROVEDOR}_${BOT_DISCLAIMER}`;
 
       let erro: string | null = null;
       try {

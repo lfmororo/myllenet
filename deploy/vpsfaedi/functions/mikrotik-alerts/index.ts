@@ -2,11 +2,16 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { getWhatsAppConfig, waSendText } from "../_shared/whatsapp.ts";
 import { exigir } from "../_shared/auth.ts";
+import { carregarConfig } from "../_shared/config.ts";
+let PROVEDOR = "Mororo.Tech";
+let PAINEL = "https://myllenet.mororo.tech";
+let TELEFONE_FMT = "";
+let SLOGAN = "";
 const AGENT_FALLBACK = Deno.env.get("MIKROTIK_AGENT") === "on"; // vpsfaedi: só API REST
 
-const ADMIN_PHONE = "85986801458";
-const BOT_DISCLAIMER =
-  "\n\n🤖 _Esta é uma mensagem automática. Para falar com um atendente, entre em contato: (85) 98680-1458_";
+let ADMIN_PHONE = "";
+let ADMINS: string[] = [];
+let BOT_DISCLAIMER = "";
 
 async function processBlockAlerts(supabase: any) {
   const { data: alerts, error } = await supabase
@@ -42,7 +47,7 @@ async function processBlockAlerts(supabase: any) {
     const adminMessage: string | undefined = Deno.env.get("ADMIN_BLOCK_ALERT_LEGACY") === "on" ? adminMessages[alert.new_status] : undefined;
     if (adminMessage) {
       try {
-        await waSendText(ADMIN_PHONE, adminMessage + BOT_DISCLAIMER, cfg);
+        for (const __adm of ADMINS) await waSendText(__adm, adminMessage + BOT_DISCLAIMER, cfg);
         await supabase.from("notification_logs").insert({
           customer_id: alert.customer_id,
           customer_name: customer.nome,
@@ -215,7 +220,7 @@ async function processCustomerDisconnections(supabase: any) {
 
       const message = `⚠️ *CLIENTE DESCONECTADO* ⚠️\n\nCliente: *${customer.nome}* (${username})\nDesconectou em: ${new Date(event.logged_at).toLocaleString("pt-BR")}\nTempo off-line: ${formatDuration(now - eventTime)}`;
       try {
-        await waSendText(ADMIN_PHONE, message + BOT_DISCLAIMER, cfg);
+        for (const __adm of ADMINS) await waSendText(__adm, message + BOT_DISCLAIMER, cfg);
         await supabase.from("customer_alerts_sent").insert({
           customer_id: customer.id,
           alert_type: "disconnect",
@@ -265,7 +270,7 @@ async function processCustomerDisconnections(supabase: any) {
 
     const message = `✅ *CLIENTE RECONECTADO* ✅\n\nCliente: *${customer.nome}* (${username})\nReconectou em: ${new Date(event.logged_at).toLocaleString("pt-BR")}\nTempo de inatividade: ${formatDuration(eventTime - disconnectTime)}`;
     try {
-      await waSendText(ADMIN_PHONE, message + BOT_DISCLAIMER, cfg);
+      for (const __adm of ADMINS) await waSendText(__adm, message + BOT_DISCLAIMER, cfg);
       await supabase.from("customer_alerts_sent").insert({
         customer_id: customer.id,
         alert_type: "reconnect",
@@ -339,7 +344,7 @@ async function processAgentCommunicationAlerts(supabase: any) {
       const message = `🚨 *ALERTA DO AGENTE* 🚨\n\nO agente *${agent.name}* está sem comunicação há mais de 2 minutos.\n\nÚltima atividade: ${lastSeen}\n\nVerifique se o serviço Node.js está em execução.`;
 
       try {
-        await waSendText(ADMIN_PHONE, message + BOT_DISCLAIMER, cfg);
+        for (const __adm of ADMINS) await waSendText(__adm, message + BOT_DISCLAIMER, cfg);
         const { error: logError } = await supabase
           .from("notification_logs")
           .insert({
@@ -373,7 +378,7 @@ async function processAgentCommunicationAlerts(supabase: any) {
       const message = `✅ *AGENTE RECONECTADO* ✅\n\nO agente *${agent.name}* voltou a se comunicar normalmente.\n\nAtividade confirmada: ${new Date(referenceTime).toLocaleString("pt-BR")}`;
 
       try {
-        await waSendText(ADMIN_PHONE, message + BOT_DISCLAIMER, cfg);
+        for (const __adm of ADMINS) await waSendText(__adm, message + BOT_DISCLAIMER, cfg);
         const { error: logError } = await supabase
           .from("notification_logs")
           .insert({
@@ -555,7 +560,7 @@ async function processMikrotikErrorAlerts(supabase: any) {
 
     const message = `🚨 *ERRO NO MIKROTIK* 🚨\n\nHost: *${candidate.host}*\nTipo: *${candidate.category}*\nDetalhes: ${candidate.detail}\nData: ${new Date(candidate.loggedAt).toLocaleString("pt-BR")}`;
     try {
-      await waSendText(ADMIN_PHONE, message + BOT_DISCLAIMER, cfg);
+      for (const __adm of ADMINS) await waSendText(__adm, message + BOT_DISCLAIMER, cfg);
       const { error: saveError } = await supabase
         .from("customer_alerts_sent")
         .insert({ alert_type: alertType });
@@ -577,6 +582,7 @@ Deno.serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   const negado = await exigir(req, "interno");
   if (negado) return negado;
+  { const __c = await carregarConfig(); PROVEDOR = __c.provedor; PAINEL = __c.painel; TELEFONE_FMT = __c.telefoneFmt; SLOGAN = __c.slogan; BOT_DISCLAIMER = __c.rodape; ADMIN_PHONE = __c.admins[0]; ADMINS = __c.admins; }
 
   const json = (body: unknown, status = 200) =>
     new Response(JSON.stringify(body), {

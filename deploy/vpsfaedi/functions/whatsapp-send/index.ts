@@ -1,5 +1,10 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 import { waSendText, waSendDocument, waSendSupportButton, waTestConnection, getWhatsAppConfig } from "../_shared/whatsapp.ts";
+import { carregarConfig } from "../_shared/config.ts";
+let PROVEDOR = "Mororo.Tech";
+let PAINEL = "https://myllenet.mororo.tech";
+let TELEFONE_FMT = "";
+let SLOGAN = "";
 
 
 const corsHeaders = {
@@ -9,7 +14,7 @@ const corsHeaders = {
 };
 
 const UAZAPI_BASE_URL = "https://ipazua.uazapi.com"; 
-const BOT_DISCLAIMER = "\n\n🤖 _Esta é uma mensagem automática. Para falar com um atendente, entre em contato: (85) 98680-1458_";
+let BOT_DISCLAIMER = "";
 const UAZAPI_FILE_ENDPOINT = "/send/media"; 
 const UAZAPI_TEXT_ENDPOINT = "/send/text";
 
@@ -287,13 +292,13 @@ async function sendInvoiceNotification(req: Request) {
   switch (notifType) {
     case "boleto_gerado": {
       const mesRef = new Date(invoice.vencimento + "T12:00:00").toLocaleDateString("pt-BR", { month: 'long', year: 'numeric' });
-      message = `Olá ${customer.nome}! 🌐\n\nSua fatura da *Mororo.Tech* referente a *${mesRef}* foi gerada:\n\n📋 ${invoice.descricao}\n💰 Valor: ${valor}\n📅 Vencimento: ${vencimento}`;
+      message = `Olá ${customer.nome}! 🌐\n\nSua fatura da *${PROVEDOR}* referente a *${mesRef}* foi gerada:\n\n📋 ${invoice.descricao}\n💰 Valor: ${valor}\n📅 Vencimento: ${vencimento}`;
       
       message += "\n\nQualquer dúvida, estamos à disposição! 😊";
       break;
     }
     case "lembrete_vencimento":
-      message = `Olá ${customer.nome}! 🌐\n\n⏰ Lembrete: sua fatura da *Mororo.Tech* vence em breve!\n\n📋 ${invoice.descricao}\n💰 Valor: ${valor}\n📅 Vencimento: ${vencimento}`;
+      message = `Olá ${customer.nome}! 🌐\n\n⏰ Lembrete: sua fatura da *${PROVEDOR}* vence em breve!\n\n📋 ${invoice.descricao}\n💰 Valor: ${valor}\n📅 Vencimento: ${vencimento}`;
       message += "\n\nEvite a suspensão do serviço. Pague em dia! 😊";
       break;
     case "pagamento_confirmado":
@@ -301,7 +306,7 @@ async function sendInvoiceNotification(req: Request) {
       message = `Olá ${customer.nome}! 🌐\n\n✅ Pagamento confirmado!\n\n📋 ${invoice.descricao}\n💰 Valor: ${valor}\n📅 Vencimento: ${vencimento}\n📂 Referência: ${mesRefPag}\n\nObrigado por manter sua internet em dia! 🚀`;
       break;
     case "cobranca_atrasada":
-      message = `Olá ${customer.nome}! 🌐\n\n⚠️ Sua fatura da *Mororo.Tech* está vencida!\n\n📋 ${invoice.descricao}\n💰 Valor: ${valor}\n📅 Vencimento: ${vencimento}`;
+      message = `Olá ${customer.nome}! 🌐\n\n⚠️ Sua fatura da *${PROVEDOR}* está vencida!\n\n📋 ${invoice.descricao}\n💰 Valor: ${valor}\n📅 Vencimento: ${vencimento}`;
       break;
     default:
       message = `Olá ${customer.nome}! Informação sobre sua fatura: ${invoice.descricao} - ${valor}`;
@@ -309,7 +314,7 @@ async function sendInvoiceNotification(req: Request) {
 
   try {
     const formattedPhone = formatPhone(customer.telefone);
-    const invoiceUrl = `https://myllenet.mororo.tech/fatura/${invoice_id}`;
+    const invoiceUrl = `${PAINEL}/fatura/${invoice_id}`;
     const fullMessage = message + BOT_DISCLAIMER;
     
     // First send the text message with the link
@@ -332,7 +337,7 @@ async function sendInvoiceNotification(req: Request) {
           type: "document",
           file: pdfUrl,
           delay: 2000,
-          text: `Fatura Mororo.Tech - ${invoice.descricao}`,
+          text: `Fatura ${PROVEDOR} - ${invoice.descricao}`,
           docName: fileName
         });
         console.log("[PDF] UAZAPI response:", fileResult);
@@ -479,6 +484,7 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
+  { const __c = await carregarConfig(); PROVEDOR = __c.provedor; PAINEL = __c.painel; TELEFONE_FMT = __c.telefoneFmt; SLOGAN = __c.slogan; BOT_DISCLAIMER = __c.rodape; }
 
   try {
     const url = new URL(req.url);

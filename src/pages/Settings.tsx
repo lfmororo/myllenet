@@ -78,6 +78,11 @@ export default function Settings() {
   const [mikrotikRestPort, setMikrotikRestPort] = useState("80");
   const [blockingDays, setBlockingDays] = useState("15");
   const [avisoCorteDias, setAvisoCorteDias] = useState("5");
+  const [provedorNome, setProvedorNome] = useState("Mororo.Tech");
+  const [atendimentoTelefone, setAtendimentoTelefone] = useState("");
+  const [urlPainel, setUrlPainel] = useState("https://myllenet.mororo.tech");
+  const [faturaSlogan, setFaturaSlogan] = useState("");
+  const [savingEmpresa, setSavingEmpresa] = useState(false);
   const [alertOfflineMinutes, setAlertOfflineMinutes] = useState("5");
   const [alertFailureCount, setAlertFailureCount] = useState("3");
 
@@ -175,7 +180,7 @@ export default function Settings() {
     const { data } = await api
       .from("settings")
       .select("key, value")
-      .in("key", ["payment_gateway", "mercadopago_access_token", "efi_client_id", "efi_client_secret", "efi_certificate_path", "uazapi_token", "whatsapp_provider", "evolution_base_url", "evolution_api_key", "evolution_instance", "mikrotik_host", "mikrotik_host_secondary", "mikrotik_username", "mikrotik_password", "mikrotik_api_port", "mikrotik_rest_port", "blocking_days", "aviso_corte_dias_antes", "pix_key", "pix_name", "pix_city", "mikrotik_alert_offline_minutes", "mikrotik_alert_failure_count", "admin_whatsapp"]);
+      .in("key", ["payment_gateway", "mercadopago_access_token", "efi_client_id", "efi_client_secret", "efi_certificate_path", "uazapi_token", "whatsapp_provider", "evolution_base_url", "evolution_api_key", "evolution_instance", "mikrotik_host", "mikrotik_host_secondary", "mikrotik_username", "mikrotik_password", "mikrotik_api_port", "mikrotik_rest_port", "blocking_days", "aviso_corte_dias_antes", "provedor_nome", "atendimento_telefone", "url_painel", "fatura_slogan", "pix_key", "pix_name", "pix_city", "mikrotik_alert_offline_minutes", "mikrotik_alert_failure_count", "admin_whatsapp"]);
 
     if (data) {
       for (const row of data) {
@@ -198,6 +203,10 @@ export default function Settings() {
         if (row.key === "mikrotik_rest_port") setMikrotikRestPort(row.value || "80");
         if (row.key === "blocking_days") setBlockingDays(row.value || "15");
         if (row.key === "aviso_corte_dias_antes") setAvisoCorteDias(row.value || "5");
+        if (row.key === "provedor_nome") setProvedorNome(row.value || "Mororo.Tech");
+        if (row.key === "atendimento_telefone") setAtendimentoTelefone(row.value || "");
+        if (row.key === "url_painel") setUrlPainel(row.value || "https://myllenet.mororo.tech");
+        if (row.key === "fatura_slogan") setFaturaSlogan(row.value || "");
         if (row.key === "pix_key") setPixKey(row.value || "");
         if (row.key === "pix_name") setPixName(row.value || "");
         if (row.key === "pix_city") setPixCity(row.value || "");
@@ -385,6 +394,7 @@ export default function Settings() {
               <Router className="mr-1.5 h-4 w-4" /> Mikrotik
             </TabsTrigger>
             <TabsTrigger value="pix">PIX Local</TabsTrigger>
+            <TabsTrigger value="empresa">Empresa</TabsTrigger>
             <TabsTrigger value="backups">Backups</TabsTrigger>
             <TabsTrigger value="diagnostic">
               <ShieldAlert className="mr-1.5 h-4 w-4" /> Diagnóstico
@@ -1082,6 +1092,56 @@ export default function Settings() {
                 >
                   {savingPix && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Salvar Configurações PIX
+                </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="empresa" className="mt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Empresa</CardTitle>
+                <CardDescription>
+                  Usados nas mensagens de WhatsApp, nas faturas (PDF e página pública), no diagnóstico e nos avisos.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="provedor_nome">Nome do provedor</Label>
+                  <Input id="provedor_nome" value={provedorNome} onChange={(e) => setProvedorNome(e.target.value)} placeholder="Mororo.Tech" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="atendimento_telefone">WhatsApp de atendimento</Label>
+                  <Input id="atendimento_telefone" value={atendimentoTelefone} onChange={(e) => setAtendimentoTelefone(e.target.value)} placeholder="85986801458" />
+                  <p className="text-xs text-muted-foreground">Aparece no rodapé das mensagens automáticas, no botão "Falar com Suporte" e na fatura.</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="url_painel">Endereço do painel</Label>
+                  <Input id="url_painel" value={urlPainel} onChange={(e) => setUrlPainel(e.target.value)} placeholder="https://myllenet.mororo.tech" />
+                  <p className="text-xs text-muted-foreground">Base dos links de fatura e diagnóstico enviados aos clientes.</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="fatura_slogan">Frase na fatura (opcional)</Label>
+                  <Input id="fatura_slogan" value={faturaSlogan} onChange={(e) => setFaturaSlogan(e.target.value)} placeholder="MylleNet agora é Mororo.Tech" />
+                </div>
+                <Button
+                  onClick={async () => {
+                    setSavingEmpresa(true);
+                    try {
+                      await upsertSetting("provedor_nome", provedorNome.trim() || "Mororo.Tech");
+                      await upsertSetting("atendimento_telefone", atendimentoTelefone.replace(/\D/g, ""));
+                      await upsertSetting("url_painel", urlPainel.trim().replace(/\/+$/, ""));
+                      await upsertSetting("fatura_slogan", faturaSlogan.trim());
+                      toast.success("Dados da empresa salvos! As mensagens usam os novos dados em até 1 minuto.");
+                    } catch (err: any) {
+                      toast.error("Erro ao salvar: " + (err.message || "Erro desconhecido"));
+                    }
+                    setSavingEmpresa(false);
+                  }}
+                  disabled={savingEmpresa}
+                >
+                  {savingEmpresa ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                  Salvar
                 </Button>
               </CardContent>
             </Card>

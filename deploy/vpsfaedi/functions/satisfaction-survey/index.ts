@@ -1,9 +1,13 @@
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { getWhatsAppConfig, waSendText } from "../_shared/whatsapp.ts";
+import { carregarConfig } from "../_shared/config.ts";
+let PROVEDOR = "Mororo.Tech";
+let PAINEL = "https://myllenet.mororo.tech";
+let TELEFONE_FMT = "";
+let SLOGAN = "";
 
-const BOT_DISCLAIMER =
-  "\n\n🤖 _Esta é uma mensagem automática. Para falar com um atendente, entre em contato: (85) 98680-1458_";
+let BOT_DISCLAIMER = "";
 
 const DEFAULT_SURVEY_URL = "https://app.mororo.tech/satisfacao";
 
@@ -18,7 +22,7 @@ export function surveyMessage(nome: string | null, url: string) {
   const saudacao = nome ? `Olá, ${nome}!` : "Olá!";
   return (
     `${saudacao} 👋\n\n` +
-    `Somos da *Mororo.Tech* e queremos garantir que sua internet esteja sempre à altura do que você espera.\n\n` +
+    `Somos da *${PROVEDOR}* e queremos garantir que sua internet esteja sempre à altura do que você espera.\n\n` +
     `⭐ *Avalie nosso atendimento* e, se precisar, registre uma *solicitação* ou *reclamação*. ` +
     `Leva menos de 1 minuto e sua resposta nos ajuda a melhorar o serviço prestado a você.\n\n` +
     `👉 ${url}\n\n` +
@@ -71,6 +75,7 @@ async function getSurveyUrl(supabase: any, override?: string) {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  { const __c = await carregarConfig(); PROVEDOR = __c.provedor; PAINEL = __c.painel; TELEFONE_FMT = __c.telefoneFmt; SLOGAN = __c.slogan; BOT_DISCLAIMER = __c.rodape; }
 
   const json = (body: unknown, status = 200) =>
     new Response(JSON.stringify(body), {

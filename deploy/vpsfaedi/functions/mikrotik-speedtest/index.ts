@@ -1,6 +1,7 @@
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors'
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { exigir } from "../_shared/auth.ts";
+import { carregarConfig } from "../_shared/config.ts";
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
@@ -171,8 +172,9 @@ Deno.serve(async (req) => {
       created_at: r.created_at
     })))
 
-    const ADMIN_PHONE = '85986801458'
-    let message = `🚀 *SPEED TEST MIKROTIK (MORORO.TECH)* 🚀\n\n`
+    const __prov = await carregarConfig()
+    const ADMIN_PHONE = __prov.admins[0]
+    let message = `🚀 *SPEED TEST MIKROTIK (${__prov.provedor.toUpperCase()})* 🚀\n\n`
     const now = new Date();
     const brDate = new Date(now.getTime() - (3 * 3600 * 1000));
     const formattedDate = brDate.toLocaleDateString('pt-BR') + ', ' + brDate.toLocaleTimeString('pt-BR');

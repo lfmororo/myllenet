@@ -2,8 +2,14 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { waSendText } from "../_shared/whatsapp.ts";
 import { exigir } from "../_shared/auth.ts";
+import { carregarConfig } from "../_shared/config.ts";
+let PROVEDOR = "Mororo.Tech";
+let PAINEL = "https://myllenet.mororo.tech";
+let TELEFONE_FMT = "";
+let SLOGAN = "";
 
-const ADMIN_PHONE = "85986801458";
+let ADMIN_PHONE = "";
+let ADMINS: string[] = [];
 const STATE_KEY = "evolution_instance_states";
 
 function isConnected(state: string) {
@@ -14,6 +20,7 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   const negado = await exigir(req, "interno");
   if (negado) return negado;
+  { const __c = await carregarConfig(); PROVEDOR = __c.provedor; PAINEL = __c.painel; TELEFONE_FMT = __c.telefoneFmt; SLOGAN = __c.slogan; ADMIN_PHONE = __c.admins[0]; ADMINS = __c.admins; }
 
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
@@ -81,7 +88,7 @@ Deno.serve(async (req) => {
         : `🟢 *Evolution API - Instância reconectada*\n\n📱 Instância: *${change.name}*\n✅ Status: ${change.state}\n🕒 ${new Date(Date.now() - 3 * 3600 * 1000).toLocaleString("pt-BR")}`;
 
       try {
-        await waSendText(ADMIN_PHONE, message);
+        for (const __adm of ADMINS) await waSendText(__adm, message);
       } catch (err) {
         console.error(`Falha ao notificar mudança da instância ${change.name}:`, err);
       }

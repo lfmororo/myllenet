@@ -1,5 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { conectarMikrotik, duracaoMs, taxaMbps } from "../_shared/mikrotik.ts";
+import { carregarConfig } from "../_shared/config.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -225,7 +226,7 @@ async function notifyAdmin(supabase: any, nome: string, id: string, row: any, ip
     if (pd.quedas) linhas.push(`Quedas: ${pd.quedas.h24} em 24 h, ${pd.quedas.d7} em 7 dias`);
     for (const r of pd.resumo ?? []) linhas.push(`• ${r}`);
   }
-  linhas.push("", `Abrir: ${Deno.env.get("PAINEL_URL") || "https://myllenet.mororo.tech"}/diagnosticos?id=${id}`);
+  linhas.push("", `Abrir: ${(await carregarConfig()).painel}/diagnosticos?id=${id}`);
   const text = linhas.join("\n");
 
   let url: string, headers: Record<string, string>;
@@ -306,6 +307,7 @@ Deno.serve(async (req) => {
         na_rede_provedor: naRede,
         cliente_primeiro_nome: (cliente.nome ?? "").trim().split(/\s+/)[0] ?? "",
         plano_mbps: planoMbps((cliente as any).plans),
+        provedor: await carregarConfig().then((c) => ({ nome: c.provedor, telefone: c.telefone, telefone_fmt: c.telefoneFmt })).catch(() => null),
         config: {
           speedtest_url: cfg?.speedtest_url ?? null,
           dns_curinga: cfg?.dns_curinga ?? null,

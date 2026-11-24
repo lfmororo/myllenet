@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { carregarConfig } from "./config.ts";
 
 /**
  * Camada de abstração de provedores WhatsApp.
@@ -172,7 +173,8 @@ export async function waSendSupportButton(phone: string, cfgIn?: WhatsAppConfig)
     const cfg = cfgIn || (await getWhatsAppConfig());
     assertConfigured(cfg);
     const number = formatPhone(phone);
-    const supportUrl = "https://wa.me/5585986801458?text=Preciso%20de%20Suporte";
+    const prov = await carregarConfig();
+    const supportUrl = `https://wa.me/55${prov.telefone.replace(/^55(?=\d{10,11}$)/, "")}?text=Preciso%20de%20Suporte`;
 
     if (cfg.provider === "evolution") {
       return await request(
@@ -182,7 +184,7 @@ export async function waSendSupportButton(phone: string, cfgIn?: WhatsAppConfig)
           number,
           title: "Precisa de Suporte?",
           description: "Escolha uma opção",
-          footer: "Mororo.Tech",
+          footer: prov.provedor,
           buttons: [{ type: "url", displayText: "Falar com Suporte", url: supportUrl }],
         },
         "evolution/sendButtons"

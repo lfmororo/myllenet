@@ -1,6 +1,11 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { waSendText, waSendSupportButton } from "../_shared/whatsapp.ts";
 import { exigir } from "../_shared/auth.ts";
+import { carregarConfig } from "../_shared/config.ts";
+let PROVEDOR = "Mororo.Tech";
+let PAINEL = "https://myllenet.mororo.tech";
+let TELEFONE_FMT = "";
+let SLOGAN = "";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,7 +13,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const BOT_DISCLAIMER = "\n\n🤖 _Esta é uma mensagem automática. Para falar com um atendente, entre em contato: (85) 98680-1458_";
+let BOT_DISCLAIMER = "";
 
 function getSupabaseAdmin() {
   return createClient(
@@ -61,6 +66,7 @@ Deno.serve(async (req) => {
   }
   const negado = await exigir(req, "interno");
   if (negado) return negado;
+  { const __c = await carregarConfig(); PROVEDOR = __c.provedor; PAINEL = __c.painel; TELEFONE_FMT = __c.telefoneFmt; SLOGAN = __c.slogan; BOT_DISCLAIMER = __c.rodape; }
 
   try {
     const supabase = getSupabaseAdmin();
@@ -108,7 +114,7 @@ Deno.serve(async (req) => {
       const pixCopiaCola = (inv as any).mp_pix_copiacola || inv.efi_pix_copiacola;
       const message = `Olá ${nome}! 🌐
 
-⏰ *Lembrete da Mororo.Tech*: sua fatura vence em *3 dias*!
+⏰ *Lembrete da ${PROVEDOR}*: sua fatura vence em *3 dias*!
 
 📋 ${inv.descricao}
 💰 Valor: ${formatCurrency(inv.valor_centavos)}
@@ -116,7 +122,7 @@ Deno.serve(async (req) => {
 
 Evite a suspensão do serviço. Pague em dia! 😊
 
-_Equipe Mororo.Tech_`;
+_Equipe ${PROVEDOR}_`;
 
       try {
         const fullMessage = message + BOT_DISCLAIMER;

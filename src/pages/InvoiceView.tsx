@@ -38,6 +38,10 @@ const InvoiceView = () => {
 
   const invoice = data?.invoice;
   const settings = data?.settings;
+  const provedor: string = settings?.provedor_nome || "Mororo.Tech";
+  const slogan: string = settings?.fatura_slogan ?? "MylleNet agora é Mororo.Tech";
+  const telefone: string = String(settings?.atendimento_telefone || "85986801458").replace(/^55(?=\d{10,11}$)/, "");
+  const telefoneFmt: string = settings?.atendimento_telefone_fmt || "(85) 98680-1458";
 
   const generatePix = () => {
     if (!invoice) return "";
@@ -79,7 +83,7 @@ const InvoiceView = () => {
     payload += f("53", "986");
     payload += f("54", (invoice.valor_centavos / 100).toFixed(2));
     payload += f("58", "BR");
-    payload += f("59", sanitize(settings.pix_name || "Mororo Tech").substring(0, 25));
+    payload += f("59", sanitize(settings.pix_name || provedor).substring(0, 25));
     payload += f("60", sanitize(settings.pix_city || "Ipu").substring(0, 15));
     payload += f("62", f("05", txid));
     payload += "6304";
@@ -111,7 +115,7 @@ const InvoiceView = () => {
       doc.setTextColor(71, 85, 105);
       doc.setFont("helvetica", "normal");
       doc.text(`#${id?.substring(0, 8).toUpperCase()}`, 20, 32);
-      doc.text("Mororo.Tech", pageWidth - 20, 25, { align: "right" });
+      doc.text(provedor, pageWidth - 20, 25, { align: "right" });
 
       doc.setFontSize(11);
       doc.setTextColor(15, 23, 42);
@@ -176,10 +180,10 @@ const InvoiceView = () => {
           <div className="space-y-1">
             <CardTitle className="text-2xl font-bold flex items-center gap-2 text-slate-900">
               <FileText className="h-6 w-6 text-primary" />
-              Mororo.Tech
+              {provedor}
             </CardTitle>
             <p className="text-sm text-muted-foreground">Fatura de Serviços de Internet</p>
-            <p className="text-xs font-medium text-primary">MylleNet agora é Mororo.Tech</p>
+            {slogan && <p className="text-xs font-medium text-primary">{slogan}</p>}
           </div>
           <div className="text-right">
             <span className={`px-3 py-1 rounded-full text-xs font-medium ${
@@ -294,15 +298,15 @@ const InvoiceView = () => {
           )}
         </CardContent>
         <CardFooter className="bg-slate-50 border-t flex flex-col items-center p-6 gap-2 text-center rounded-b-xl">
-          <p className="text-sm font-semibold text-slate-800">MylleNet agora é Mororo.Tech</p>
+          {slogan && <p className="text-sm font-semibold text-slate-800">{slogan}</p>}
           <p className="text-sm text-slate-600">
             Dúvidas? Entre em contato com nosso suporte:
           </p>
           <a 
-            href="https://wa.me/5585986801458" 
+            href={`https://wa.me/55${telefone}`}
             className="text-primary font-bold hover:underline flex items-center gap-1"
           >
-            (85) 98680-1458
+            {telefoneFmt}
           </a>
         </CardFooter>
       </Card>
