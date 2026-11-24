@@ -23,6 +23,10 @@ import { useDiagnosticPDF } from "@/hooks/useDiagnosticPDF";
 import { Checkbox } from "@/components/ui/checkbox";
 import { MIKROTIK_AGENT_ENABLED } from "@/lib/features";
 
+// Credenciais: gravadas pela function settings-segredos e nunca lidas de volta pelo navegador
+const SEGREDOS = ["efi_client_id", "efi_client_secret", "mercadopago_access_token", "uazapi_token", "evolution_api_key", "mikrotik_password"];
+const MASCARA = "••• configurado (preencha só para trocar)";
+
 
 
 export default function Settings() {
@@ -37,6 +41,7 @@ export default function Settings() {
   const [savingMp, setSavingMp] = useState(false);
   const [mpAccessToken, setMpAccessToken] = useState("");
   const [mpTokenSaved, setMpTokenSaved] = useState(false);
+  const [segredosOk, setSegredosOk] = useState<Record<string, boolean>>({});
   const API_URL = (import.meta.env.VITE_API_URL as string) || "http://localhost:3333";
   const mpWebhookUrl = `${API_URL}/api/functions/mercadopago/webhook`;
   const [clientId, setClientId] = useState("");
@@ -200,11 +205,22 @@ export default function Settings() {
         if (row.key === "mikrotik_alert_failure_count") setAlertFailureCount(row.value || "3");
       }
     }
+    const { data: seg } = await api.functions.invoke("settings-segredos", { method: "GET" });
+    const conf = ((seg as any)?.configurado ?? {}) as Record<string, boolean>;
+    setSegredosOk(conf);
+    setMpTokenSaved(!!conf.mercadopago_access_token);
 
     setLoadingSettings(false);
   };
 
   const upsertSetting = async (key: string, value: string) => {
+    if (SEGREDOS.includes(key)) {
+      if (!value || !value.trim()) return; // vazio = manter o que já está salvo
+      const { error } = await api.functions.invoke("settings-segredos", { body: { chave: key, valor: value.trim() } });
+      if (error) throw error;
+      setSegredosOk((m) => ({ ...m, [key]: true }));
+      return;
+    }
     const { data: existing } = await api
       .from("settings")
       .select("id")
@@ -560,7 +576,7 @@ export default function Settings() {
                         id="client_id"
                         value={clientId}
                         onChange={(e) => setClientId(e.target.value)}
-                        placeholder="Informe o Client ID da EFI"
+                        placeholder={segredosOk.efi_client_id ? MASCARA : "Informe o Client ID da EFI"}
                       />
                     </div>
 
@@ -571,7 +587,7 @@ export default function Settings() {
                         type="password"
                         value={clientSecret}
                         onChange={(e) => setClientSecret(e.target.value)}
-                        placeholder="Informe o Client Secret da EFI"
+                        placeholder={segredosOk.efi_client_secret ? MASCARA : "Informe o Client Secret da EFI"}
                       />
                     </div>
 
@@ -665,7 +681,7 @@ export default function Settings() {
                           type="password"
                           value={uazapiToken}
                           onChange={(e) => setUazapiToken(e.target.value)}
-                          placeholder="Informe o token do servidor uazapi"
+                          placeholder={segredosOk.uazapi_token ? MASCARA : "Informe o token do servidor uazapi"}
                         />
                         <p className="text-xs text-muted-foreground">
                           Servidor: https://ipazua.uazapi.com
@@ -689,7 +705,7 @@ export default function Settings() {
                             type="password"
                             value={evolutionApiKey}
                             onChange={(e) => setEvolutionApiKey(e.target.value)}
-                            placeholder="Chave global ou da instância"
+                            placeholder={segredosOk.evolution_api_key ? MASCARA : "Chave global ou da instância"}
                           />
                         </div>
                         <div className="space-y-2">
@@ -893,7 +909,7 @@ export default function Settings() {
                         type="password"
                         value={mikrotikPass}
                         onChange={(e) => setMikrotikPass(e.target.value)}
-                        placeholder="Senha do Mikrotik"
+                        placeholder={segredosOk.mikrotik_password ? MASCARA : "Senha do Mikrotik"}
                       />
                     </div>
 
