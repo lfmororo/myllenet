@@ -1,4 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { conectarMikrotik, duracaoMs, taxaMbps } from "../_shared/mikrotik.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -52,7 +53,143 @@ function formatPhone(phone: string): string {
 }
 
 // deno-lint-ignore no-explicit-any
-async function notifyAdmin(supabase: any, nome: string, id: string, row: any, ip: string, naRede: boolean) {
+function planoMbps(plano: any): number | null {
+  for (const s of [plano?.nome_servidor, plano?.nome]) {
+    const m = String(s ?? "").match(/(\d+(?:[.,]\d+)?)\s*(m|g)/i);
+    if (m) return parseFloat(m[1].replace(",", ".")) * (m[2].toLowerCase() === "g" ? 1000 : 1);
+  }
+  return null;
+}
+
+/**
+ * Visão do provedor, direto pela API REST do MikroTik (substitui o agente local):
+ * sessão PPPoE, ping do concentrador até o cliente, tráfego da sessão, limite da fila,
+ * quedas nas últimas 24 h / 7 dias. Grava um diagnóstico origem "provedor" ligado ao do cliente.
+ */
+// deno-lint-ignore no-explicit-any
+async function analisarProvedor(supabase: any, cliente: any, diagId: string, rowCliente: any) {
+  const login = String(cliente.usuario_pppoe ?? "").trim();
+  const plano = planoMbps(cliente.plans);
+  // deno-lint-ignore no-explicit-any
+  const dados: any = { fonte: "api_rest", diagnostico_origem_id: diagId, pppoe: {}, ping: {}, plano_mbps: plano };
+
+  if (!login) {
+    dados.erro = "Cliente sem usuário PPPoE cadastrado";
+  } else {
+    try {
+      const mk = await conectarMikrotik(supabase);
+      const ativos = await mk.get(`/ppp/active?name=${encodeURIComponent(login)}`, 6000);
+      const s = Array.isArray(ativos) ? ativos[0] : null;
+      dados.pppoe = s
+        ? { online: true, ip: s.address ?? null, uptime: s.uptime ?? null, mac: s["caller-id"] ?? null, login }
+        : { online: false, login };
+
+      if (s?.address) {
+        const iface = `<pppoe-${login}>`;
+        const [ping, trafego, fila] = await Promise.allSettled([
+          mk.post("/ping", { address: s.address, count: "10", interval: "0.2" }, 15000),
+          mk.post("/interface/monitor-traffic", { interface: iface, once: "" }, 8000),
+          mk.get(`/queue/simple?name=${encodeURIComponent(iface)}`, 6000),
+        ]);
+        if (ping.status === "fulfilled" && Array.isArray(ping.value) && ping.value.length) {
+          const u = ping.value[ping.value.length - 1];
+          const perda = Number(String(u["packet-loss"] ?? "").replace("%", ""));
+          dados.ping = {
+            enviados: Number(u.sent ?? ping.value.length),
+            recebidos: Number(u.received ?? 0),
+            perda_pct: Number.isFinite(perda) ? perda : null,
+            media_ms: duracaoMs(u["avg-rtt"]),
+            max_ms: duracaoMs(u["max-rtt"]),
+          };
+        } else if (ping.status === "rejected") dados.ping = { erro: String(ping.reason?.message ?? ping.reason) };
+        if (trafego.status === "fulfilled") {
+          const t = Array.isArray(trafego.value) ? trafego.value[0] : trafego.value;
+          // visto do concentrador: tx = o que desce para o cliente, rx = o que ele envia
+          dados.trafego = {
+            download_mbps: t ? Number(t["tx-bits-per-second"] ?? 0) / 1e6 : null,
+            upload_mbps: t ? Number(t["rx-bits-per-second"] ?? 0) / 1e6 : null,
+          };
+        }
+        if (fila.status === "fulfilled" && Array.isArray(fila.value) && fila.value[0]) {
+          const [up, down] = String(fila.value[0]["max-limit"] ?? "").split("/");
+          dados.fila = { max_limit: fila.value[0]["max-limit"] ?? null, upload_mbps: taxaMbps(up), download_mbps: taxaMbps(down) };
+        }
+      }
+    } catch (e) {
+      dados.erro = (e as Error).message;
+    }
+  }
+
+  // quedas registradas pelo mikrotik-sync-logs
+  if (cliente.id) {
+    const agora = Date.now();
+    const conta = async (horas: number) => {
+      const { count } = await supabase
+        .from("pppoe_logs")
+        .select("id", { count: "exact", head: true })
+        .eq("customer_id", cliente.id)
+        .eq("event_type", "disconnected")
+        .gte("logged_at", new Date(agora - horas * 3600_000).toISOString());
+      return count ?? 0;
+    };
+    const { data: ult } = await supabase
+      .from("pppoe_logs")
+      .select("logged_at")
+      .eq("customer_id", cliente.id)
+      .eq("event_type", "disconnected")
+      .order("logged_at", { ascending: false })
+      .limit(1);
+    dados.quedas = { h24: await conta(24), d7: await conta(24 * 7), ultima: ult?.[0]?.logged_at ?? null };
+  }
+
+  // veredito e leitura para o atendimento
+  const online = dados.pppoe?.online;
+  const perda = Number(dados.ping?.perda_pct ?? 0);
+  const media = Number(dados.ping?.media_ms ?? 0);
+  const q24 = Number(dados.quedas?.h24 ?? 0);
+  const limite = dados.fila?.download_mbps ?? plano;
+  const resumo: string[] = [];
+  if (dados.erro && online === undefined) resumo.push(`Não foi possível consultar o MikroTik: ${dados.erro}`);
+  if (online === false) resumo.push("Cliente sem sessão PPPoE ativa no momento do teste");
+  if (online && perda >= 1) resumo.push(`Perda de ${perda.toFixed(0)}% entre o concentrador e o cliente: verificar enlace, ONU ou rádio`);
+  if (online && perda < 1 && media > 50) resumo.push(`Latência alta até o cliente (${media.toFixed(0)} ms): verificar enlace`);
+  if (q24 >= 3) resumo.push(`${q24} quedas nas últimas 24 h (${dados.quedas?.d7 ?? 0} em 7 dias): instabilidade`);
+  if (dados.trafego?.download_mbps != null && limite && dados.trafego.download_mbps >= limite * 0.7)
+    resumo.push(`Banda ocupada por outros aparelhos no momento (${dados.trafego.download_mbps.toFixed(1)} de ${limite} Mbps)`);
+  if (dados.fila?.download_mbps && plano && Math.abs(dados.fila.download_mbps - plano) > plano * 0.1)
+    resumo.push(`Limite no roteador (${dados.fila.download_mbps} Mbps) diferente do plano (${plano} Mbps)`);
+  const provOk = online === true && perda < 1 && media <= 50 && q24 < 3;
+  if (provOk && ["falha", "alerta"].includes(rowCliente.veredito))
+    resumo.push("Rede do provedor ok até o cliente; problema provável no roteador, Wi-Fi ou aparelho da casa");
+  if (limite && typeof rowCliente.download_mbps === "number") {
+    const pct = (rowCliente.download_mbps / limite) * 100;
+    dados.percentual_plano = Math.round(pct);
+    if (pct < 50 && provOk) resumo.push(`Velocidade medida: ${pct.toFixed(0)}% do plano (${rowCliente.download_mbps.toFixed(1)} de ${limite} Mbps)`);
+  }
+  dados.resumo = resumo;
+  const veredito = online === false || perda >= 20 ? "falha"
+    : online === undefined ? null
+    : perda > 0 || media > 50 || q24 >= 3 ? "alerta" : "ok";
+
+  const { data: ins } = await supabase
+    .from("diagnosticos")
+    .insert({
+      cliente_id: cliente.id,
+      origem: "provedor",
+      dados,
+      latencia_ms: dados.ping?.media_ms ?? null,
+      perda_pct: dados.ping?.perda_pct ?? null,
+      veredito,
+      ip_publico: dados.pppoe?.ip ?? null,
+      na_rede_provedor: online === true ? true : online === false ? false : null,
+    })
+    .select("id")
+    .single();
+  return { id: ins?.id ?? null, veredito, dados };
+}
+
+// deno-lint-ignore no-explicit-any
+async function notifyAdmin(supabase: any, nome: string, id: string, row: any, ip: string, naRede: boolean, prov?: any) {
   const { data: rows } = await supabase
     .from("settings")
     .select("key, value")
@@ -80,6 +217,15 @@ async function notifyAdmin(supabase: any, nome: string, id: string, row: any, ip
     if (tipo) linhas.push(`Conexão do aparelho: ${tipo === "cellular" ? "dados móveis" : tipo}`);
   }
   linhas.push(`IP: ${ip || "—"} | Na rede do provedor: ${naRede ? "sim" : "não"}`);
+  if (prov?.dados) {
+    const pd = prov.dados;
+    linhas.push("", `📡 *Visão do provedor*: ${vered[prov.veredito] ?? "—"}`);
+    linhas.push(`PPPoE: ${pd.pppoe?.online === false ? "offline" : pd.pppoe?.online ? `online há ${pd.pppoe.uptime ?? "?"}` : "—"}`);
+    if (pd.ping?.media_ms != null) linhas.push(`Ping até o cliente: ${Number(pd.ping.media_ms).toFixed(0)} ms, perda ${pd.ping.perda_pct ?? "?"}%`);
+    if (pd.quedas) linhas.push(`Quedas: ${pd.quedas.h24} em 24 h, ${pd.quedas.d7} em 7 dias`);
+    for (const r of pd.resumo ?? []) linhas.push(`• ${r}`);
+  }
+  linhas.push("", `Abrir: ${Deno.env.get("PAINEL_URL") || "https://myllenet.mororo.tech"}/diagnosticos?id=${id}`);
   const text = linhas.join("\n");
 
   let url: string, headers: Record<string, string>;
@@ -128,7 +274,7 @@ Deno.serve(async (req) => {
 
     const { data: cliente } = await supabase
       .from("customers")
-      .select("id, nome")
+      .select("id, nome, usuario_pppoe, plan_id, plans(nome, nome_servidor)")
       .eq("diagnostico_token", token)
       .maybeSingle();
     if (!cliente) return json({ erro: "Link inválido ou expirado" }, 404);
@@ -159,6 +305,7 @@ Deno.serve(async (req) => {
         ip,
         na_rede_provedor: naRede,
         cliente_primeiro_nome: (cliente.nome ?? "").trim().split(/\s+/)[0] ?? "",
+        plano_mbps: planoMbps((cliente as any).plans),
         config: {
           speedtest_url: cfg?.speedtest_url ?? null,
           dns_curinga: cfg?.dns_curinga ?? null,
@@ -227,22 +374,20 @@ Deno.serve(async (req) => {
     }
 
     const webhook = Deno.env.get("AGENTE_WEBHOOK_URL");
+    let tarefa: Promise<unknown>;
     if (webhook) {
-      const p = fetch(webhook, {
+      // agente local (legado): ele mesmo grava a visão do provedor
+      tarefa = fetch(webhook, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${Deno.env.get("AGENTE_TOKEN") ?? ""}`,
-        },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${Deno.env.get("AGENTE_TOKEN") ?? ""}` },
         body: JSON.stringify({ diagnostico_id: inserted.id, cliente_id: cliente.id, ip_publico: ip || null }),
-      }).catch((e) => console.error("webhook error", e));
-      // deno-lint-ignore no-explicit-any
-      (globalThis as any).EdgeRuntime?.waitUntil?.(p);
+      }).then(() => notifyAdmin(supabase, cliente.nome, inserted.id, row, ip, naRede));
+    } else {
+      tarefa = analisarProvedor(supabase, cliente, inserted.id, row)
+        .catch((e) => { console.error("analise provedor", e); return null; })
+        .then((prov) => notifyAdmin(supabase, cliente.nome, inserted.id, row, ip, naRede, prov));
     }
-
-    // Aviso ao administrador via WhatsApp (não bloqueia a resposta)
-    const aviso = notifyAdmin(supabase, cliente.nome, inserted.id, row, ip, naRede)
-      .catch((e) => console.error("admin notify error", e));
+    const aviso = tarefa.catch((e) => console.error("diagnostico background", e));
     // deno-lint-ignore no-explicit-any
     (globalThis as any).EdgeRuntime?.waitUntil?.(aviso);
 

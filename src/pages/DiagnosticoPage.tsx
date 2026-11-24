@@ -21,6 +21,7 @@ interface Inicial {
   ip: string;
   na_rede_provedor: boolean;
   cliente_primeiro_nome: string;
+  plano_mbps?: number | null;
   config: Config;
 }
 interface Etapa {
@@ -292,6 +293,14 @@ export default function DiagnosticoPage() {
       rel.velocidade.download_mbps = mbps;
       rel.velocidade.download_bytes = bytes;
       if (bytes === 0) return ["falha", "Não foi possível baixar dados."];
+      const plano = inicial.plano_mbps;
+      if (plano) {
+        const pct = Math.round((mbps / plano) * 100);
+        rel.velocidade.plano_mbps = plano;
+        rel.velocidade.percentual_plano = pct;
+        if (pct < 50) return ["alerta", `${fmt(mbps)} Mbps (${pct}% do seu plano de ${plano} Mbps).`];
+        return ["ok", `${fmt(mbps)} Mbps (${pct}% do seu plano de ${plano} Mbps).`];
+      }
       return ["ok", `${fmt(mbps)} Mbps.`];
     });
 

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent } from "@/components/ui/card";
@@ -347,11 +347,13 @@ function Detalhe({ d, cliente, onSaved, onOpenOther }: { d: Diag; cliente?: Cli;
         const pd = prov.dados ?? {};
         const offline = pd?.pppoe?.online === false;
         const perdaProv = Number(pd?.ping?.perda_pct ?? prov.perda_pct ?? 0);
-        const resumo: string[] = [];
+        const resumo: string[] = Array.isArray(pd?.resumo) ? [...pd.resumo] : [];
+        if (!Array.isArray(pd?.resumo)) {
         if (offline) resumo.push("Cliente não está conectado ao concentrador");
         if (!offline && perdaProv > 0) resumo.push("Perda de pacotes entre o concentrador e o cliente; verificar enlace/ONU");
         if (!offline && perdaProv === 0 && prov.veredito === "ok" && d.veredito === "falha")
           resumo.push("Rede do provedor ok até o cliente; problema provável no roteador ou Wi-Fi da casa");
+        }
         return (
           <div className="space-y-3 rounded-lg border p-4">
             <h4 className="text-sm font-semibold">Visão do provedor</h4>
@@ -372,7 +374,17 @@ function Detalhe({ d, cliente, onSaved, onOpenOther }: { d: Diag; cliente?: Cli;
                 <Info label="PPPoE" value={pd?.pppoe?.online === false ? "Offline" : pd?.pppoe?.online ? `Online · ${pd.pppoe.uptime ?? ""}` : "—"} />
               </div>
             </div>
-            {pd?.erro && <p className="text-sm text-destructive">Erro do agente: {String(pd.erro)}</p>}
+            {(pd?.quedas || pd?.trafego || pd?.fila || pd?.percentual_plano != null) && (
+              <div className="grid grid-cols-2 gap-3">
+                {pd?.quedas && <Info label="Quedas" value={`${pd.quedas.h24} em 24 h · ${pd.quedas.d7} em 7 dias`} />}
+                {pd?.quedas?.ultima && <Info label="Última queda" value={dt(pd.quedas.ultima)} />}
+                {pd?.trafego && <Info label="Tráfego da sessão agora" value={`↓ ${fmt(pd.trafego.download_mbps)} · ↑ ${fmt(pd.trafego.upload_mbps)} Mbps`} />}
+                {pd?.fila && <Info label="Limite no roteador" value={`↓ ${fmt(pd.fila.download_mbps, 0)} · ↑ ${fmt(pd.fila.upload_mbps, 0)} Mbps`} />}
+                {pd?.percentual_plano != null && <Info label="Velocidade medida" value={`${pd.percentual_plano}% do plano`} />}
+                {pd?.pppoe?.mac && <Info label="MAC do equipamento" value={pd.pppoe.mac} />}
+              </div>
+            )}
+            {pd?.erro && <p className="text-sm text-destructive">{pd?.fonte === "api_rest" ? "Erro ao consultar o MikroTik" : "Erro do agente"}: {String(pd.erro)}</p>}
             <Button size="sm" variant="outline" onClick={() => onOpenOther(prov)}>Abrir diagnóstico do provedor</Button>
           </div>
         );
@@ -449,6 +461,29 @@ export default function DiagnosticosPage() {
   }, [dias, carregarClientes]);
 
   useEffect(() => { carregar(); }, [carregar]);
+
+  // link direto (aviso no WhatsApp): /diagnosticos?id=<uuid>
+  const [params, setParams] = useSearchParams();
+  useEffect(() => {
+    const id = params.get("id");
+    if (!id) return;
+    const achado = rows.find((r) => r.id === id);
+    if (achado) {
+      setSel(achado);
+      params.delete("id");
+      setParams(params, { replace: true });
+    } else if (!loading) {
+      supabase.from("diagnosticos").select("*").eq("id", id).maybeSingle().then(async ({ data }) => {
+        if (data) {
+          await carregarClientes([(data as Diag).cliente_id]);
+          setSel(data as Diag);
+        }
+        params.delete("id");
+        setParams(params, { replace: true });
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, loading]);
 
   useEffect(() => {
     const ch = supabase
