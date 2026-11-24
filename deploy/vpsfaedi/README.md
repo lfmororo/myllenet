@@ -70,3 +70,10 @@ cd /opt/myllenet/app/deploy/vpsfaedi && ./04-frontend.sh --pull
 - o painel é buildado com `VITE_MIKROTIK_AGENT=off`, que esconde o menu "Agente VPS",
   o card do agente e a fila de comandos.
 - requer RouterOS 7.1+ com o serviço `www` (REST) acessível a partir da vpsfaedi.
+
+## Repasse para o MikroTik (08)
+
+Na vpsfaedi, a REST do roteador responde ao host mas não aos containers. O
+`./08-mikrotik-relay.sh 206.42.25.226:8090` sobe um `socat` (network_mode host) em
+`172.17.0.1:18090` e aponta Configurações → MikroTik para `host.docker.internal:18090`.
+O endereço real fica em `MIKROTIK_RELAY_TARGET` no `.env` da stack.
