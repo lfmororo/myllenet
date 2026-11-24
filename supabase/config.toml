@@ -1,4 +1,49 @@
-project_id = "bleenvuqsrvkmxwaoswb"
+project_id = "myllenet"
+
+# Funções sem checagem de JWT no gateway (cada uma faz a própria checagem; ver _shared/auth.ts).
+# Na vpsfaedi a mesma lista está em deploy/vpsfaedi/config.env (NO_VERIFY_JWT_FUNCTIONS).
+
+[functions.efi-boleto]
+verify_jwt = false
+
+[functions.whatsapp-send]
+verify_jwt = false
+
+[functions.user-management]
+verify_jwt = false
+
+[functions.daily-report]
+verify_jwt = false
+
+[functions.due-reminder]
+verify_jwt = false
+
+[functions.cutoff-warning]
+verify_jwt = false
+
+[functions.mikrotik-status]
+verify_jwt = false
+
+[functions.mikrotik-agent-ingest]
+verify_jwt = false
+
+[functions.mikrotik-sync-logs]
+verify_jwt = false
+
+[functions.mikrotik-alerts]
+verify_jwt = false
+
+[functions.mikrotik-sync]
+verify_jwt = false
+
+[functions.auto-block-30d]
+verify_jwt = false
+
+[functions.satisfaction-survey]
+verify_jwt = false
+
+[functions.mercadopago]
+verify_jwt = false
 
 [functions.diagnostico]
 verify_jwt = false
@@ -7,4 +52,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.fatura-publica]
+verify_jwt = false
+
+[functions.google-drive]
 verify_jwt = false

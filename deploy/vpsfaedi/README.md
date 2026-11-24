@@ -35,16 +35,10 @@ cd /opt/myllenet/app/deploy/vpsfaedi && ./04-frontend.sh --pull
 
 ## Edge Functions
 
-- `functions/` (nesta pasta): as funções de Efí, Mercado Pago, WhatsApp, MikroTik,
-  usuários, fatura em PDF etc. Elas foram apagadas do repo em 05/out/2026
-  (commit `c6945c1`, "migracao postgres + remove supabase"), mas continuam publicadas
-  na Lovable Cloud e o painel ainda as chama. Foram recuperadas dessa versão, com os
-  links `myllenet.lovable.app` trocados por `myllenet.mororo.tech`. A `migrate-helper`
-  ficou de fora porque devolvia a service key.
-- `supabase/functions/` (do repo): `diagnostico` e `diagnostico-provedor`. Elas têm
-  prioridade sobre as da pasta acima.
-- O `main/index.ts` da stack recebe uma lista de funções sem checagem de JWT
-  (`NO_VERIFY_JWT_FUNCTIONS` no `config.env`), igual ao `verify_jwt = false` da Lovable.
+Todas ficam em `supabase/functions` (o `04-frontend.sh --pull` copia para a stack).
+`_shared/` tem o que é comum: `auth.ts` (quem pode chamar), `config.ts` (dados da empresa),
+`mikrotik.ts` (API REST do roteador) e `whatsapp.ts`. As funções sem checagem de JWT no gateway
+estão em `NO_VERIFY_JWT_FUNCTIONS` (`config.env`); cada uma faz a própria checagem.
 
 ## O que o 02 faz com o backup
 

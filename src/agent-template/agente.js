@@ -69,7 +69,7 @@ if (CFG.hosts.length === 0) {
   process.exit(1);
 }
 
-const INGEST_URL = `${CFG.apiUrl}/api/functions/mikrotik-agent-ingest`;
+const INGEST_URL = `${CFG.apiUrl}/functions/v1/mikrotik-agent-ingest`;
 const log = (...a) => console.log(`[${new Date().toISOString()}]`, ...a);
 
 // ---------- Mikrotik REST ----------

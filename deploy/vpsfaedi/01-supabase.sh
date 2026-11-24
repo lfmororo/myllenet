@@ -11,7 +11,7 @@ die() { printf '\n\033[1;31mERRO: %s\033[0m\n' "$*" >&2; exit 1; }
 
 command -v docker >/dev/null || die "docker não encontrado"
 docker compose version >/dev/null || die "docker compose não encontrado"
-[ -d "$APP_DIR/deploy/vpsfaedi/functions" ] || die "repo não está em $APP_DIR (veja o README)"
+[ -d "$APP_DIR/supabase/functions/_shared" ] || die "repo não está em $APP_DIR (veja o README)"
 [ -e "$SB_DIR" ] && die "$SB_DIR já existe. Para recriar do zero: cd $SB_DIR && docker compose down -v && cd .. && sudo rm -rf $SB_DIR"
 
 say "Verificando portas livres"

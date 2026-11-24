@@ -98,7 +98,7 @@ export function MikrotikAgentCard() {
         `# Agente: ${agent.name} - ${new Date().toLocaleString("pt-BR")}`,
         "",
         "# Backend do sistema",
-        `API_URL=${import.meta.env.VITE_API_URL || "http://localhost:3333"}`,
+        `API_URL=${import.meta.env.VITE_SUPABASE_URL}`,
         `AGENT_TOKEN=${agent.token}`,
         "",
         "# Mikrotik (cadastrado nas configurações do sistema)",

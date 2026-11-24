@@ -1,10 +1,16 @@
 # Client Connect Pro
 
-Sistema de cadastro de clientes provedor de internet, com backend Fastify + PostgreSQL
+Sistema de gestão para provedor de internet (MyLLENET): React/Vite no painel e Supabase
+auto-hospedado (Postgres, Auth, Edge Functions) na vpsfaedi.
+
+- Painel: https://myllenet.mororo.tech · API: https://api-myllenet.mororo.tech
+- Implantação e manutenção: `deploy/vpsfaedi/README.md` (scripts numerados 01–17)
+- Edge Functions: `supabase/functions` · Migrations: `supabase/migrations`
+- Testes: `npm test` (painel) e `tests/sql/regras_cobranca.sql` (regras de bloqueio, roda pelo 17)
 
 This project was built with [Lovable](https://lovable.dev).
 
-**Live app**: https://myllenet.lovable.app
+**Live app**: https://myllenet.mororo.tech (a versão na Lovable foi desativada em 24/11/2026)
 
 ## Build with Lovable
 

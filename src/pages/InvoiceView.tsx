@@ -10,7 +10,6 @@ import { jsPDF } from "jspdf";
 import QRCode from "qrcode";
 import { maskCustomerName, maskDocument, maskedCustomerLocation } from "@/lib/privacy";
 
-const API_URL = (import.meta.env.VITE_API_URL as string) || "http://localhost:3333";
 
 const InvoiceView = () => {
   const [copying, setCopying] = useState(false);
@@ -20,17 +19,12 @@ const InvoiceView = () => {
   const { data, isLoading, error } = useQuery({
     queryKey: ["public-invoice", id],
     queryFn: async () => {
-      // Backend Supabase (VPS e Lovable): Edge Function pública fatura-publica
-      if (((import.meta.env.VITE_BACKEND as string) || "supabase") === "supabase") {
-        const base = import.meta.env.VITE_SUPABASE_URL as string;
-        const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
-        const res = await fetch(`${base}/functions/v1/fatura-publica?id=${encodeURIComponent(id || "")}`, {
-          headers: { apikey: key, Authorization: `Bearer ${key}` },
-        });
-        if (!res.ok) throw new Error("Fatura não encontrada");
-        return res.json();
-      }
-      const res = await fetch(`${API_URL}/api/public/invoice/${id}`);
+      // Edge Function pública fatura-publica (dados mascarados)
+      const base = import.meta.env.VITE_SUPABASE_URL as string;
+      const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
+      const res = await fetch(`${base}/functions/v1/fatura-publica?id=${encodeURIComponent(id || "")}`, {
+        headers: { apikey: key, Authorization: `Bearer ${key}` },
+      });
       if (!res.ok) throw new Error("Fatura não encontrada");
       return res.json();
     },
