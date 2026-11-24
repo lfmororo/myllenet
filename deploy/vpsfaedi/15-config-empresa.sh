@@ -24,8 +24,9 @@ SQL
 psql_admin -c "select key, value from public.settings where key in ('provedor_nome','atendimento_telefone','url_painel','fatura_slogan','admin_whatsapp') order by 1"
 
 echo "==> Sobrou algum valor fixo nas functions publicadas?"
-grep -rln "85986801458\|98680-1458\|Mororo\.Tech\|myllenet\.mororo\.tech" "$SB_DIR/volumes/functions" --include=index.ts \
-  | grep -v "_shared/config.ts" | sed 's/^/  /' || echo "  nenhum (fora os valores padrão em _shared/config.ts)"
+SOBRA=$(grep -rn "85986801458\|98680-1458\|Mororo\.Tech\|myllenet\.mororo\.tech" "$SB_DIR/volumes/functions" --include=index.ts \
+  | grep -v "let PROVEDOR = \|let PAINEL = \|ADMIN_PADRAO = \|PAINEL_URL\") ||" || true)
+[ -n "$SOBRA" ] && printf '%s\n' "$SOBRA" | sed 's/^/  /' || echo "  nenhum (só os valores padrão usados se a configuração estiver vazia)"
 
 echo "==> Teste: fatura pública traz os dados da empresa"
 FID=$(psql_admin -tAc "select id from public.invoices order by created_at desc limit 1")
