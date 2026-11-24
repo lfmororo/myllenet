@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { AlertTriangle, Copy, Loader2, Search } from "lucide-react";
+import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { toast } from "sonner";
 
 type Diag = {
@@ -386,6 +387,38 @@ function Detalhe({ d, cliente, onSaved, onOpenOther }: { d: Diag; cliente?: Cli;
             )}
             {pd?.erro && <p className="text-sm text-destructive">{pd?.fonte === "api_rest" ? "Erro ao consultar o MikroTik" : "Erro do agente"}: {String(pd.erro)}</p>}
             <Button size="sm" variant="outline" onClick={() => onOpenOther(prov)}>Abrir diagnóstico do provedor</Button>
+          </div>
+        );
+      })()}
+
+      {(() => {
+        const serie = [d, ...outros]
+          .filter((x) => x.origem === "navegador" && (x.download_mbps != null || x.latencia_ms != null))
+          .sort((a, b) => a.criado_em.localeCompare(b.criado_em))
+          .map((x) => ({
+            quando: new Date(x.criado_em).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }),
+            download: x.download_mbps != null ? Number(Number(x.download_mbps).toFixed(1)) : null,
+            latencia: x.latencia_ms != null ? Math.round(Number(x.latencia_ms)) : null,
+          }));
+        if (serie.length < 2) return null;
+        return (
+          <div>
+            <h4 className="mb-2 text-sm font-semibold">Evolução deste cliente</h4>
+            <div className="h-52 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={serie} margin={{ top: 5, right: 8, bottom: 0, left: -12 }}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                  <XAxis dataKey="quando" tick={{ fontSize: 11 }} />
+                  <YAxis yAxisId="mbps" tick={{ fontSize: 11 }} />
+                  <YAxis yAxisId="ms" orientation="right" tick={{ fontSize: 11 }} />
+                  <Tooltip />
+                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                  {plano && <Line yAxisId="mbps" dataKey={() => plano} name={`Plano (${plano} Mbps)`} stroke="hsl(var(--muted-foreground))" strokeDasharray="4 4" dot={false} />}
+                  <Line yAxisId="mbps" type="monotone" dataKey="download" name="Download (Mbps)" stroke="hsl(var(--primary))" strokeWidth={2} connectNulls />
+                  <Line yAxisId="ms" type="monotone" dataKey="latencia" name="Latência (ms)" stroke="hsl(var(--destructive))" strokeWidth={1.5} connectNulls />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         );
       })()}

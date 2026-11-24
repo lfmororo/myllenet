@@ -32,9 +32,12 @@ function ipInCidr(ip: string, cidr: string): boolean {
   return ((ipInt & mask) >>> 0) === ((baseInt & mask) >>> 0);
 }
 
+// IP do cliente: X-Real-IP gravado pelo Traefik (o cliente não consegue forjar);
+// o primeiro item do X-Forwarded-For só como último recurso.
 function getIp(req: Request): string {
-  let ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    req.headers.get("cf-connecting-ip")?.trim() || "";
+  let ip = req.headers.get("x-real-ip")?.trim() ||
+    req.headers.get("cf-connecting-ip")?.trim() ||
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "";
   if (ip.startsWith("::ffff:")) ip = ip.slice(7);
   return ip;
 }
@@ -275,10 +278,14 @@ Deno.serve(async (req) => {
 
     const { data: cliente } = await supabase
       .from("customers")
-      .select("id, nome, usuario_pppoe, plan_id, plans(nome, nome_servidor)")
+      .select("id, nome, usuario_pppoe, plan_id, diagnostico_token_expira, plans(nome, nome_servidor)")
       .eq("diagnostico_token", token)
       .maybeSingle();
     if (!cliente) return json({ erro: "Link inválido ou expirado" }, 404);
+    const expira = (cliente as any).diagnostico_token_expira;
+    if (expira && new Date(expira).getTime() < Date.now()) {
+      return json({ erro: "Link expirado. Peça um novo link ao atendimento." }, 410);
+    }
 
     const { data: cfg } = await supabase
       .from("config_diagnostico")
@@ -290,11 +297,13 @@ Deno.serve(async (req) => {
     const faixas: string[] = cfg?.faixas_ip ?? [];
     let naRede = !!ip && faixas.some((c) => ipInCidr(ip, c));
     if (!naRede && ip) {
-      // Compara com os IPs das sessões PPPoE ativas no MikroTik (últimos 15 min)
-      const desde = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+      // Só conta como "na rede" se o IP for o da sessão PPPoE DESTE cliente (últimas 2 h);
+      // antes valia o IP de qualquer cliente, o que aceitava um teste feito na conexão do vizinho.
+      const desde = new Date(Date.now() - 2 * 3600 * 1000).toISOString();
       const { data: sess } = await supabase
         .from("pppoe_logs")
         .select("id")
+        .eq("customer_id", cliente.id)
         .eq("ip_address", ip)
         .gte("logged_at", desde)
         .limit(1);

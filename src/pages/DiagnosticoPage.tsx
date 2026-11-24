@@ -267,6 +267,10 @@ export default function DiagnosticoPage() {
         if (s > 0) setDown((bytes * 8) / s / 1e6);
       }, 250);
       const timer = setTimeout(() => ctrl.abort(), duracao);
+      // descarta o início (aceleração do TCP): mede só depois do aquecimento
+      const aquecimento = Math.min(2000, duracao * 0.25);
+      let bAq = 0, tAq = 0;
+      const tmAq = setTimeout(() => { bAq = bytes; tAq = performance.now(); }, aquecimento);
       const loop = async () => {
         while (!ctrl.signal.aborted) {
           try {
@@ -287,11 +291,16 @@ export default function DiagnosticoPage() {
       };
       await Promise.all(Array.from({ length: fluxos }, loop));
       clearTimeout(timer);
+      clearTimeout(tmAq);
       clearInterval(tick);
-      const s = (performance.now() - t0) / 1000;
-      const mbps = (bytes * 8) / s / 1e6;
+      const fim = performance.now();
+      const s = (fim - t0) / 1000;
+      const mediaTotal = (bytes * 8) / s / 1e6;
+      const mbps = tAq && fim - tAq > 500 ? ((bytes - bAq) * 8) / ((fim - tAq) / 1000) / 1e6 : mediaTotal;
       setDown(mbps);
       rel.velocidade.download_mbps = mbps;
+      rel.velocidade.download_media_total_mbps = mediaTotal;
+      rel.velocidade.aquecimento_ms = aquecimento;
       rel.velocidade.download_bytes = bytes;
       if (bytes === 0) return ["falha", "Não foi possível baixar dados."];
       const plano = inicial.plano_mbps;
@@ -318,6 +327,9 @@ export default function DiagnosticoPage() {
         if (s > 0) setUp((bytes * 8) / s / 1e6);
       }, 250);
       const timer = setTimeout(() => ctrl.abort(), duracao);
+      const aquecimento = Math.min(2000, duracao * 0.25);
+      let bAq = 0, tAq = 0;
+      const tmAq = setTimeout(() => { bAq = bytes; tAq = performance.now(); }, aquecimento);
       const loop = async () => {
         while (!ctrl.signal.aborted) {
           try {
@@ -336,9 +348,13 @@ export default function DiagnosticoPage() {
       };
       await Promise.all(Array.from({ length: fluxos }, loop));
       clearTimeout(timer);
+      clearTimeout(tmAq);
       clearInterval(tick);
-      const s = (performance.now() - t0) / 1000;
-      const mbps = (bytes * 8) / s / 1e6;
+      const fim = performance.now();
+      const s = (fim - t0) / 1000;
+      const mediaTotal = (bytes * 8) / s / 1e6;
+      const mbps = tAq && fim - tAq > 500 && bytes > bAq ? ((bytes - bAq) * 8) / ((fim - tAq) / 1000) / 1e6 : mediaTotal;
+      rel.velocidade.upload_media_total_mbps = mediaTotal;
       setUp(mbps);
       rel.velocidade.upload_mbps = mbps;
       rel.velocidade.upload_bytes = bytes;

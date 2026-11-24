@@ -330,13 +330,20 @@ export default function CustomerDetailDialog({
   };
 
   const handleSendDiagLink = async () => {
-    if (!customer || !diagLinkInfo?.token) return;
+    if (!customer || !diagLinkInfo) return;
     if (!customer.telefone) {
       toast.error("Cliente sem telefone cadastrado");
       return;
     }
+    // cada envio gera um link novo, com validade (Configurações: diagnostico_link_dias, padrão 7)
+    const { data: novoToken, error: erroToken } = await api.rpc("renovar_link_diagnostico", { p_customer: customer.id });
+    if (erroToken || !novoToken) {
+      toast.error("Não foi possível gerar o link: " + (erroToken?.message || "sem retorno"));
+      return;
+    }
+    setDiagLinkInfo({ ...diagLinkInfo, token: String(novoToken) });
     const base = (diagLinkInfo.url || window.location.origin).replace(/\/$/, "");
-    const link = `${base}/diagnostico?c=${diagLinkInfo.token}`;
+    const link = `${base}/diagnostico?c=${novoToken}`;
     const firstName = customer.nome.split(" ")[0];
     const template =
       diagLinkInfo.mensagem ||
@@ -604,7 +611,7 @@ export default function CustomerDetailDialog({
                  size="sm"
                  variant="outline"
                  className="h-8 text-xs"
-                 disabled={sendingDiagLink || !diagLinkInfo?.token}
+                 disabled={sendingDiagLink || !diagLinkInfo}
                  onClick={handleSendDiagLink}
                >
                  {sendingDiagLink ? (
