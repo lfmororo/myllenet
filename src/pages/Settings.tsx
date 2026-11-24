@@ -69,6 +69,7 @@ export default function Settings() {
   const [mikrotikApiPort, setMikrotikApiPort] = useState("8728");
   const [mikrotikRestPort, setMikrotikRestPort] = useState("80");
   const [blockingDays, setBlockingDays] = useState("15");
+  const [avisoCorteDias, setAvisoCorteDias] = useState("5");
   const [alertOfflineMinutes, setAlertOfflineMinutes] = useState("5");
   const [alertFailureCount, setAlertFailureCount] = useState("3");
 
@@ -166,7 +167,7 @@ export default function Settings() {
     const { data } = await api
       .from("settings")
       .select("key, value")
-      .in("key", ["payment_gateway", "mercadopago_access_token", "efi_client_id", "efi_client_secret", "efi_certificate_path", "uazapi_token", "whatsapp_provider", "evolution_base_url", "evolution_api_key", "evolution_instance", "mikrotik_host", "mikrotik_host_secondary", "mikrotik_username", "mikrotik_password", "mikrotik_api_port", "mikrotik_rest_port", "blocking_days", "pix_key", "pix_name", "pix_city", "mikrotik_alert_offline_minutes", "mikrotik_alert_failure_count", "admin_whatsapp"]);
+      .in("key", ["payment_gateway", "mercadopago_access_token", "efi_client_id", "efi_client_secret", "efi_certificate_path", "uazapi_token", "whatsapp_provider", "evolution_base_url", "evolution_api_key", "evolution_instance", "mikrotik_host", "mikrotik_host_secondary", "mikrotik_username", "mikrotik_password", "mikrotik_api_port", "mikrotik_rest_port", "blocking_days", "aviso_corte_dias_antes", "pix_key", "pix_name", "pix_city", "mikrotik_alert_offline_minutes", "mikrotik_alert_failure_count", "admin_whatsapp"]);
 
     if (data) {
       for (const row of data) {
@@ -188,6 +189,7 @@ export default function Settings() {
         if (row.key === "mikrotik_api_port") setMikrotikApiPort(row.value || "8728");
         if (row.key === "mikrotik_rest_port") setMikrotikRestPort(row.value || "80");
         if (row.key === "blocking_days") setBlockingDays(row.value || "15");
+        if (row.key === "aviso_corte_dias_antes") setAvisoCorteDias(row.value || "5");
         if (row.key === "pix_key") setPixKey(row.value || "");
         if (row.key === "pix_name") setPixName(row.value || "");
         if (row.key === "pix_city") setPixCity(row.value || "");
@@ -930,6 +932,22 @@ export default function Settings() {
                       </p>
                     </div>
 
+                    <div className="space-y-2">
+                      <Label htmlFor="aviso_corte_dias_antes">Avisar o cliente quantos dias antes do bloqueio</Label>
+                      <Input
+                        id="aviso_corte_dias_antes"
+                        type="number"
+                        min="1"
+                        max="30"
+                        value={avisoCorteDias}
+                        onChange={(e) => setAvisoCorteDias(e.target.value)}
+                        placeholder="5"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        O cliente recebe no WhatsApp a data exata do bloqueio. O bloqueio automático roda às 23h.
+                      </p>
+                    </div>
+
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="alert_offline_minutes">Minutos Offline p/ Alerta</Label>
@@ -967,6 +985,7 @@ export default function Settings() {
                           await upsertSetting("mikrotik_api_port", mikrotikApiPort);
                           await upsertSetting("mikrotik_rest_port", mikrotikRestPort);
                           await upsertSetting("blocking_days", blockingDays);
+                          await upsertSetting("aviso_corte_dias_antes", avisoCorteDias);
                           await upsertSetting("mikrotik_alert_offline_minutes", alertOfflineMinutes);
                           await upsertSetting("mikrotik_alert_failure_count", alertFailureCount);
                           toast.success("Configurações Mikrotik salvas!");

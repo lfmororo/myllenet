@@ -1,199 +1,137 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+// cutoff-warning — avisa o CLIENTE, N dias antes, que o sinal será bloqueado
+//
+// Usa a mesma regra e a mesma data do bloqueio automático:
+//   - public.clientes_a_bloquear(data) = quem será bloqueado na execução daquele dia
+//   - datas no fuso America/Fortaleza (public.hoje_local())
+//   - N = settings.aviso_corte_dias_antes (padrão 5)
+// Cada cliente recebe o aviso uma vez: no dia em que passa a constar na lista de daqui a N dias.
+import { createClient } from "npm:@supabase/supabase-js@2";
 import { waSendText, waSendSupportButton } from "../_shared/whatsapp.ts";
 import { exigir } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+const BOT_DISCLAIMER =
+  "\n\n🤖 _Esta é uma mensagem automática. Para falar com um atendente, entre em contato: (85) 98680-1458_";
+
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+const brl = (c: number) => (Number(c || 0) / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const dataBR = (d: string) => d.slice(0, 10).split("-").reverse().join("/");
+const somaDias = (iso: string, n: number) => {
+  const d = new Date(`${iso}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
 };
 
-const BOT_DISCLAIMER = "\n\n🤖 _Esta é uma mensagem automática. Para falar com um atendente, entre em contato: (85) 98680-1458_";
-const DAYS_OVERDUE_THRESHOLD = 15;
-const DAYS_UNTIL_CUTOFF = 5;
-
-function getSupabaseAdmin() {
-  return createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-  );
-}
-
-async function sendWhatsApp(phone: string, message: string) {
-  try {
-    await waSendText(phone, message);
-    return true;
-  } catch (err) {
-    console.error("WhatsApp send error:", err);
-    return false;
-  }
-}
-
-async function sendSupportButton(phone: string) {
-  await waSendSupportButton(phone);
-}
-
-async function logNotification(supabase: any, params: {
-  customer_id?: string;
-  customer_name: string;
-  phone?: string;
-  type: string;
-  message: string;
-  status: "sent" | "failed";
-  error_message?: string;
-}) {
-  try {
-    await supabase.from("notification_logs").insert({
-      customer_id: params.customer_id || null,
-      customer_name: params.customer_name,
-      phone: params.phone || null,
-      type: params.type,
-      message: params.message,
-      status: params.status,
-      error_message: params.error_message || null,
-    });
-  } catch (err) {
-    console.error("Failed to log notification:", err);
-  }
-}
-
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   const negado = await exigir(req, "interno");
   if (negado) return negado;
 
   try {
-    const supabase = getSupabaseAdmin();
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const body = await req.json().catch(() => ({}));
+    const simular = body?.simular === true; // só lista, não envia
 
-    // Calculate the date that is exactly DAYS_OVERDUE_THRESHOLD days ago
-    const thresholdDate = new Date(today);
-    thresholdDate.setDate(thresholdDate.getDate() - DAYS_OVERDUE_THRESHOLD);
-    const thresholdStr = `${thresholdDate.getFullYear()}-${String(thresholdDate.getMonth() + 1).padStart(2, "0")}-${String(thresholdDate.getDate()).padStart(2, "0")}`;
+    const { data: hoje, error: eHoje } = await supabase.rpc("hoje_local");
+    if (eHoje) throw eHoje;
+    const { data: cfg } = await supabase
+      .from("settings")
+      .select("key, value")
+      .in("key", ["aviso_corte_dias_antes", "blocking_days"]);
+    const s: Record<string, string> = {};
+    for (const r of cfg || []) s[r.key] = r.value ?? "";
+    const diasAntes = Math.max(1, parseInt(s.aviso_corte_dias_antes || "5", 10) || 5);
+    const diasBloqueio = Math.max(1, parseInt(s.blocking_days || "15", 10) || 15);
 
-    console.log(`Checking invoices due on or before ${thresholdStr} (${DAYS_OVERDUE_THRESHOLD}+ days overdue)`);
-
-    // Get overdue invoices that are exactly 15 days overdue (vencimento = thresholdDate)
-    // to avoid sending duplicate notifications
-    const { data: overdueInvoices } = await supabase
-      .from("invoices")
-      .select("*, customers(nome, telefone, cpf, usuario_pppoe)")
-      .eq("vencimento", thresholdStr)
-      .in("status", ["pending", "overdue"]);
-
-    const invoices = overdueInvoices || [];
-
-    if (invoices.length === 0) {
-      console.log("No invoices exactly 15 days overdue today.");
-      return new Response(JSON.stringify({
-        message: `Nenhuma fatura com exatamente ${DAYS_OVERDUE_THRESHOLD} dias de atraso hoje.`,
-        sent: 0,
-        failed: 0,
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const formatCurrency = (v: number) =>
-      (v / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-    const formatDate = (d: string) => {
-      const [y, m, day] = d.split("-");
-      return `${day}/${m}/${y}`;
+    const dataCorte = somaDias(String(hoje), diasAntes);
+    const lista = async (d: string) => {
+      const { data, error } = await supabase.rpc("clientes_a_bloquear", { p_data_execucao: d });
+      if (error) throw error;
+      return (data || []) as any[];
     };
+    // entram hoje na lista de "bloqueio daqui a N dias" (não estavam na de N-1 dias)
+    const ontem = new Set((await lista(somaDias(dataCorte, -1))).map((c) => c.customer_id));
+    const alvos = (await lista(dataCorte)).filter((c) => !ontem.has(c.customer_id));
 
     let sent = 0;
     let failed = 0;
     const skipped: string[] = [];
+    const previa: any[] = [];
 
-    for (const inv of invoices) {
-      const customer = (inv as any).customers;
-      if (!customer?.telefone) {
-        skipped.push(customer?.nome || inv.customer_id);
-        continue;
-      }
+    for (const c of alvos) {
+      // faturas que vão causar o bloqueio (vencimento <= data do corte - dias de bloqueio)
+      const limite = somaDias(dataCorte, -diasBloqueio);
+      const { data: faturas } = await supabase
+        .from("invoices")
+        .select("id, descricao, valor_centavos, vencimento")
+        .eq("customer_id", c.customer_id)
+        .in("status", ["pending", "overdue"])
+        .lte("vencimento", limite)
+        .order("vencimento", { ascending: true });
+      const fs = faturas || [];
+      previa.push({ cliente: c.nome, telefone: c.telefone, corte: dataCorte, faturas: fs.length, total: c.valor_centavos });
+      if (simular) continue;
+      if (!c.telefone) { skipped.push(c.nome); continue; }
 
-      const nome = customer.nome.split(" ")[0];
-      const invoiceUrl = `https://myllenet.mororo.tech/fatura/${inv.id}`;
+      const nome = String(c.nome || "").split(" ")[0];
+      const linhas = fs.map((f: any) =>
+        `📋 ${f.descricao} — ${brl(f.valor_centavos)} (venc. ${dataBR(f.vencimento)})\n🔗 https://myllenet.mororo.tech/fatura/${f.id}`
+      );
       const message = `Olá ${nome}! 🌐
 
 ⚠️ *AVISO IMPORTANTE da Mororo.Tech*
 
-Sua fatura está com *${DAYS_OVERDUE_THRESHOLD} dias de atraso*:
+${fs.length > 1 ? "Você tem faturas em aberto" : "Sua fatura está em aberto"}:
 
-📋 ${inv.descricao}
-💰 Valor: ${formatCurrency(inv.valor_centavos)}
-📅 Vencimento: ${formatDate(inv.vencimento)}
+${linhas.join("\n\n")}
 
-🔗 *Link da Fatura:* ${invoiceUrl}
+💰 Total: ${brl(c.valor_centavos)}
 
-🚨 *Seu sinal será cortado em ${DAYS_UNTIL_CUTOFF} dias* caso o pagamento não seja regularizado.
+🚨 *Seu sinal será bloqueado em ${dataBR(dataCorte)}* caso o pagamento não seja regularizado até lá.
 
-Regularize agora para evitar a suspensão do serviço!
+Pague pelo link acima para evitar a suspensão do serviço.
 
-_Equipe Mororo.Tech_`;
+_Equipe Mororo.Tech_${BOT_DISCLAIMER}`;
 
+      let erro: string | null = null;
       try {
-        const fullMessage = message + BOT_DISCLAIMER;
-        const ok = await sendWhatsApp(customer.telefone, fullMessage);
-        if (ok) {
-          await sendSupportButton(customer.telefone);
-          sent++;
-          await logNotification(supabase, {
-            customer_id: inv.customer_id,
-            customer_name: customer.nome,
-            phone: customer.telefone,
-            type: "aviso_corte",
-            message: fullMessage,
-            status: "sent",
-          });
-        } else {
-          failed++;
-          await logNotification(supabase, {
-            customer_id: inv.customer_id,
-            customer_name: customer.nome,
-            phone: customer.telefone,
-            type: "aviso_corte",
-            message,
-            status: "failed",
-            error_message: "WhatsApp API returned non-ok status",
-          });
-        }
-      } catch (err) {
-        console.error(`Failed to send cutoff warning to ${customer.nome}:`, err);
+        await waSendText(c.telefone, message);
+        await waSendSupportButton(c.telefone).catch(() => {});
+        sent++;
+      } catch (e) {
+        erro = (e as Error).message;
         failed++;
-        await logNotification(supabase, {
-          customer_id: inv.customer_id,
-          customer_name: customer.nome,
-          phone: customer.telefone,
-          type: "aviso_corte",
-          message,
-          status: "failed",
-          error_message: err.message,
-        });
       }
-
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      await supabase.from("notification_logs").insert({
+        customer_id: c.customer_id,
+        customer_name: c.nome,
+        phone: c.telefone,
+        type: "aviso_corte",
+        message,
+        status: erro ? "failed" : "sent",
+        error_message: erro,
+      });
+      await new Promise((r) => setTimeout(r, 1500));
     }
 
     const result = {
-      invoices_15_days_overdue: invoices.length,
+      hoje,
+      data_corte: dataCorte,
+      dias_antes: diasAntes,
+      clientes: alvos.length,
       sent,
       failed,
       skipped_no_phone: skipped.length,
+      ...(simular ? { previa } : {}),
     };
     console.log("Cutoff warning result:", result);
-
-    return new Response(JSON.stringify(result), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return json(result);
   } catch (err) {
     console.error("Cutoff warning error:", err);
-    return new Response(
-      JSON.stringify({ error: err.message || "Erro interno" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return json({ error: (err as Error).message || "Erro interno" }, 500);
   }
 });

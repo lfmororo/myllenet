@@ -16,6 +16,9 @@ echo "==> Banco: função de prévia, trigger do aviso imediato e agendamento"
 psql_admin -v key="$SERVICE_ROLE_KEY" <<'SQL'
 alter table public.block_alerts_sent add column if not exists admin_notified boolean default false;
 
+create or replace function public.hoje_local() returns date
+language sql stable as $$ select (now() at time zone 'America/Fortaleza')::date $$;
+
 -- mesmos critérios do check_and_block_overdue_customers(), para uma data de execução
 create or replace function public.clientes_a_bloquear(p_data_execucao date)
 returns table (customer_id uuid, nome text, telefone text, usuario_pppoe text, faturas int,
@@ -83,8 +86,8 @@ $c$);
 SQL
 
 echo "==> Quem seria bloqueado hoje e amanhã (conferência, sem enviar nada)"
-psql_admin -c "select 'hoje 23h' quando, * from public.clientes_a_bloquear((now() at time zone 'utc')::date + 1)
-  union all select 'amanhã 23h', * from public.clientes_a_bloquear((now() at time zone 'utc')::date + 2)"
+psql_admin -c "select 'hoje 23h' quando, * from public.clientes_a_bloquear(public.hoje_local())
+  union all select 'amanhã 23h', * from public.clientes_a_bloquear(public.hoje_local() + 1)"
 psql_admin -c "select key, value from public.settings where key = 'admin_whatsapp'"
 
 echo

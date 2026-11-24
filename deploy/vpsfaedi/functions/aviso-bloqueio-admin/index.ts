@@ -63,21 +63,21 @@ async function enviar(supabase: any, tipo: string, texto: string, customer?: { i
 }
 
 async function previa(supabase: any) {
-  // O bloqueio automático roda às 02:00 UTC (23:00 em Brasília) e usa a data UTC do momento.
-  const agora = new Date();
-  const hoje23h = new Date(Date.UTC(agora.getUTCFullYear(), agora.getUTCMonth(), agora.getUTCDate() + 1));
-  const amanha23h = new Date(hoje23h.getTime() + 86400000);
+  // O bloqueio automático roda às 23:00 (Brasília) e usa a data local (public.hoje_local()).
+  const { data: hoje, error: eHoje } = await supabase.rpc("hoje_local");
+  if (eHoje) throw eHoje;
+  const amanhaIso = new Date(new Date(`${hoje}T12:00:00Z`).getTime() + 86400000).toISOString().slice(0, 10);
 
-  const lista = async (d: Date) => {
-    const { data, error } = await supabase.rpc("clientes_a_bloquear", { p_data_execucao: isoDia(d) });
+  const lista = async (d: string) => {
+    const { data, error } = await supabase.rpc("clientes_a_bloquear", { p_data_execucao: d });
     if (error) throw error;
     return (data || []) as any[];
   };
-  const hoje = await lista(hoje23h);
-  const idsHoje = new Set(hoje.map((c) => c.customer_id));
-  const amanha = (await lista(amanha23h)).filter((c) => !idsHoje.has(c.customer_id));
+  const hojeLista = await lista(String(hoje));
+  const idsHoje = new Set(hojeLista.map((c) => c.customer_id));
+  const amanha = (await lista(amanhaIso)).filter((c) => !idsHoje.has(c.customer_id));
 
-  if (!hoje.length && !amanha.length) return { hoje: 0, amanha: 0, enviados: 0 };
+  if (!hojeLista.length && !amanha.length) return { hoje: 0, amanha: 0, enviados: 0 };
 
   const linha = (c: any) =>
     `• *${c.nome}*${c.usuario_pppoe ? ` (${c.usuario_pppoe})` : ""}\n` +
@@ -85,11 +85,11 @@ async function previa(supabase: any) {
 
   const partes = [`⏰ *AVISO DE BLOQUEIO PROGRAMADO*`];
   if (amanha.length) partes.push(`\n*Amanhã às 23h* — ${amanha.length} cliente(s):\n${amanha.map(linha).join("\n")}`);
-  if (hoje.length) partes.push(`\n*Hoje às 23h* — ${hoje.length} cliente(s):\n${hoje.map(linha).join("\n")}`);
+  if (hojeLista.length) partes.push(`\n*Hoje às 23h* — ${hojeLista.length} cliente(s):\n${hojeLista.map(linha).join("\n")}`);
   partes.push(`\nO bloqueio só não acontece se as faturas forem pagas ou se o cliente for marcado como inativo antes do horário.`);
 
   const r = await enviar(supabase, "admin_previa_bloqueio", partes.join("\n"));
-  return { hoje: hoje.length, amanha: amanha.length, ...r };
+  return { hoje: hojeLista.length, amanha: amanha.length, ...r };
 }
 
 async function bloqueado(supabase: any, body: any) {
